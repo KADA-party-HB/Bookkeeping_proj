@@ -269,7 +269,6 @@ def admin_furn_new():
 
     furnishing_kind = request.form.get("furnishing_kind","").strip()
     weight_kg = request.form.get("weight_kg","").strip() or None
-    power_watts = request.form.get("power_watts","").strip() or None
     notes = request.form.get("notes","").strip() or None
 
     if not sku or not display_name or daily_rate=="" or not furnishing_kind:
@@ -279,7 +278,7 @@ def admin_furn_new():
     try:
         row = query(SQL_ADD_FURNISHING_ITEM, (
             sku, display_name, daily_rate,
-            furnishing_kind, weight_kg, power_watts, notes
+            furnishing_kind, weight_kg, notes
         ), one=True, commit=True)
         flash(f"Furnishing created (item_id={row['new_item_id']}).", "success")
     except Exception as e:

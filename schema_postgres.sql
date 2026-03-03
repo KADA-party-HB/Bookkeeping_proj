@@ -66,10 +66,8 @@ CREATE TABLE furnishings (
   item_id INT PRIMARY KEY REFERENCES items(id) ON DELETE CASCADE,
   furnishing_kind VARCHAR(100) NOT NULL,
   weight_kg NUMERIC(5,2),
-  power_watts INT,
   notes TEXT,
-  CONSTRAINT chk_furn_weight CHECK (weight_kg IS NULL OR weight_kg >= 0),
-  CONSTRAINT chk_furn_power CHECK (power_watts IS NULL OR power_watts >= 0)
+  CONSTRAINT chk_furn_weight CHECK (weight_kg IS NULL OR weight_kg >= 0)
 );
 
 -- subtype enforcement (tents XOR furnishings)
@@ -213,7 +211,6 @@ CREATE OR REPLACE FUNCTION add_furnishing_item(
   p_daily_rate NUMERIC(10,2),
   p_furnishing_kind VARCHAR,
   p_weight_kg NUMERIC(5,2) DEFAULT NULL,
-  p_power_watts INT DEFAULT NULL,
   p_notes TEXT DEFAULT NULL
 )
 RETURNS INT LANGUAGE plpgsql AS $$
@@ -223,8 +220,8 @@ BEGIN
   VALUES (p_sku, p_display_name, p_daily_rate)
   RETURNING id INTO v_item_id;
 
-  INSERT INTO furnishings (item_id, furnishing_kind, weight_kg, power_watts, notes)
-  VALUES (v_item_id, p_furnishing_kind, p_weight_kg, p_power_watts, p_notes);
+  INSERT INTO furnishings (item_id, furnishing_kind, weight_kg, notes)
+  VALUES (v_item_id, p_furnishing_kind, p_weight_kg, p_notes);
 
   RETURN v_item_id;
 END$$;

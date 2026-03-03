@@ -15,8 +15,8 @@
         <a class="text-sm text-slate-700 hover:text-slate-900" href="{{ url_for('routes.customers') }}">Customer</a>
 
         {% if session.get('role') == 'admin' %}
-          <a class="text-sm text-slate-700 hover:text-slate-900" href="{{ url_for('routes.admin_items') }}">Admin: Items</a>
-          <a class="text-sm text-slate-700 hover:text-slate-900" href="{{ url_for('routes.admin_bookings') }}">Admin: Bookings</a>
+          <a class="text-sm text-slate-700 hover:text-slate-900" href="{{ url_for('routes.admin_items') }}">Items</a>
+          <a class="text-sm text-slate-700 hover:text-slate-900" href="{{ url_for('routes.admin_bookings') }}">Bookings</a>
         {% endif %}
 
         <span class="ml-auto text-sm text-slate-500">Role: {{ session.get('role') }}</span>

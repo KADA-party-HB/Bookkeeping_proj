@@ -51,7 +51,7 @@ SELECT
   (t.item_id IS NOT NULL) AS is_tent,
   t.capacity, t.season_rating, t.estimated_build_time_minutes, t.construction_cost, t.deconstruction_cost,
   (f.item_id IS NOT NULL) AS is_furnishing,
-  f.furnishing_kind, f.power_watts
+  f.furnishing_kind, f.notes
 FROM items i
 LEFT JOIN tents t ON t.item_id = i.id
 LEFT JOIN furnishings f ON f.item_id = i.id
@@ -93,7 +93,7 @@ SELECT add_tent_item(
 SQL_ADD_FURNISHING_ITEM = """
 SELECT add_furnishing_item(
   %s, %s, %s,
-  %s, %s, %s, %s
+  %s, %s, %s
 ) AS new_item_id;
 """
 
