@@ -168,7 +168,6 @@ def upsert_furnishing(
 def main():
     conn = get_conn()
     try:
-        # One transaction so the deferred subtype trigger is satisfied
         with conn.transaction():
             admin_id = upsert_admin(conn)
             print(f"Admin user upserted: id={admin_id}, email={ADMIN_EMAIL}")
@@ -184,7 +183,6 @@ def main():
             print(f"Customer profile upserted: id={temp_customer_id}, user_id={temp_user_id}")
             print(f"Temporary user upserted: id={temp_user_id}, email={TEMP_USER_EMAIL}")
 
-            # --- Furnishings (from the image) ---
             # Table
             item_id = upsert_item(conn, sku="FURN-TABLE-01", display_name="Table (1 st)", daily_rate=Decimal("80"))
             upsert_furnishing(
