@@ -6,7 +6,7 @@ from .sql import (
     SQL_LIST_CUSTOMERS, SQL_GET_CUSTOMER, SQL_GET_CUSTOMER_BY_USER_ID, SQL_CREATE_CUSTOMER,
     SQL_LIST_BOOKINGS_FOR_CUSTOMER,
 
-    # booking (A1)
+    # booking
     SQL_AVAILABLE_CATEGORIES, SQL_CREATE_BOOKING_WITH_ALLOCATIONS,
 
     # units
@@ -45,7 +45,7 @@ def require_admin():
         abort(403)
     return uid, role
 
-# --- Home (category availability) ---
+# Home (category availability)
 @bp.get("/")
 def home():
     uid, role = current_user()
@@ -73,7 +73,7 @@ def home():
         role=role
     )
 
-# --- Booking create (A1 function) ---
+# Booking create
 @bp.post("/bookings/create")
 def booking_create_from_home():
     uid, role = require_login()
@@ -100,7 +100,7 @@ def booking_create_from_home():
             return redirect(url_for("routes.home", start_date=start, end_date=end))
         customer_id = str(cust["id"])
 
-    # parse qty_<catid>
+    # parse qty
     selections = []
     for k, v in request.form.items():
         if k.startswith("qty_"):
@@ -133,7 +133,7 @@ def booking_create_from_home():
         flash(f"Could not place booking: {str(e)}", "error")
         return redirect(url_for("routes.home", start_date=start, end_date=end))
 
-# --- Customers ---
+# Customers 
 @bp.get("/customers")
 def customers():
     uid, role = require_login()
@@ -191,16 +191,14 @@ def customer_detail(customer_id: int):
     bookings = query(SQL_LIST_BOOKINGS_FOR_CUSTOMER, (customer_id,))
     return render_template("customer_detail.html", customer=cust, bookings=bookings, role=role)
 
-# --- Admin: Bookings list ---
+# Admin: Bookings list
 @bp.get("/admin/bookings")
 def admin_bookings():
     require_admin()
     bookings = query(SQL_LIST_ALL_BOOKINGS)
     return render_template("admin_bookings.html", bookings=bookings, role="admin")
 
-# =========================================================
-# Admin: UNITS (physical items)
-# =========================================================
+# Admin: Items (physical items)
 @bp.get("/admin/items")
 def admin_items():
     require_admin()
@@ -284,9 +282,7 @@ def admin_item_delete(item_id: int):
 
     return redirect(url_for("routes.admin_items"))
 
-# =========================================================
 # Admin: CATEGORIES (shared product models)
-# =========================================================
 @bp.get("/admin/categories")
 def admin_categories():
     require_admin()
@@ -429,7 +425,7 @@ def admin_category_edit_save(category_id: int):
         flash(f"Update failed: {str(e)}", "error")
         return redirect(url_for("routes.admin_category_edit_form", category_id=category_id))
 
-# --- Booking detail / status (unchanged) ---
+# Booking detail / status
 @bp.get("/bookings/<int:booking_id>")
 def booking_detail(booking_id: int):
     uid, role = require_login()

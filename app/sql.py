@@ -1,5 +1,5 @@
 
-# --- Auth / Users ---
+# Auth / Users
 SQL_CREATE_USER = """
 INSERT INTO users (email, password_hash, role)
 VALUES (%s, %s, %s)
@@ -12,7 +12,7 @@ FROM users
 WHERE email = %s;
 """
 
-# --- Customers ---
+# Customers
 SQL_CREATE_CUSTOMER = """
 INSERT INTO customers (full_name, email, phone, user_id)
 VALUES (%s, %s, %s, %s)
@@ -44,7 +44,7 @@ FROM customers
 WHERE user_id = %s;
 """
 
-# --- Booking: category availability (for Option A UI) ---
+# Booking: category availability
 SQL_AVAILABLE_CATEGORIES = """
 WITH available_items AS (
   SELECT i.id, i.category_id
@@ -84,14 +84,16 @@ GROUP BY
   c.id, c.display_name, c.daily_rate,
   tc.category_id, tc.capacity, tc.season_rating, tc.estimated_build_time_minutes, tc.construction_cost, tc.deconstruction_cost,
   fc.category_id, fc.furnishing_kind
-ORDER BY c.display_name;
+ORDER BY (COUNT(ai.id) = 0),
+         (tc.category_id IS NOT NULL) DESC,
+         c.id;
 """
 
 SQL_CREATE_BOOKING_WITH_ALLOCATIONS = """
 SELECT create_booking_with_allocations(%s, %s, %s, %s, %s) AS booking_id;
 """
 
-# --- Units list (items + category join) ---
+# Units list
 SQL_LIST_UNITS = """
 SELECT
   i.id,
@@ -116,7 +118,7 @@ FROM items i
 JOIN categories c ON c.id = i.category_id
 LEFT JOIN tent_categories tc ON tc.category_id = c.id
 LEFT JOIN furnishing_categories fc ON fc.category_id = c.id
-ORDER BY i.created_at DESC;
+ORDER BY c.id, i.id;
 """
 
 SQL_LIST_CATEGORIES_FOR_DROPDOWN = """
@@ -156,7 +158,7 @@ SET category_id = %s,
 WHERE id = %s;
 """
 
-# Unit create (existing function)
+# Unit create
 SQL_ADD_ITEM_UNIT = """
 SELECT add_item_unit(%s, %s, %s) AS new_item_id;
 """
@@ -174,7 +176,7 @@ LIMIT 1;
 SQL_DELETE_BOOKING_ITEMS_FOR_ITEM = "DELETE FROM booking_items WHERE item_id = %s;"
 SQL_DELETE_ITEM = "DELETE FROM items WHERE id = %s;"
 
-# --- Categories list + edit ---
+# Categories list + edit
 SQL_LIST_CATEGORIES = """
 SELECT
   c.id,
@@ -204,7 +206,7 @@ GROUP BY
   c.id, c.display_name, c.daily_rate, c.created_at,
   tc.category_id, tc.capacity, tc.season_rating, tc.estimated_build_time_minutes, tc.construction_cost, tc.deconstruction_cost,
   fc.category_id, fc.furnishing_kind, fc.weight_kg, fc.notes
-ORDER BY c.display_name;
+ORDER BY (tc.category_id IS NOT NULL) DESC, c.id;
 """
 
 SQL_GET_CATEGORY_FOR_EDIT = """
@@ -279,7 +281,7 @@ SET furnishing_kind = %s,
 WHERE category_id = %s;
 """
 
-# --- Bookings ---
+# Bookings
 SQL_CREATE_BOOKING = """
 INSERT INTO bookings (customer_id, start_date, end_date, status)
 VALUES (%s, %s, %s, 'pending')

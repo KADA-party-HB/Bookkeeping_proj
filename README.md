@@ -9,7 +9,8 @@
 
 ## Seeding (demo data)
 This project includes a small seed script that:
-- creates/updates an admin account: `karl.wikell@gmail.com` (password: `DV1703`)
+- creates an admin account: `karl.wikell@gmail.com` (password: `DV1703`)
+- creates an customer for testing: `hej.hej@hej.hej` (password: `DV1703`)
 - inserts demo tents and furnishings into the inventory
 
 Run it after you’ve applied `schema_postgres.sql` and set `DATABASE_URL`:

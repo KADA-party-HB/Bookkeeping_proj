@@ -60,7 +60,13 @@
                         {% endif %}
                       </td>
                       <td class="p-3">{{ c.daily_rate }}</td>
-                      <td class="p-3">{{ c.available_units }}</td>
+                      <td class="p-3">
+                        {% if c.available_units == 0 %}
+                          <span class="text-rose-600 font-medium">None avalible</span>
+                        {% else %}
+                          {{ c.available_units }}
+                        {% endif %}
+                      </td>
                       <td class="p-3">
                         <input
                           type="number"

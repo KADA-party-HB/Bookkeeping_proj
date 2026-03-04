@@ -24,17 +24,31 @@
       </thead>
       <tbody>
         {% for b in bookings %}
-          <tr
-            class="border-t hover:bg-slate-50 cursor-pointer"
-            role="link"
-            tabindex="0"
-            onclick="window.location.href='{{ detail_url }}'"
-            onkeydown="if(event.key==='Enter'){window.location.href='{{ detail_url }}'}"
-          >
-            <td class="p-3 font-medium text-indigo-700">#{{ b.id }}</td>
-            <td class="p-3">{{ b.start_date }} → {{ b.end_date }}</td>
-            <td class="p-3">{{ b.status }}</td>
-            <td class="p-3 text-xs text-slate-500">{{ b.created_at }}</td>
+          <tr class="border-t hover:bg-slate-50">
+            <td class="p-3 font-medium text-indigo-700">
+              <a class="block w-full h-full"
+                 href="{{ url_for('routes.booking_detail', booking_id=b.id) }}">
+                #{{ b.id }}
+              </a>
+            </td>
+            <td class="p-3">
+              <a class="block w-full h-full"
+                 href="{{ url_for('routes.booking_detail', booking_id=b.id) }}">
+                {{ b.start_date }} → {{ b.end_date }}
+              </a>
+            </td>
+            <td class="p-3">
+              <a class="block w-full h-full"
+                 href="{{ url_for('routes.booking_detail', booking_id=b.id) }}">
+                {{ b.status }}
+              </a>
+            </td>
+            <td class="p-3 text-xs text-slate-500">
+              <a class="block w-full h-full"
+                 href="{{ url_for('routes.booking_detail', booking_id=b.id) }}">
+                {{ b.created_at }}
+              </a>
+            </td>
           </tr>
         {% else %}
           <tr><td class="p-3" colspan="4"><i>No bookings yet.</i></td></tr>

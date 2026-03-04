@@ -35,7 +35,7 @@ desktop.ini
 # ---- Logs ----
 *.log
 
-# ---- Local database dumps / exports (keep schema in git instead) ----
+# ---- Local database dumps ----
 *.sql.bak
 *.dump
 *.backup

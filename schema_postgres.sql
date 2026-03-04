@@ -189,7 +189,7 @@ CREATE TRIGGER prevent_overlap_on_booking_items
 BEFORE INSERT OR UPDATE ON booking_items
 FOR EACH ROW EXECUTE FUNCTION trg_prevent_overlapping_item_booking();
 
--- stored functions: create (category + subtype) and one physical unit (item) atomically
+-- stored functions: create (category + subtype) and one physical unit (item)
 
 CREATE OR REPLACE FUNCTION add_tent_item(
   p_sku VARCHAR,
@@ -360,7 +360,7 @@ BEGIN
   RETURN v_booking_id;
 END$$;
 
--- Add a physical unit to an existing category (unit-only insert)
+-- Add a physical unit to an existing category
 CREATE OR REPLACE FUNCTION add_item_unit(
   p_category_id INT,
   p_sku VARCHAR,
