@@ -2,16 +2,12 @@
 {% block content %}
 <div class="bg-white border rounded-xl p-6 shadow-sm">
   <div class="flex items-center gap-3">
-    <h2 class="text-xl font-semibold">Units (admin)</h2>
+    <h2 class="text-xl font-semibold">Items</h2>
     <div class="ml-auto flex flex-wrap gap-2">
       <a class="rounded-lg border px-3 py-2 text-sm hover:bg-slate-50"
          href="{{ url_for('routes.admin_unit_new_form') }}">+ Add item</a>
     </div>
   </div>
-
-  <p class="text-xs text-slate-500 mt-2">
-    Units are physical items (unique SKU).
-  </p>
 
   <div class="overflow-x-auto border rounded-lg mt-4">
     <table class="min-w-full text-sm">
