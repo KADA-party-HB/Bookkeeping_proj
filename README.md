@@ -3,8 +3,7 @@
 ## Run
 1) Install deps (Including postgre DB)
 2) Create .env and add "DATABASE_URL, "
-2) Create DB and apply schema_postgres.sql
-3) Set DATABASE_URL in .env
+3) Create DB and apply schema_postgres.sql
 4) `flask --app run.py --debug run`
 
 ## Seeding (demo data)
