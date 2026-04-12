@@ -59,6 +59,12 @@
 
     <div class="border rounded-lg p-4">
       <div><b>Phone:</b> {{ booking.phone or "" }}</div>
+      {% if booking.booking_note %}
+        <div class="mt-2">
+          <b>Booking note:</b>
+          <div class="text-slate-600 mt-1">{{ booking.booking_note }}</div>
+        </div>
+      {% endif %}
       {% if booking.custom_total_price is not none %}
         <div class="mt-2">
           <b>Booking total override:</b>

@@ -221,6 +221,7 @@ CREATE TABLE bookings (
   delivery_fee NUMERIC(10,2),
   custom_total_price NUMERIC(10,2),
   custom_price_note TEXT,
+  booking_note TEXT,
 
   admin_note TEXT,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -454,6 +455,7 @@ CREATE OR REPLACE FUNCTION create_booking_with_allocations(
   p_include_setup_service BOOLEAN DEFAULT FALSE,
   p_booking_custom_total_price NUMERIC(10,2) DEFAULT NULL,
   p_booking_custom_price_note TEXT DEFAULT NULL,
+  p_booking_note TEXT DEFAULT NULL,
   p_custom_total_prices NUMERIC(10,2)[] DEFAULT NULL,
   p_custom_price_notes TEXT[] DEFAULT NULL
 )
@@ -505,7 +507,8 @@ BEGIN
     delivery_fee,
     include_setup_service,
     custom_total_price,
-    custom_price_note
+    custom_price_note,
+    booking_note
   )
   VALUES (
     p_customer_id,
@@ -516,7 +519,8 @@ BEGIN
     CASE WHEN p_include_delivery THEN COALESCE(p_delivery_fee, 0) ELSE NULL END,
     p_include_setup_service,
     p_booking_custom_total_price,
-    p_booking_custom_price_note
+    p_booking_custom_price_note,
+    p_booking_note
   )
   RETURNING id INTO v_booking_id;
 

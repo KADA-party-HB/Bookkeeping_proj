@@ -1,420 +1,539 @@
 {% extends "base.html" %}
 {% block content %}
-  <div class="bg-white border rounded-xl p-6 shadow-sm">
-    <h2 class="text-xl font-semibold">Search availability</h2>
-
-    <form method="get" class="mt-4 flex flex-wrap gap-3 items-end">
+  <section class="relative overflow-hidden rounded-[2rem] border border-sky-100 bg-gradient-to-br from-white via-sky-50 to-amber-50 shadow-sm">
+    <div class="absolute inset-y-0 right-0 hidden w-1/3 bg-[radial-gradient(circle_at_top,rgba(14,165,233,0.16),transparent_58%)] lg:block"></div>
+    <div class="relative grid gap-8 px-6 py-8 md:px-8 lg:grid-cols-[1.15fr_0.85fr] lg:items-end">
       <div>
-        <label class="text-sm font-medium" for="start_date">Start date</label>
-        <input
-          id="start_date"
-          type="date"
-          name="start_date"
-          value="{{ start_date }}"
-          required
-          class="mt-1 rounded-lg border px-3 py-2"
-        >
+        <div class="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-white/80 px-3 py-1 text-xs font-medium uppercase tracking-[0.2em] text-sky-700">
+          Booking Studio
+        </div>
+        <h1 class="mt-4 max-w-2xl font-serif text-3xl font-semibold tracking-tight text-slate-900 md:text-4xl">
+          Build a booking window first, then shape the order with pricing, setup, and notes.
+        </h1>
+        <p class="mt-3 max-w-2xl text-sm leading-6 text-slate-600 md:text-base">
+          Pick the first rental day and we will keep the end date aligned so the range always stays valid.
+          After that you can review live availability and complete the booking in one flow.
+        </p>
+
+        <div class="mt-6 grid gap-3 sm:grid-cols-3">
+          <div class="rounded-2xl border border-white/80 bg-white/80 p-4 shadow-sm backdrop-blur">
+            <div class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">Availability</div>
+            <div class="mt-2 text-sm font-medium text-slate-800">Only active and free units are shown</div>
+          </div>
+          <div class="rounded-2xl border border-white/80 bg-white/80 p-4 shadow-sm backdrop-blur">
+            <div class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">Pricing</div>
+            <div class="mt-2 text-sm font-medium text-slate-800">Standard periods and admin overrides stay visible</div>
+          </div>
+          <div class="rounded-2xl border border-white/80 bg-white/80 p-4 shadow-sm backdrop-blur">
+            <div class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">Booking Notes</div>
+            <div class="mt-2 text-sm font-medium text-slate-800">Capture delivery, access, and placement details up front</div>
+          </div>
+        </div>
       </div>
 
-      <div>
-        <label class="text-sm font-medium" for="end_date">End date</label>
-        <input
-          id="end_date"
-          type="date"
-          name="end_date"
-          value="{{ end_date }}"
-          required
-          class="mt-1 rounded-lg border px-3 py-2"
-        >
+      <div class="rounded-[1.75rem] border border-slate-200 bg-white/90 p-5 shadow-lg shadow-sky-100/50 backdrop-blur">
+        <div class="flex items-center justify-between gap-3">
+          <div>
+            <h2 class="text-lg font-semibold text-slate-900">Search availability</h2>
+            <p class="mt-1 text-sm text-slate-500">Choose the dates to open the booking workspace.</p>
+          </div>
+          <div class="rounded-full bg-slate-900 px-3 py-1 text-xs font-medium text-white">
+            Step 1
+          </div>
+        </div>
+
+        <form method="get" class="mt-5 grid gap-4 md:grid-cols-2" id="availability-search-form">
+          <div>
+            <label class="text-sm font-medium text-slate-700" for="start_date">Start date</label>
+            <input
+              id="start_date"
+              type="date"
+              name="start_date"
+              value="{{ start_date }}"
+              required
+              class="mt-1 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 shadow-sm transition focus:border-sky-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-sky-100"
+            >
+          </div>
+
+          <div>
+            <label class="text-sm font-medium text-slate-700" for="end_date">End date</label>
+            <input
+              id="end_date"
+              type="date"
+              name="end_date"
+              value="{{ end_date }}"
+              required
+              class="mt-1 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 shadow-sm transition focus:border-sky-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-sky-100"
+            >
+          </div>
+
+          <button class="md:col-span-2 inline-flex items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white transition hover:bg-sky-700 focus:outline-none focus:ring-4 focus:ring-sky-100">
+            Search bookings
+          </button>
+        </form>
+
+        <p class="mt-3 text-xs text-slate-500">
+          Availability is checked for the selected period. Cancelled bookings are ignored.
+        </p>
       </div>
-
-      <button class="rounded-lg bg-slate-900 text-white px-4 py-2 hover:bg-slate-800">
-        Search
-      </button>
-    </form>
-
-    <p class="text-xs text-slate-500 mt-2">
-      Availability is checked for the selected period. Cancelled bookings are ignored.
-    </p>
-  </div>
+    </div>
+  </section>
 
   {% if categories is not none %}
-    <div class="bg-white border rounded-xl p-6 shadow-sm mt-6">
-      <h3 class="text-lg font-semibold">Select quantities per category</h3>
+    <section class="mt-6 rounded-[2rem] border border-slate-200 bg-white shadow-sm">
+      <div class="border-b border-slate-200 px-6 py-5 md:px-8">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <div class="text-xs font-medium uppercase tracking-[0.2em] text-slate-400">Step 2</div>
+            <h3 class="mt-1 text-2xl font-semibold text-slate-900">Create booking</h3>
+            <p class="mt-1 text-sm text-slate-500">
+              Review availability, choose quantities, and complete the booking details below.
+            </p>
+          </div>
+          <div class="rounded-full bg-sky-50 px-4 py-2 text-sm font-medium text-sky-700">
+            {{ categories|length }} categories loaded
+          </div>
+        </div>
+      </div>
 
-      {% if categories|length == 0 %}
-        <p class="text-sm text-slate-600 mt-2"><i>No categories yet.</i></p>
-      {% else %}
-        {% if not session.get('user_id') %}
-          <p class="text-sm text-slate-600 mt-2">
-            Please
-            <a class="text-indigo-700 hover:underline" href="{{ url_for('auth.login_form') }}">log in</a>
-            to place a booking.
-          </p>
+      <div class="px-6 py-6 md:px-8">
+        {% if categories|length == 0 %}
+          <p class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-600"><i>No categories yet.</i></p>
         {% else %}
-          <form method="post" action="{{ url_for('routes.booking_create_from_home') }}" class="mt-4 space-y-4">
-            <input type="hidden" name="start_date" value="{{ start_date }}">
-            <input type="hidden" name="end_date" value="{{ end_date }}">
-
-            <div class="overflow-x-auto border rounded-lg">
-              <table class="min-w-full text-sm">
-                <thead class="bg-slate-50 text-slate-600">
-                  <tr>
-                    <th class="p-3 text-left">Category</th>
-                    <th class="p-3 text-left">Type</th>
-                    <th class="p-3 text-left">Rental period</th>
-                    <th class="p-3 text-left">Price</th>
-                    <th class="p-3 text-left">Available</th>
-                    <th class="p-3 text-left">Qty</th>
-                    <th class="p-3 text-left">Details</th>
-                    {% if role == 'admin' %}
-                      <th class="p-3 text-left">Custom price</th>
-                      <th class="p-3 text-left">Admin note</th>
-                    {% endif %}
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {% for c in categories %}
-                    <tr class="border-t align-top">
-                      <td class="p-3">
-                        <div class="font-medium">{{ c.display_name }}</div>
-                        <div class="text-xs text-slate-500">Category #{{ c.id }}</div>
-                      </td>
-
-                      <td class="p-3">
-                        {% if c.is_tent %}
-                          <span class="inline-flex rounded-full bg-indigo-50 text-indigo-700 px-2 py-0.5 text-xs">
-                            Tent
-                          </span>
-                        {% endif %}
-                        {% if c.is_furnishing %}
-                          <span class="inline-flex rounded-full bg-emerald-50 text-emerald-700 px-2 py-0.5 text-xs">
-                            Furnishing
-                          </span>
-                        {% endif %}
-                      </td>
-
-                      <td class="p-3">
-                        {% if c.has_standard_price %}
-                          <div class="font-medium">{{ c.rental_period_label }}</div>
-                          <div class="text-xs text-slate-500">
-                            {{ c.rental_period_min_days }}–{{ c.rental_period_max_days }} days
-                          </div>
-                        {% else %}
-                          <span class="text-amber-700 font-medium">No available standard price</span>
-                        {% endif %}
-                      </td>
-
-                      <td class="p-3">
-                        {% if c.has_standard_price %}
-                          {{ c.quoted_period_price }} kr
-                        {% else %}
-                          <span class="text-slate-400">Custom admin price required</span>
-                        {% endif %}
-                      </td>
-
-                      <td class="p-3">
-                        {% if c.available_units == 0 %}
-                          <span class="text-rose-600 font-medium">None available</span>
-                        {% else %}
-                          {{ c.available_units }}
-                        {% endif %}
-                      </td>
-
-                      <td class="p-3">
-                        <input
-                          type="number"
-                          min="0"
-                          max="{{ c.available_units }}"
-                          step="1"
-                          value="0"
-                          name="qty_{{ c.id }}"
-                          inputmode="numeric"
-                          {% if c.available_units == 0 or (not c.has_standard_price and role != 'admin') %}disabled{% endif %}
-                          class="w-24 rounded-lg border px-3 py-2"
-                          oninput="
-                            if (this.value === '') return;
-                            const max = parseInt(this.max || '0', 10);
-                            const min = parseInt(this.min || '0', 10);
-                            let val = parseInt(this.value, 10);
-
-                            if (isNaN(val)) {
-                              this.value = min;
-                            } else if (val > max) {
-                              this.value = max;
-                            } else if (val < min) {
-                              this.value = min;
-                            }
-                          "
-                        >
-                        {% if c.available_units > 0 and not c.has_standard_price and role == 'admin' %}
-                          <div class="text-xs text-amber-700 mt-1">
-                            Admin can book with custom price
-                          </div>
-                        {% endif %}
-                      </td>
-
-                      <td class="p-3 text-slate-700">
-                        {% if c.is_tent %}
-                          <div>Capacity: {{ c.capacity }}</div>
-                          <div>Season rating: {{ c.season_rating }}</div>
-                          <div>Build time: {{ c.estimated_build_time_minutes }} min</div>
-                          <div>Setup service: {{ c.setup_service_fee }} kr</div>
-                          {% if c.packed_weight_kg %}
-                            <div>Packed weight: {{ c.packed_weight_kg }} kg</div>
-                          {% endif %}
-                          {% if c.floor_area_m2 %}
-                            <div>Floor area: {{ c.floor_area_m2 }} m²</div>
-                          {% endif %}
-                        {% else %}
-                          <div>{{ c.furnishing_kind }}</div>
-                          {% if c.weight_kg %}
-                            <div>Weight: {{ c.weight_kg }} kg</div>
-                          {% endif %}
-                          {% if c.notes %}
-                            <div class="text-xs text-slate-500 mt-1">{{ c.notes }}</div>
-                          {% endif %}
-                        {% endif %}
-                      </td>
-
-                      {% if role == 'admin' %}
-                        <td class="p-3">
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            name="custom_price_{{ c.id }}"
-                            placeholder="{% if c.has_standard_price %}Optional{% else %}Required if booking{% endif %}"
-                            class="w-32 rounded-lg border px-3 py-2"
-                            {% if c.available_units == 0 %}disabled{% endif %}
-                          >
-                          <div class="text-xs text-slate-500 mt-1">
-                            {% if c.has_standard_price %}
-                              Overrides the standard period price per booked unit.
-                            {% else %}
-                              Required when no standard price matches these dates.
-                            {% endif %}
-                          </div>
-                        </td>
-
-                        <td class="p-3">
-                          <input
-                            type="text"
-                            name="custom_price_note_{{ c.id }}"
-                            placeholder="Discount, special period, etc."
-                            class="w-56 rounded-lg border px-3 py-2"
-                            {% if c.available_units == 0 %}disabled{% endif %}
-                          >
-                        </td>
-                      {% endif %}
-                    </tr>
-                  {% endfor %}
-                </tbody>
-              </table>
+          {% if not session.get('user_id') %}
+            <div class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-900">
+              Please
+              <a class="font-medium text-amber-950 underline decoration-amber-300 underline-offset-2" href="{{ url_for('auth.login_form') }}">log in</a>
+              to place a booking.
             </div>
+          {% else %}
+            <form method="post" action="{{ url_for('routes.booking_create_from_home') }}" class="space-y-6">
+              <input type="hidden" name="start_date" value="{{ start_date }}">
+              <input type="hidden" name="end_date" value="{{ end_date }}">
 
-            <div class="border rounded-xl p-4 bg-slate-50">
-              <h4 class="font-medium text-slate-900">Booking options</h4>
+              <div class="overflow-hidden rounded-[1.5rem] border border-slate-200">
+                <div class="overflow-x-auto">
+                  <table class="min-w-full text-sm">
+                    <thead class="bg-slate-900 text-slate-100">
+                      <tr>
+                        <th class="p-3 text-left font-medium">Category</th>
+                        <th class="p-3 text-left font-medium">Type</th>
+                        <th class="p-3 text-left font-medium">Rental period</th>
+                        <th class="p-3 text-left font-medium">Price</th>
+                        <th class="p-3 text-left font-medium">Available</th>
+                        <th class="p-3 text-left font-medium">Qty</th>
+                        <th class="p-3 text-left font-medium">Details</th>
+                        {% if role == 'admin' %}
+                          <th class="p-3 text-left font-medium">Custom price</th>
+                          <th class="p-3 text-left font-medium">Admin note</th>
+                        {% endif %}
+                      </tr>
+                    </thead>
 
-              <div class="mt-3 grid gap-4 md:grid-cols-2">
-                <label class="flex items-start gap-3">
-                  <input
-                    type="checkbox"
-                    name="include_setup_service"
-                    value="on"
-                    class="mt-1"
-                  >
-                  <span>
-                    <span class="block font-medium text-sm">Include setup service</span>
-                    <span class="block text-xs text-slate-500">
-                      For tents, this includes construction and deconstruction together.
-                    </span>
-                  </span>
-                </label>
+                    <tbody class="divide-y divide-slate-200 bg-white">
+                      {% for c in categories %}
+                        <tr class="align-top transition hover:bg-sky-50/60">
+                          <td class="p-3">
+                            <div class="font-medium text-slate-900">{{ c.display_name }}</div>
+                            <div class="mt-1 text-xs text-slate-500">Category #{{ c.id }}</div>
+                          </td>
 
-                <div class="border rounded-lg p-3 bg-white">
-                  <label class="flex items-start gap-3">
-                    <input
-                      type="checkbox"
-                      name="include_delivery"
-                      value="on"
-                      class="mt-1"
-                    >
-                    <span>
-                      <span class="block font-medium text-sm">Include delivery</span>
-                      <span class="block text-xs text-slate-500">
-                        Add a delivery fee for this booking.
-                      </span>
-                    </span>
-                  </label>
+                          <td class="p-3">
+                            <div class="flex flex-wrap gap-2">
+                              {% if c.is_tent %}
+                                <span class="inline-flex rounded-full bg-sky-100 px-2.5 py-1 text-xs font-medium text-sky-800">
+                                  Tent
+                                </span>
+                              {% endif %}
+                              {% if c.is_furnishing %}
+                                <span class="inline-flex rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-800">
+                                  Furnishing
+                                </span>
+                              {% endif %}
+                            </div>
+                          </td>
 
-                  <div class="mt-3">
-                    <label class="text-sm font-medium" for="delivery_fee">Delivery fee</label>
-                    <input
-                      id="delivery_fee"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      name="delivery_fee"
-                      placeholder="e.g. 449"
-                      class="mt-1 w-full rounded-lg border px-3 py-2"
-                    >
-                  </div>
+                          <td class="p-3">
+                            {% if c.has_standard_price %}
+                              <div class="font-medium text-slate-900">{{ c.rental_period_label }}</div>
+                              <div class="mt-1 text-xs text-slate-500">
+                                {{ c.rental_period_min_days }}-{{ c.rental_period_max_days }} days
+                              </div>
+                            {% else %}
+                              <span class="font-medium text-amber-700">No available standard price</span>
+                            {% endif %}
+                          </td>
+
+                          <td class="p-3">
+                            {% if c.has_standard_price %}
+                              <div class="font-medium text-slate-900">{{ c.quoted_period_price }} kr</div>
+                            {% else %}
+                              <span class="text-slate-400">Custom admin price required</span>
+                            {% endif %}
+                          </td>
+
+                          <td class="p-3">
+                            {% if c.available_units == 0 %}
+                              <span class="font-medium text-rose-600">None available</span>
+                            {% else %}
+                              <span class="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
+                                {{ c.available_units }} ready
+                              </span>
+                            {% endif %}
+                          </td>
+
+                          <td class="p-3">
+                            <input
+                              type="number"
+                              min="0"
+                              max="{{ c.available_units }}"
+                              step="1"
+                              value="0"
+                              name="qty_{{ c.id }}"
+                              inputmode="numeric"
+                              {% if c.available_units == 0 or (not c.has_standard_price and role != 'admin') %}disabled{% endif %}
+                              class="w-24 rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 shadow-sm transition focus:border-sky-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-sky-100"
+                              oninput="
+                                if (this.value === '') return;
+                                const max = parseInt(this.max || '0', 10);
+                                const min = parseInt(this.min || '0', 10);
+                                let val = parseInt(this.value, 10);
+
+                                if (isNaN(val)) {
+                                  this.value = min;
+                                } else if (val > max) {
+                                  this.value = max;
+                                } else if (val < min) {
+                                  this.value = min;
+                                }
+                              "
+                            >
+                            {% if c.available_units > 0 and not c.has_standard_price and role == 'admin' %}
+                              <div class="mt-2 text-xs font-medium text-amber-700">
+                                Admin can book with custom price
+                              </div>
+                            {% endif %}
+                          </td>
+
+                          <td class="p-3 text-slate-700">
+                            {% if c.is_tent %}
+                              <div>Capacity: {{ c.capacity }}</div>
+                              <div>Season rating: {{ c.season_rating }}</div>
+                              <div>Build time: {{ c.estimated_build_time_minutes }} min</div>
+                              <div>Setup service: {{ c.setup_service_fee }} kr</div>
+                              {% if c.packed_weight_kg %}
+                                <div>Packed weight: {{ c.packed_weight_kg }} kg</div>
+                              {% endif %}
+                              {% if c.floor_area_m2 %}
+                                <div>Floor area: {{ c.floor_area_m2 }} m2</div>
+                              {% endif %}
+                            {% else %}
+                              <div>{{ c.furnishing_kind }}</div>
+                              {% if c.weight_kg %}
+                                <div>Weight: {{ c.weight_kg }} kg</div>
+                              {% endif %}
+                              {% if c.notes %}
+                                <div class="mt-1 text-xs text-slate-500">{{ c.notes }}</div>
+                              {% endif %}
+                            {% endif %}
+                          </td>
+
+                          {% if role == 'admin' %}
+                            <td class="p-3">
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                name="custom_price_{{ c.id }}"
+                                placeholder="{% if c.has_standard_price %}Optional{% else %}Required if booking{% endif %}"
+                                class="w-32 rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 shadow-sm transition focus:border-sky-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-sky-100"
+                                {% if c.available_units == 0 %}disabled{% endif %}
+                              >
+                              <div class="mt-2 text-xs text-slate-500">
+                                {% if c.has_standard_price %}
+                                  Overrides the standard period price per booked unit.
+                                {% else %}
+                                  Required when no standard price matches these dates.
+                                {% endif %}
+                              </div>
+                            </td>
+
+                            <td class="p-3">
+                              <input
+                                type="text"
+                                name="custom_price_note_{{ c.id }}"
+                                placeholder="Discount, special period, etc."
+                                class="w-56 rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 shadow-sm transition focus:border-sky-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-sky-100"
+                                {% if c.available_units == 0 %}disabled{% endif %}
+                              >
+                            </td>
+                          {% endif %}
+                        </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
                 </div>
               </div>
 
-              {% if role == 'admin' %}
-                <div class="mt-4 border rounded-lg p-3 bg-white">
-                  <div class="font-medium text-sm">Booking total override</div>
-                  <div class="text-xs text-slate-500 mt-1">
-                    Replaces the whole booking total, including rental, setup, and delivery.
-                  </div>
-
-                  <div class="mt-3 grid gap-4 md:grid-cols-2">
+              <div class="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+                <div class="rounded-[1.5rem] border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-5">
+                  <div class="flex items-center justify-between gap-3">
                     <div>
-                      <label class="text-sm font-medium" for="booking_custom_total_price">Override total</label>
-                      <input
-                        id="booking_custom_total_price"
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        name="booking_custom_total_price"
-                        placeholder="e.g. 5000"
-                        class="mt-1 w-full rounded-lg border px-3 py-2"
-                      >
+                      <h4 class="text-lg font-semibold text-slate-900">Booking options</h4>
+                      <p class="mt-1 text-sm text-slate-500">Tune the service details before placing the booking.</p>
                     </div>
-
-                    <div>
-                      <label class="text-sm font-medium" for="booking_custom_price_note">Override note</label>
-                      <input
-                        id="booking_custom_price_note"
-                        type="text"
-                        name="booking_custom_price_note"
-                        placeholder="Package deal, manual quote, etc."
-                        class="mt-1 w-full rounded-lg border px-3 py-2"
-                      >
+                    <div class="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-500 shadow-sm">
+                      Services
                     </div>
-                  </div>
-                </div>
-              {% endif %}
-            </div>
-
-            <div class="mt-4 flex flex-wrap items-end gap-3">
-              {% if role == 'admin' %}
-                <div class="w-full border rounded-xl p-4 bg-slate-50">
-                  <div class="flex items-start gap-3">
-                    <div class="flex-1">
-                      <label class="text-sm font-medium" for="customer_id">Existing customer</label>
-                      <select
-                        id="customer_id"
-                        name="customer_id"
-                        class="mt-1 rounded-lg border px-3 py-2 min-w-72 w-full"
-                      >
-                        <option value="">-- select --</option>
-                        {% for cu in customers %}
-                          <option value="{{ cu.id }}">{{ cu.full_name }} ({{ cu.email }})</option>
-                        {% endfor %}
-                      </select>
-                    </div>
-
-                    <label class="self-end flex items-center gap-2 text-sm">
-                      <input
-                        id="create_new_user"
-                        type="checkbox"
-                        name="create_new_user"
-                        value="on"
-                        onchange="
-                          const checked = this.checked;
-                          const existing = document.getElementById('customer_id');
-                          const fields = document.querySelectorAll('[data-new-user-field]');
-                          if (existing) { existing.disabled = checked; if (checked) { existing.value = ''; } }
-                          fields.forEach((field) => {
-                            field.disabled = !checked;
-                            if (!checked) { field.value = ''; }
-                          });
-                        "
-                      >
-                      <span>Create new user</span>
-                    </label>
                   </div>
 
                   <div class="mt-4 grid gap-4 md:grid-cols-2">
-                    <div>
-                      <label class="text-sm font-medium" for="new_customer_full_name">Full name</label>
-                      <input
-                        id="new_customer_full_name"
-                        name="new_customer_full_name"
-                        data-new-user-field
-                        disabled
-                        class="mt-1 w-full rounded-lg border px-3 py-2"
-                      >
-                    </div>
+                    <label class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                      <div class="flex items-start gap-3">
+                        <input
+                          type="checkbox"
+                          name="include_setup_service"
+                          value="on"
+                          class="mt-1"
+                        >
+                        <span>
+                          <span class="block text-sm font-medium text-slate-900">Include setup service</span>
+                          <span class="mt-1 block text-xs leading-5 text-slate-500">
+                            For tents, this includes construction and deconstruction together.
+                          </span>
+                        </span>
+                      </div>
+                    </label>
 
-                    <div>
-                      <label class="text-sm font-medium" for="new_customer_email">Email</label>
-                      <input
-                        id="new_customer_email"
-                        name="new_customer_email"
-                        type="email"
-                        data-new-user-field
-                        disabled
-                        class="mt-1 w-full rounded-lg border px-3 py-2"
-                      >
-                    </div>
+                    <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                      <label class="flex items-start gap-3">
+                        <input
+                          type="checkbox"
+                          name="include_delivery"
+                          value="on"
+                          class="mt-1"
+                        >
+                        <span>
+                          <span class="block text-sm font-medium text-slate-900">Include delivery</span>
+                          <span class="mt-1 block text-xs leading-5 text-slate-500">
+                            Add a delivery fee for this booking.
+                          </span>
+                        </span>
+                      </label>
 
-                    <div>
-                      <label class="text-sm font-medium" for="new_customer_phone">Phone</label>
-                      <input
-                        id="new_customer_phone"
-                        name="new_customer_phone"
-                        data-new-user-field
-                        disabled
-                        class="mt-1 w-full rounded-lg border px-3 py-2"
-                      >
-                    </div>
-
-                    <div>
-                      <label class="text-sm font-medium" for="new_customer_password">Password</label>
-                      <input
-                        id="new_customer_password"
-                        name="new_customer_password"
-                        type="password"
-                        data-new-user-field
-                        disabled
-                        class="mt-1 w-full rounded-lg border px-3 py-2"
-                      >
-                    </div>
-
-                    <div class="md:col-span-2">
-                      <label class="text-sm font-medium" for="new_customer_address">Address</label>
-                      <textarea
-                        id="new_customer_address"
-                        name="new_customer_address"
-                        rows="3"
-                        data-new-user-field
-                        disabled
-                        class="mt-1 w-full rounded-lg border px-3 py-2"
-                      ></textarea>
+                      <div class="mt-4">
+                        <label class="text-sm font-medium text-slate-700" for="delivery_fee">Delivery fee</label>
+                        <input
+                          id="delivery_fee"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          name="delivery_fee"
+                          placeholder="e.g. 449"
+                          class="mt-1 w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 shadow-sm transition focus:border-sky-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-sky-100"
+                        >
+                      </div>
                     </div>
                   </div>
-                </div>
-              {% else %}
-                <div class="text-sm text-slate-600">
-                  Booking will be placed for
-                  <span class="font-medium">
-                    {{ customers[0].full_name if customers and customers[0] else "your account" }}
-                  </span>.
-                </div>
-              {% endif %}
 
-              <button class="ml-auto rounded-lg bg-indigo-600 text-white px-4 py-2 hover:bg-indigo-700">
-                Place booking
-              </button>
-            </div>
-          </form>
+                  <div class="mt-4">
+                    <label class="text-sm font-medium text-slate-700" for="booking_note">General booking note</label>
+                    <textarea
+                      id="booking_note"
+                      name="booking_note"
+                      rows="4"
+                      placeholder="Access info, placement wishes, timing, special requests, etc."
+                      class="mt-1 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 shadow-sm transition focus:border-sky-400 focus:outline-none focus:ring-4 focus:ring-sky-100"
+                    ></textarea>
+                  </div>
+
+                  {% if role == 'admin' %}
+                    <div class="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                      <div class="font-medium text-sm text-amber-900">Booking total override</div>
+                      <div class="mt-1 text-xs text-amber-800/80">
+                        Replaces the whole booking total, including rental, setup, and delivery.
+                      </div>
+
+                      <div class="mt-3 grid gap-4 md:grid-cols-2">
+                        <div>
+                          <label class="text-sm font-medium text-amber-950" for="booking_custom_total_price">Override total</label>
+                          <input
+                            id="booking_custom_total_price"
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            name="booking_custom_total_price"
+                            placeholder="e.g. 5000"
+                            class="mt-1 w-full rounded-xl border border-amber-200 bg-white px-3 py-2 shadow-sm transition focus:border-amber-400 focus:outline-none focus:ring-4 focus:ring-amber-100"
+                          >
+                        </div>
+
+                        <div>
+                          <label class="text-sm font-medium text-amber-950" for="booking_custom_price_note">Override note</label>
+                          <input
+                            id="booking_custom_price_note"
+                            type="text"
+                            name="booking_custom_price_note"
+                            placeholder="Package deal, manual quote, etc."
+                            class="mt-1 w-full rounded-xl border border-amber-200 bg-white px-3 py-2 shadow-sm transition focus:border-amber-400 focus:outline-none focus:ring-4 focus:ring-amber-100"
+                          >
+                        </div>
+                      </div>
+                    </div>
+                  {% endif %}
+                </div>
+
+                <div class="rounded-[1.5rem] border border-slate-200 bg-slate-900 p-5 text-white shadow-lg shadow-slate-200">
+                  <div class="flex items-center justify-between gap-3">
+                    <div>
+                      <h4 class="text-lg font-semibold">Who is this booking for?</h4>
+                      <p class="mt-1 text-sm text-slate-300">Choose an existing customer or create a new profile inline.</p>
+                    </div>
+                    <div class="rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-slate-200">
+                      Final step
+                    </div>
+                  </div>
+
+                  <div class="mt-4">
+                    {% if role == 'admin' %}
+                      <div class="rounded-2xl border border-white/10 bg-white/5 p-4">
+                        <div class="flex items-start gap-3">
+                          <div class="flex-1">
+                            <label class="text-sm font-medium text-slate-100" for="customer_id">Existing customer</label>
+                            <select
+                              id="customer_id"
+                              name="customer_id"
+                              class="mt-1 w-full rounded-xl border border-white/10 bg-slate-800 px-3 py-2 text-white shadow-sm transition focus:border-sky-400 focus:outline-none focus:ring-4 focus:ring-sky-400/20"
+                            >
+                              <option value="">-- select --</option>
+                              {% for cu in customers %}
+                                <option value="{{ cu.id }}">{{ cu.full_name }} ({{ cu.email }})</option>
+                              {% endfor %}
+                            </select>
+                          </div>
+
+                          <label class="self-end flex items-center gap-2 rounded-full bg-white/10 px-3 py-2 text-sm text-slate-100">
+                            <input
+                              id="create_new_customer"
+                              type="checkbox"
+                              name="create_new_customer"
+                              value="on"
+                              onchange="
+                                const checked = this.checked;
+                                const existing = document.getElementById('customer_id');
+                                const fields = document.querySelectorAll('[data-new-user-field]');
+                                if (existing) {
+                                  existing.disabled = checked;
+                                  if (checked) {
+                                    existing.value = '';
+                                  }
+                                }
+                                fields.forEach((field) => {
+                                  field.disabled = !checked;
+                                  if (!checked) {
+                                    field.value = '';
+                                  }
+                                });
+                              "
+                            >
+                            <span>Create new customer</span>
+                          </label>
+                        </div>
+
+                        <div class="mt-4 grid gap-4 md:grid-cols-2">
+                          <div>
+                            <label class="text-sm font-medium text-slate-100" for="new_customer_full_name">Full name</label>
+                            <input
+                              id="new_customer_full_name"
+                              name="new_customer_full_name"
+                              data-new-user-field
+                              disabled
+                              class="mt-1 w-full rounded-xl border border-white/10 bg-slate-800 px-3 py-2 text-white shadow-sm transition focus:border-sky-400 focus:outline-none focus:ring-4 focus:ring-sky-400/20 disabled:opacity-50"
+                            >
+                          </div>
+
+                          <div>
+                            <label class="text-sm font-medium text-slate-100" for="new_customer_email">Email</label>
+                            <input
+                              id="new_customer_email"
+                              name="new_customer_email"
+                              type="email"
+                              data-new-user-field
+                              disabled
+                              class="mt-1 w-full rounded-xl border border-white/10 bg-slate-800 px-3 py-2 text-white shadow-sm transition focus:border-sky-400 focus:outline-none focus:ring-4 focus:ring-sky-400/20 disabled:opacity-50"
+                            >
+                          </div>
+
+                          <div>
+                            <label class="text-sm font-medium text-slate-100" for="new_customer_phone">Phone</label>
+                            <input
+                              id="new_customer_phone"
+                              name="new_customer_phone"
+                              data-new-user-field
+                              disabled
+                              class="mt-1 w-full rounded-xl border border-white/10 bg-slate-800 px-3 py-2 text-white shadow-sm transition focus:border-sky-400 focus:outline-none focus:ring-4 focus:ring-sky-400/20 disabled:opacity-50"
+                            >
+                          </div>
+
+                          <div class="md:col-span-2">
+                            <label class="text-sm font-medium text-slate-100" for="new_customer_address">Address</label>
+                            <textarea
+                              id="new_customer_address"
+                              name="new_customer_address"
+                              rows="3"
+                              data-new-user-field
+                              disabled
+                              class="mt-1 w-full rounded-xl border border-white/10 bg-slate-800 px-3 py-2 text-white shadow-sm transition focus:border-sky-400 focus:outline-none focus:ring-4 focus:ring-sky-400/20 disabled:opacity-50"
+                            ></textarea>
+                          </div>
+                        </div>
+                      </div>
+                    {% else %}
+                      <div class="rounded-2xl border border-white/10 bg-white/5 px-4 py-4 text-sm text-slate-200">
+                        Booking will be placed for
+                        <span class="font-medium text-white">
+                          {{ customers[0].full_name if customers and customers[0] else "your account" }}
+                        </span>.
+                      </div>
+                    {% endif %}
+                  </div>
+
+                  <button class="mt-5 inline-flex w-full items-center justify-center rounded-2xl bg-sky-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-sky-300 focus:outline-none focus:ring-4 focus:ring-sky-300/40">
+                    Place booking
+                  </button>
+                </div>
+              </div>
+            </form>
+          {% endif %}
         {% endif %}
-      {% endif %}
-    </div>
+      </div>
+    </section>
   {% endif %}
+
+  <script>
+    (() => {
+      const startInput = document.getElementById("start_date");
+      const endInput = document.getElementById("end_date");
+
+      if (!startInput || !endInput) {
+        return;
+      }
+
+      const syncEndDate = () => {
+        if (!startInput.value) {
+          return;
+        }
+
+        endInput.min = startInput.value;
+
+        if (!endInput.value || endInput.value < startInput.value) {
+          endInput.value = startInput.value;
+        }
+      };
+
+      startInput.addEventListener("change", syncEndDate);
+      startInput.addEventListener("input", syncEndDate);
+      syncEndDate();
+    })();
+  </script>
 {% endblock %}

@@ -175,7 +175,7 @@ ORDER BY
 
 SQL_CREATE_BOOKING_WITH_ALLOCATIONS = """
 SELECT create_booking_with_allocations(
-  %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+  %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
 ) AS booking_id;
 """
 
@@ -465,9 +465,10 @@ INSERT INTO bookings (
   include_setup_service,
   custom_total_price,
   custom_price_note,
+  booking_note,
   admin_note
 )
-VALUES (%s, %s, %s, 'pending', %s, %s, %s, %s, %s, %s)
+VALUES (%s, %s, %s, 'pending', %s, %s, %s, %s, %s, %s, %s)
 RETURNING id;
 """
 
@@ -486,6 +487,7 @@ SELECT
   b.include_setup_service,
   b.custom_total_price,
   b.custom_price_note,
+  b.booking_note,
   b.admin_note,
   b.created_at
 FROM bookings b
@@ -508,6 +510,7 @@ SELECT
   b.include_setup_service,
   b.custom_total_price,
   b.custom_price_note,
+  b.booking_note,
   b.admin_note,
   b.created_at
 FROM bookings b
@@ -635,6 +638,7 @@ SELECT
   include_setup_service,
   custom_total_price,
   custom_price_note,
+  booking_note,
   admin_note,
   created_at
 FROM bookings
@@ -653,6 +657,7 @@ SELECT
   b.include_setup_service,
   b.custom_total_price,
   b.custom_price_note,
+  b.booking_note,
   b.admin_note,
   b.created_at,
   c.id AS customer_id,

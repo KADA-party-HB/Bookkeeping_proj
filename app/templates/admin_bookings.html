@@ -85,7 +85,11 @@
                   <div class="text-slate-500 mt-1">Has admin note</div>
                 {% endif %}
 
-                {% if not b.include_setup_service and not b.include_delivery and not b.admin_note %}
+                {% if b.booking_note %}
+                  <div class="text-slate-500 mt-1">Has booking note</div>
+                {% endif %}
+
+                {% if not b.include_setup_service and not b.include_delivery and not b.admin_note and not b.booking_note %}
                   <span class="text-slate-400">No extras</span>
                 {% endif %}
               </a>

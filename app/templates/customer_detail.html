@@ -103,7 +103,10 @@
                     Delivery included{% if b.delivery_fee is not none %} ({{ b.delivery_fee }} kr){% endif %}
                   </div>
                 {% endif %}
-                {% if not b.include_setup_service and not b.include_delivery %}
+                {% if b.booking_note %}
+                  <div class="text-slate-500 mt-1">Has booking note</div>
+                {% endif %}
+                {% if not b.include_setup_service and not b.include_delivery and not b.booking_note %}
                   <span class="text-slate-400">No extras</span>
                 {% endif %}
               </a>

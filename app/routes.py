@@ -1,12 +1,9 @@
 from flask import Blueprint, request, render_template, redirect, url_for, flash, session, abort
 
 from datetime import timedelta
-from werkzeug.security import generate_password_hash
 
 from .db import query, execute, tx
 from .sql import (
-    SQL_CREATE_USER,
-    SQL_LINK_CUSTOMER_TO_USER,
     # customers
     SQL_LIST_CUSTOMERS,
     SQL_GET_CUSTOMER,
@@ -97,12 +94,6 @@ def _to_int_or_none(value):
 def _to_str_or_none(value):
     value = (value or "").strip()
     return value if value != "" else None
-
-
-def _normalize_email(value):
-    return (value or "").strip().lower()
-
-
 def _collect_category_period_prices_from_form():
     """
     Reads fields in the pattern:
@@ -199,20 +190,19 @@ def booking_create_from_home():
         return redirect(url_for("routes.home"))
 
     if role == "admin":
-        create_new_user = _to_bool(request.form.get("create_new_user"))
         customer_id = request.form.get("customer_id", "").strip()
+        create_new_customer = _to_bool(request.form.get("create_new_customer"))
         new_full_name = request.form.get("new_customer_full_name", "").strip()
-        new_email = _normalize_email(request.form.get("new_customer_email"))
+        new_email = _to_str_or_none(request.form.get("new_customer_email"))
         new_phone = _to_str_or_none(request.form.get("new_customer_phone"))
         new_address = _to_str_or_none(request.form.get("new_customer_address"))
-        new_password = request.form.get("new_customer_password", "")
 
-        if create_new_user:
-            if not new_full_name or not new_email or not new_password:
-                flash("Name, email and password are required to create a new user during booking.", "error")
+        if create_new_customer:
+            if not new_full_name:
+                flash("Full name is required to create a new customer during booking.", "error")
                 return redirect(url_for("routes.home", start_date=start, end_date=end))
         elif not customer_id:
-            flash("Select a customer or create a new user.", "error")
+            flash("Select a customer or create a new customer.", "error")
             return redirect(url_for("routes.home", start_date=start, end_date=end))
     else:
         cust = query(SQL_GET_CUSTOMER_BY_USER_ID, (uid,), one=True)
@@ -220,11 +210,12 @@ def booking_create_from_home():
             flash("No customer profile linked to this account.", "error")
             return redirect(url_for("routes.home", start_date=start, end_date=end))
         customer_id = str(cust["id"])
-        create_new_user = False
+        create_new_customer = False
 
     include_delivery = _to_bool(request.form.get("include_delivery"))
     include_setup_service = _to_bool(request.form.get("include_setup_service"))
     delivery_fee = _to_str_or_none(request.form.get("delivery_fee")) if include_delivery else None
+    booking_note = _to_str_or_none(request.form.get("booking_note"))
     booking_custom_total_price = (
         _to_str_or_none(request.form.get("booking_custom_total_price"))
         if role == "admin"
@@ -303,21 +294,12 @@ def booking_create_from_home():
             def work(cur):
                 effective_customer_id = customer_id
 
-                if create_new_user:
-                    password_hash = generate_password_hash(new_password)
-                    cur.execute(SQL_CREATE_USER, (new_email, password_hash, "customer"))
-                    user = cur.fetchone()
-
-                    cur.execute(SQL_LINK_CUSTOMER_TO_USER, (user["id"], new_email))
+                if create_new_customer:
+                    cur.execute(
+                        SQL_CREATE_CUSTOMER,
+                        (new_full_name, new_email, new_phone, new_address, None),
+                    )
                     customer = cur.fetchone()
-
-                    if not customer:
-                        cur.execute(
-                            SQL_CREATE_CUSTOMER,
-                            (new_full_name, new_email, new_phone, new_address, user["id"]),
-                        )
-                        customer = cur.fetchone()
-
                     effective_customer_id = customer["id"]
 
                 cur.execute(
@@ -333,6 +315,7 @@ def booking_create_from_home():
                         include_setup_service,
                         booking_custom_total_price,
                         booking_custom_price_note,
+                        booking_note,
                         custom_total_prices,
                         custom_price_notes,
                     ),
@@ -354,6 +337,7 @@ def booking_create_from_home():
                     include_setup_service,
                     booking_custom_total_price,
                     booking_custom_price_note,
+                    booking_note,
                     custom_total_prices,
                     custom_price_notes,
                 ),
