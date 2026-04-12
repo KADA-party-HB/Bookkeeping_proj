@@ -237,7 +237,7 @@ def main():
                     (rp_4_7, Decimal("95"), 2),
                 ],
             )
-            insert_units(conn, bord, "FURN-BORD", 12)
+            insert_units(conn, bord, "FURN-BORD", 16)
 
             stolar_premium = upsert_category(conn, "Stolar premium")
             upsert_furn_category(conn, stolar_premium, "chair_premium", None, "Premiumstolar per styck")

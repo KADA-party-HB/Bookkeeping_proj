@@ -222,7 +222,7 @@ CREATE TABLE bookings (
   admin_note TEXT,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-  CONSTRAINT chk_booking_dates CHECK (end_date > start_date),
+  CONSTRAINT chk_booking_dates CHECK (end_date >= start_date),
   CONSTRAINT chk_booking_status CHECK (status IN ('pending','confirmed','cancelled')),
   CONSTRAINT chk_delivery_fee CHECK (delivery_fee IS NULL OR delivery_fee >= 0)
 );
@@ -484,11 +484,11 @@ BEGIN
     RAISE EXCEPTION 'custom_price_notes must have same length as category_ids';
   END IF;
 
-  IF p_end <= p_start THEN
+  IF p_end < p_start THEN
     RAISE EXCEPTION 'Invalid dates: end_date must be after start_date';
   END IF;
 
-  v_rental_days := (p_end - p_start);
+  v_rental_days := (p_end - p_start + 1);
 
   INSERT INTO bookings (
     customer_id,
@@ -574,8 +574,8 @@ BEGIN
           JOIN bookings b ON b.id = bi.booking_id
           WHERE bi.item_id = i.id
             AND b.status <> 'cancelled'
-            AND p_start < b.end_date
-            AND p_end > b.start_date
+            AND p_start <= b.end_date
+            AND p_end >= b.start_date
         )
       ORDER BY i.id
       FOR UPDATE SKIP LOCKED

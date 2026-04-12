@@ -103,8 +103,8 @@ available_items AS (
       JOIN bookings b ON b.id = bi.booking_id
       WHERE bi.item_id = i.id
         AND b.status <> 'cancelled'
-        AND %s < b.end_date
-        AND %s > b.start_date
+        AND %s <= b.end_date
+        AND %s >= b.start_date
     )
 ),
 matching_period AS (
