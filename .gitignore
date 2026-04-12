@@ -44,3 +44,5 @@ desktop.ini
 
 # ---- Node / frontend (if you ever add it) ----
 node_modules/
+
+certs
