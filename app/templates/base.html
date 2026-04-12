@@ -3,29 +3,83 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>TentRental</title>
+  <title>Kada Party Rentals</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-slate-50 text-slate-900">
   <nav class="border-b bg-white">
     <div class="mx-auto max-w-6xl px-4 py-3 flex items-center gap-4">
-      <a class="font-bold text-indigo-700" href="{{ url_for('routes.home') }}">TentRental</a>
+      <a class="font-bold text-indigo-700" href="{{ url_for('routes.home') }}">
+        Kada Party Rentals
+      </a>
 
       {% if session.get('user_id') %}
-        <a class="text-sm text-slate-700 hover:text-slate-900" href="{{ url_for('routes.customers') }}">Customer</a>
+        <a
+          class="text-sm text-slate-700 hover:text-slate-900"
+          href="{{ url_for('routes.customers') }}"
+        >
+          Customers
+        </a>
 
         {% if session.get('role') == 'admin' %}
-          <a class="text-sm text-slate-700 hover:text-slate-900" href="{{ url_for('routes.admin_items') }}">Items</a>
-          <a class="text-sm text-slate-700 hover:text-slate-900" href="{{ url_for('routes.admin_categories') }}">Categories</a>
-          <a class="text-sm text-slate-700 hover:text-slate-900" href="{{ url_for('routes.admin_bookings') }}">Bookings</a>
+          <a
+            class="text-sm text-slate-700 hover:text-slate-900"
+            href="{{ url_for('routes.admin_items') }}"
+          >
+            Units
+          </a>
+
+          <a
+            class="text-sm text-slate-700 hover:text-slate-900"
+            href="{{ url_for('routes.admin_categories') }}"
+          >
+            Categories
+          </a>
+
+          <a
+            class="text-sm text-slate-700 hover:text-slate-900"
+            href="{{ url_for('routes.admin_bookings') }}"
+          >
+            Bookings
+          </a>
+
+          {# Add this once rental period routes exist #}
+          {# 
+          <a
+            class="text-sm text-slate-700 hover:text-slate-900"
+            href="{{ url_for('routes.admin_rental_periods') }}"
+          >
+            Rental periods
+          </a>
+          #}
         {% endif %}
 
-        <span class="ml-auto text-sm text-slate-500">Role: {{ session.get('role') }}</span>
-        <a class="text-sm text-indigo-700 hover:underline" href="{{ url_for('auth.logout') }}">Logout</a>
+        <span class="ml-auto text-sm text-slate-500">
+          Role: {{ session.get('role') }}
+        </span>
+
+        <a
+          class="text-sm text-indigo-700 hover:underline"
+          href="{{ url_for('auth.logout') }}"
+        >
+          Log out
+        </a>
       {% else %}
         <span class="ml-auto"></span>
-        <a class="text-sm text-slate-700 hover:text-slate-900" href="{{ url_for('auth.login_form') }}">Login</a>
-        <a class="text-sm text-indigo-700 hover:underline" href="{{ url_for('auth.register_form') }}">Register</a>
+
+        <a
+          class="text-sm text-slate-700 hover:text-slate-900"
+          href="{{ url_for('auth.login_form') }}"
+        >
+          Log in
+        </a>
+
+        <a
+          class="text-sm text-indigo-700 hover:underline"
+          href="{{ url_for('auth.register_form') }}"
+        >
+          Create account
+        </a>
       {% endif %}
     </div>
   </nav>
@@ -35,9 +89,14 @@
       {% if messages %}
         <div class="space-y-2 mb-4">
           {% for category, message in messages %}
-            <div class="rounded-lg px-4 py-3 text-sm
-              {% if category == 'success' %} bg-emerald-50 text-emerald-800 border border-emerald-200
-              {% else %} bg-rose-50 text-rose-800 border border-rose-200 {% endif %}">
+            <div
+              class="rounded-lg px-4 py-3 text-sm
+              {% if category == 'success' %}
+                bg-emerald-50 text-emerald-800 border border-emerald-200
+              {% else %}
+                bg-rose-50 text-rose-800 border border-rose-200
+              {% endif %}"
+            >
               {{ message }}
             </div>
           {% endfor %}

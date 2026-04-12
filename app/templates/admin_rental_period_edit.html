@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-2xl bg-white border rounded-xl p-6 shadow-sm">
+  <h1 class="text-xl font-semibold">Edit rental period #{{ rental_period.id }}</h1>
+  <p class="text-sm text-slate-500 mt-1">
+    Update a reusable rental period definition.
+  </p>
+
+  <form method="post" class="mt-4 space-y-4">
+    <div>
+      <label class="text-sm font-medium" for="label">Label</label>
+      <input
+        id="label"
+        name="label"
+        required
+        value="{{ rental_period.label }}"
+        class="mt-1 w-full rounded-lg border px-3 py-2"
+      >
+      <p class="text-xs text-slate-500 mt-1">
+        This is the display name shown in the admin UI and bookings.
+      </p>
+    </div>
+
+    <div class="grid gap-4 md:grid-cols-2">
+      <div>
+        <label class="text-sm font-medium" for="min_days">Minimum days</label>
+        <input
+          id="min_days"
+          name="min_days"
+          type="number"
+          min="1"
+          required
+          value="{{ rental_period.min_days }}"
+          class="mt-1 w-full rounded-lg border px-3 py-2"
+        >
+      </div>
+
+      <div>
+        <label class="text-sm font-medium" for="max_days">Maximum days</label>
+        <input
+          id="max_days"
+          name="max_days"
+          type="number"
+          min="1"
+          required
+          value="{{ rental_period.max_days }}"
+          class="mt-1 w-full rounded-lg border px-3 py-2"
+        >
+      </div>
+    </div>
+
+    <div class="rounded-lg border bg-slate-50 p-4 text-sm text-slate-600">
+      <div><b>Current range:</b>
+        {% if rental_period.min_days == rental_period.max_days %}
+          {{ rental_period.min_days }} day{% if rental_period.min_days != 1 %}s{% endif %}
+        {% else %}
+          {{ rental_period.min_days }}–{{ rental_period.max_days }} days
+        {% endif %}
+      </div>
+
+      {% if pricing_usage_count is defined %}
+        <div class="mt-2">
+          <b>Used by category pricing rows:</b> {{ pricing_usage_count }}
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="flex gap-2">
+      <button class="rounded-lg bg-indigo-600 text-white px-4 py-2 hover:bg-indigo-700">
+        Save changes
+      </button>
+      <a
+        class="rounded-lg border px-4 py-2 hover:bg-slate-50"
+        href="{{ url_for('routes.admin_rental_periods') }}"
+      >
+        Cancel
+      </a>
+    </div>
+  </form>
+
+  {% if allow_delete is defined and allow_delete %}
+    <div class="mt-6 border-t pt-6">
+      <h2 class="text-sm font-semibold text-rose-700">Danger zone</h2>
+      <p class="text-sm text-slate-500 mt-1">
+        Delete this rental period if it is no longer needed.
+      </p>
+
+      <form
+        method="post"
+        action="{{ url_for('routes.admin_rental_period_delete', rental_period_id=rental_period.id) }}"
+        class="mt-3"
+      >
+        <button
+          type="submit"
+          class="rounded-lg bg-rose-600 text-white px-4 py-2 hover:bg-rose-700"
+        >
+          Delete rental period
+        </button>
+      </form>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

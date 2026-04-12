@@ -1,12 +1,49 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="bg-white border rounded-xl p-6 shadow-sm">
-  <h2 class="text-xl font-semibold">{{ customer.full_name }}</h2>
-  <p class="text-sm text-slate-700 mt-2">
-    <b>Email:</b> {{ customer.email }}<br>
-    <b>Phone:</b> {{ customer.phone or "" }}<br>
-    <span class="text-xs text-slate-500">Created: {{ customer.created_at }}</span>
-  </p>
+  <div class="flex items-start gap-3">
+    <div>
+      <h2 class="text-xl font-semibold">{{ customer.full_name }}</h2>
+      <p class="text-sm text-slate-700 mt-2">
+        <b>Email:</b>
+        {% if customer.email %}
+          {{ customer.email }}
+        {% else %}
+          <span class="text-slate-400 italic">No email</span>
+        {% endif %}
+        <br>
+
+        <b>Phone:</b>
+        {% if customer.phone %}
+          {{ customer.phone }}
+        {% else %}
+          <span class="text-slate-400 italic">No phone</span>
+        {% endif %}
+        <br>
+
+        <b>Address:</b>
+        {% if customer.address %}
+          {{ customer.address }}
+        {% else %}
+          <span class="text-slate-400 italic">No address</span>
+        {% endif %}
+        <br>
+
+        <span class="text-xs text-slate-500">Created: {{ customer.created_at }}</span>
+      </p>
+    </div>
+
+    {% if role == "admin" %}
+      <div class="ml-auto">
+        <a
+          href="{{ url_for('routes.customer_edit_form', customer_id=customer.id) }}"
+          class="rounded-lg border px-3 py-2 text-sm hover:bg-slate-50"
+        >
+          Edit customer
+        </a>
+      </div>
+    {% endif %}
+  </div>
 </div>
 
 <div class="bg-white border rounded-xl p-6 shadow-sm mt-6">
@@ -19,6 +56,7 @@
           <th class="p-3 text-left">ID</th>
           <th class="p-3 text-left">Dates</th>
           <th class="p-3 text-left">Status</th>
+          <th class="p-3 text-left">Options</th>
           <th class="p-3 text-left">Created</th>
         </tr>
       </thead>
@@ -26,32 +64,64 @@
         {% for b in bookings %}
           <tr class="border-t hover:bg-slate-50">
             <td class="p-3 font-medium text-indigo-700">
-              <a class="block w-full h-full"
-                 href="{{ url_for('routes.booking_detail', booking_id=b.id) }}">
+              <a
+                class="block w-full h-full"
+                href="{{ url_for('routes.booking_detail', booking_id=b.id) }}"
+              >
                 #{{ b.id }}
               </a>
             </td>
+
             <td class="p-3">
-              <a class="block w-full h-full"
-                 href="{{ url_for('routes.booking_detail', booking_id=b.id) }}">
+              <a
+                class="block w-full h-full"
+                href="{{ url_for('routes.booking_detail', booking_id=b.id) }}"
+              >
                 {{ b.start_date }} → {{ b.end_date }}
               </a>
             </td>
+
             <td class="p-3">
-              <a class="block w-full h-full"
-                 href="{{ url_for('routes.booking_detail', booking_id=b.id) }}">
+              <a
+                class="block w-full h-full"
+                href="{{ url_for('routes.booking_detail', booking_id=b.id) }}"
+              >
                 {{ b.status }}
               </a>
             </td>
+
+            <td class="p-3 text-xs text-slate-600">
+              <a
+                class="block w-full h-full"
+                href="{{ url_for('routes.booking_detail', booking_id=b.id) }}"
+              >
+                {% if b.include_setup_service %}
+                  <div>Setup included</div>
+                {% endif %}
+                {% if b.include_delivery %}
+                  <div>
+                    Delivery included{% if b.delivery_fee is not none %} ({{ b.delivery_fee }} kr){% endif %}
+                  </div>
+                {% endif %}
+                {% if not b.include_setup_service and not b.include_delivery %}
+                  <span class="text-slate-400">No extras</span>
+                {% endif %}
+              </a>
+            </td>
+
             <td class="p-3 text-xs text-slate-500">
-              <a class="block w-full h-full"
-                 href="{{ url_for('routes.booking_detail', booking_id=b.id) }}">
+              <a
+                class="block w-full h-full"
+                href="{{ url_for('routes.booking_detail', booking_id=b.id) }}"
+              >
                 {{ b.created_at }}
               </a>
             </td>
           </tr>
         {% else %}
-          <tr><td class="p-3" colspan="4"><i>No bookings yet.</i></td></tr>
+          <tr>
+            <td class="p-3" colspan="5"><i>No bookings yet.</i></td>
+          </tr>
         {% endfor %}
       </tbody>
     </table>

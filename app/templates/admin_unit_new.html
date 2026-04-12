@@ -1,40 +1,63 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="max-w-2xl bg-white border rounded-xl p-6 shadow-sm">
-  <h2 class="text-xl font-semibold">Add unit (physical item)</h2>
+  <h2 class="text-xl font-semibold">Add unit</h2>
   <p class="text-sm text-slate-500 mt-1">
-    Adds a new SKU to an existing category. Category fields are not changed.
+    Add a new physical inventory unit to an existing category. Category details and pricing are not changed.
   </p>
 
   <form method="post" class="mt-4 space-y-4">
     <div>
-      <label class="text-sm font-medium">Category</label>
-      <select name="category_id" required class="mt-1 w-full rounded-lg border px-3 py-2">
+      <label class="text-sm font-medium" for="category_id">Category</label>
+      <select
+        id="category_id"
+        name="category_id"
+        required
+        class="mt-1 w-full rounded-lg border px-3 py-2"
+      >
         <option value="">-- select --</option>
         {% for c in categories %}
           <option value="{{ c.id }}">
-            {{ c.display_name }} ({{ c.daily_rate }}/day)
-            {% if c.is_tent %} - Tent cap {{ c.capacity }}{% endif %}
-            {% if c.is_furnishing %} - {{ c.furnishing_kind }}{% endif %}
+            {{ c.display_name }}
+            {% if c.is_tent %} - Tent{% endif %}
+            {% if c.is_tent and c.capacity %} (cap {{ c.capacity }}){% endif %}
+            {% if c.is_furnishing and c.furnishing_kind %} - {{ c.furnishing_kind }}{% endif %}
           </option>
         {% endfor %}
       </select>
     </div>
 
     <div>
-      <label class="text-sm font-medium">SKU</label>
-      <input name="sku" required class="mt-1 w-full rounded-lg border px-3 py-2" placeholder="e.g. FURN-CHAIR-07">
-      <p class="text-xs text-slate-500 mt-1">Must be unique per physical unit.</p>
+      <label class="text-sm font-medium" for="sku">SKU</label>
+      <input
+        id="sku"
+        name="sku"
+        required
+        class="mt-1 w-full rounded-lg border px-3 py-2"
+        placeholder="e.g. FURN-CHAIR-07"
+      >
+      <p class="text-xs text-slate-500 mt-1">
+        Must be unique for each physical unit.
+      </p>
     </div>
 
     <div class="flex items-center gap-2">
       <input id="is_active" name="is_active" type="checkbox" class="h-4 w-4" checked>
-      <label for="is_active" class="text-sm font-medium">Active (available for booking)</label>
+      <label for="is_active" class="text-sm font-medium">
+        Active (available for booking)
+      </label>
     </div>
 
     <div class="flex gap-2">
-      <button class="rounded-lg bg-indigo-600 text-white px-4 py-2 hover:bg-indigo-700">Create</button>
-      <a class="rounded-lg border px-4 py-2 hover:bg-slate-50" href="{{ url_for('routes.admin_items') }}">Cancel</a>
+      <button class="rounded-lg bg-indigo-600 text-white px-4 py-2 hover:bg-indigo-700">
+        Create
+      </button>
+      <a
+        class="rounded-lg border px-4 py-2 hover:bg-slate-50"
+        href="{{ url_for('routes.admin_items') }}"
+      >
+        Cancel
+      </a>
     </div>
   </form>
 </div>

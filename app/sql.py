@@ -1,4 +1,3 @@
-
 # Auth / Users
 SQL_CREATE_USER = """
 INSERT INTO users (email, password_hash, role)
@@ -14,8 +13,8 @@ WHERE email = %s;
 
 # Customers
 SQL_CREATE_CUSTOMER = """
-INSERT INTO customers (full_name, email, phone, user_id)
-VALUES (%s, %s, %s, %s)
+INSERT INTO customers (full_name, email, phone, address, user_id)
+VALUES (%s, %s, %s, %s, %s)
 RETURNING id;
 """
 
@@ -33,7 +32,7 @@ ORDER BY created_at DESC;
 """
 
 SQL_GET_CUSTOMER = """
-SELECT id, full_name, email, phone, created_at, user_id
+SELECT id, full_name, email, phone, address, user_id, created_at
 FROM customers
 WHERE id = %s;
 """
@@ -44,9 +43,57 @@ FROM customers
 WHERE user_id = %s;
 """
 
-# Booking: category availability
+# Rental periods
+SQL_LIST_RENTAL_PERIODS = """
+SELECT id, label, min_days, max_days, created_at
+FROM rental_periods
+ORDER BY min_days, max_days, label;
+"""
+
+SQL_GET_RENTAL_PERIOD = """
+SELECT id, label, min_days, max_days, created_at
+FROM rental_periods
+WHERE id = %s;
+"""
+
+SQL_CREATE_RENTAL_PERIOD = """
+INSERT INTO rental_periods (label, min_days, max_days)
+VALUES (%s, %s, %s)
+RETURNING id;
+"""
+
+SQL_UPDATE_RENTAL_PERIOD = """
+UPDATE rental_periods
+SET label = %s,
+    min_days = %s,
+    max_days = %s
+WHERE id = %s;
+"""
+
+SQL_DELETE_RENTAL_PERIOD = """
+DELETE FROM rental_periods
+WHERE id = %s;
+"""
+
+SQL_RENTAL_PERIOD_IN_USE = """
+SELECT 1
+FROM category_rental_period_prices
+WHERE rental_period_id = %s
+LIMIT 1;
+"""
+
+SQL_RENTAL_PERIOD_USAGE_COUNT = """
+SELECT COUNT(*) AS usage_count
+FROM category_rental_period_prices
+WHERE rental_period_id = %s;
+"""
+
+# Booking: category availability + matching rental price for requested date range
 SQL_AVAILABLE_CATEGORIES = """
-WITH available_items AS (
+WITH rental_input AS (
+  SELECT (%s::date - %s::date) AS rental_days
+),
+available_items AS (
   SELECT i.id, i.category_id
   FROM items i
   WHERE i.is_active = TRUE
@@ -59,38 +106,76 @@ WITH available_items AS (
         AND %s < b.end_date
         AND %s > b.start_date
     )
+),
+matching_period AS (
+  SELECT
+    crpp.category_id,
+    rp.id AS rental_period_id,
+    rp.label AS rental_period_label,
+    rp.min_days,
+    rp.max_days,
+    crpp.price,
+    crpp.sort_order,
+    ROW_NUMBER() OVER (
+      PARTITION BY crpp.category_id
+      ORDER BY crpp.sort_order, rp.min_days, rp.max_days, rp.id
+    ) AS rn
+  FROM category_rental_period_prices crpp
+  JOIN rental_periods rp ON rp.id = crpp.rental_period_id
+  CROSS JOIN rental_input ri
+  WHERE ri.rental_days BETWEEN rp.min_days AND rp.max_days
 )
 SELECT
   c.id,
   c.display_name,
-  c.daily_rate,
+
+  mp.rental_period_id,
+  mp.rental_period_label,
+  mp.min_days AS rental_period_min_days,
+  mp.max_days AS rental_period_max_days,
+  mp.price AS quoted_period_price,
 
   (tc.category_id IS NOT NULL) AS is_tent,
   tc.capacity,
   tc.season_rating,
   tc.estimated_build_time_minutes,
-  tc.construction_cost,
-  tc.deconstruction_cost,
+  tc.setup_service_fee,
+  tc.packed_weight_kg,
+  tc.floor_area_m2,
 
   (fc.category_id IS NOT NULL) AS is_furnishing,
   fc.furnishing_kind,
+  fc.weight_kg,
+  fc.notes,
 
   COUNT(ai.id) AS available_units
 FROM categories c
-LEFT JOIN available_items ai ON ai.category_id = c.id
-LEFT JOIN tent_categories tc ON tc.category_id = c.id
-LEFT JOIN furnishing_categories fc ON fc.category_id = c.id
+LEFT JOIN available_items ai
+  ON ai.category_id = c.id
+LEFT JOIN tent_categories tc
+  ON tc.category_id = c.id
+LEFT JOIN furnishing_categories fc
+  ON fc.category_id = c.id
+LEFT JOIN matching_period mp
+  ON mp.category_id = c.id
+ AND mp.rn = 1
 GROUP BY
-  c.id, c.display_name, c.daily_rate,
-  tc.category_id, tc.capacity, tc.season_rating, tc.estimated_build_time_minutes, tc.construction_cost, tc.deconstruction_cost,
-  fc.category_id, fc.furnishing_kind
-ORDER BY (COUNT(ai.id) = 0),
-         (tc.category_id IS NOT NULL) DESC,
-         c.id;
+  c.id, c.display_name,
+  mp.rental_period_id, mp.rental_period_label, mp.min_days, mp.max_days, mp.price,
+  tc.category_id, tc.capacity, tc.season_rating, tc.estimated_build_time_minutes,
+  tc.setup_service_fee, tc.packed_weight_kg, tc.floor_area_m2,
+  fc.category_id, fc.furnishing_kind, fc.weight_kg, fc.notes
+ORDER BY
+  (COUNT(ai.id) = 0),
+  (mp.rental_period_id IS NULL),
+  (tc.category_id IS NOT NULL) DESC,
+  c.display_name;
 """
 
 SQL_CREATE_BOOKING_WITH_ALLOCATIONS = """
-SELECT create_booking_with_allocations(%s, %s, %s, %s, %s) AS booking_id;
+SELECT create_booking_with_allocations(
+  %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+) AS booking_id;
 """
 
 # Units list
@@ -103,29 +188,30 @@ SELECT
 
   c.id AS category_id,
   c.display_name,
-  c.daily_rate,
 
   (tc.category_id IS NOT NULL) AS is_tent,
   tc.capacity,
   tc.season_rating,
   tc.estimated_build_time_minutes,
-  tc.construction_cost,
-  tc.deconstruction_cost,
+  tc.setup_service_fee,
+  tc.packed_weight_kg,
+  tc.floor_area_m2,
 
   (fc.category_id IS NOT NULL) AS is_furnishing,
-  fc.furnishing_kind
+  fc.furnishing_kind,
+  fc.weight_kg,
+  fc.notes
 FROM items i
 JOIN categories c ON c.id = i.category_id
 LEFT JOIN tent_categories tc ON tc.category_id = c.id
 LEFT JOIN furnishing_categories fc ON fc.category_id = c.id
-ORDER BY c.id, i.id;
+ORDER BY c.display_name, i.id;
 """
 
 SQL_LIST_CATEGORIES_FOR_DROPDOWN = """
 SELECT
   c.id,
   c.display_name,
-  c.daily_rate,
   (tc.category_id IS NOT NULL) AS is_tent,
   (fc.category_id IS NOT NULL) AS is_furnishing,
   tc.capacity,
@@ -173,47 +259,22 @@ WHERE bi.item_id = %s
   AND b.end_date > CURRENT_DATE
 LIMIT 1;
 """
-SQL_DELETE_BOOKING_ITEMS_FOR_ITEM = "DELETE FROM booking_items WHERE item_id = %s;"
-SQL_DELETE_ITEM = "DELETE FROM items WHERE id = %s;"
+
+SQL_DELETE_BOOKING_ITEMS_FOR_ITEM = """
+DELETE FROM booking_items
+WHERE item_id = %s;
+"""
+
+SQL_DELETE_ITEM = """
+DELETE FROM items
+WHERE id = %s;
+"""
 
 # Categories list + edit
 SQL_LIST_CATEGORIES = """
 SELECT
   c.id,
   c.display_name,
-  c.daily_rate,
-  c.created_at,
-
-  (tc.category_id IS NOT NULL) AS is_tent,
-  tc.capacity,
-  tc.season_rating,
-  tc.estimated_build_time_minutes,
-  tc.construction_cost,
-  tc.deconstruction_cost,
-
-  (fc.category_id IS NOT NULL) AS is_furnishing,
-  fc.furnishing_kind,
-  fc.weight_kg,
-  fc.notes,
-
-  COUNT(i.id) AS total_units,
-  SUM(CASE WHEN i.is_active THEN 1 ELSE 0 END) AS active_units
-FROM categories c
-LEFT JOIN items i ON i.category_id = c.id
-LEFT JOIN tent_categories tc ON tc.category_id = c.id
-LEFT JOIN furnishing_categories fc ON fc.category_id = c.id
-GROUP BY
-  c.id, c.display_name, c.daily_rate, c.created_at,
-  tc.category_id, tc.capacity, tc.season_rating, tc.estimated_build_time_minutes, tc.construction_cost, tc.deconstruction_cost,
-  fc.category_id, fc.furnishing_kind, fc.weight_kg, fc.notes
-ORDER BY (tc.category_id IS NOT NULL) DESC, c.id;
-"""
-
-SQL_GET_CATEGORY_FOR_EDIT = """
-SELECT
-  c.id,
-  c.display_name,
-  c.daily_rate,
   c.created_at,
 
   (tc.category_id IS NOT NULL) AS is_tent,
@@ -222,8 +283,40 @@ SELECT
   tc.packed_weight_kg,
   tc.floor_area_m2,
   tc.estimated_build_time_minutes,
-  tc.construction_cost,
-  tc.deconstruction_cost,
+  tc.setup_service_fee,
+
+  (fc.category_id IS NOT NULL) AS is_furnishing,
+  fc.furnishing_kind,
+  fc.weight_kg,
+  fc.notes,
+
+  COUNT(i.id) AS total_units,
+  COALESCE(SUM(CASE WHEN i.is_active THEN 1 ELSE 0 END), 0) AS active_units
+FROM categories c
+LEFT JOIN items i ON i.category_id = c.id
+LEFT JOIN tent_categories tc ON tc.category_id = c.id
+LEFT JOIN furnishing_categories fc ON fc.category_id = c.id
+GROUP BY
+  c.id, c.display_name, c.created_at,
+  tc.category_id, tc.capacity, tc.season_rating, tc.packed_weight_kg,
+  tc.floor_area_m2, tc.estimated_build_time_minutes, tc.setup_service_fee,
+  fc.category_id, fc.furnishing_kind, fc.weight_kg, fc.notes
+ORDER BY (tc.category_id IS NOT NULL) DESC, c.display_name;
+"""
+
+SQL_GET_CATEGORY_FOR_EDIT = """
+SELECT
+  c.id,
+  c.display_name,
+  c.created_at,
+
+  (tc.category_id IS NOT NULL) AS is_tent,
+  tc.capacity,
+  tc.season_rating,
+  tc.packed_weight_kg,
+  tc.floor_area_m2,
+  tc.estimated_build_time_minutes,
+  tc.setup_service_fee,
 
   (fc.category_id IS NOT NULL) AS is_furnishing,
   fc.furnishing_kind,
@@ -236,28 +329,37 @@ WHERE c.id = %s;
 """
 
 SQL_CREATE_CATEGORY = """
-INSERT INTO categories (display_name, daily_rate)
-VALUES (%s, %s)
+INSERT INTO categories (display_name)
+VALUES (%s)
 RETURNING id;
 """
 
 SQL_CREATE_TENT_CATEGORY_ROW = """
 INSERT INTO tent_categories (
-  category_id, capacity, season_rating, packed_weight_kg, floor_area_m2,
-  estimated_build_time_minutes, construction_cost, deconstruction_cost
+  category_id,
+  capacity,
+  season_rating,
+  packed_weight_kg,
+  floor_area_m2,
+  estimated_build_time_minutes,
+  setup_service_fee
 )
-VALUES (%s,%s,%s,%s,%s,%s,%s,%s);
+VALUES (%s, %s, %s, %s, %s, %s, %s);
 """
 
 SQL_CREATE_FURN_CATEGORY_ROW = """
-INSERT INTO furnishing_categories (category_id, furnishing_kind, weight_kg, notes)
-VALUES (%s,%s,%s,%s);
+INSERT INTO furnishing_categories (
+  category_id,
+  furnishing_kind,
+  weight_kg,
+  notes
+)
+VALUES (%s, %s, %s, %s);
 """
 
 SQL_UPDATE_CATEGORY_BASE = """
 UPDATE categories
-SET display_name = %s,
-    daily_rate = %s
+SET display_name = %s
 WHERE id = %s;
 """
 
@@ -268,8 +370,7 @@ SET capacity = %s,
     packed_weight_kg = %s,
     floor_area_m2 = %s,
     estimated_build_time_minutes = %s,
-    construction_cost = %s,
-    deconstruction_cost = %s
+    setup_service_fee = %s
 WHERE category_id = %s;
 """
 
@@ -281,43 +382,170 @@ SET furnishing_kind = %s,
 WHERE category_id = %s;
 """
 
+# Category rental period pricing
+SQL_LIST_CATEGORY_RENTAL_PERIOD_PRICES = """
+SELECT
+  crpp.category_id,
+  rp.id AS rental_period_id,
+  rp.label,
+  rp.min_days,
+  rp.max_days,
+  crpp.price,
+  crpp.sort_order,
+  crpp.created_at
+FROM category_rental_period_prices crpp
+JOIN rental_periods rp ON rp.id = crpp.rental_period_id
+WHERE crpp.category_id = %s
+ORDER BY crpp.sort_order, rp.min_days, rp.max_days, rp.label;
+"""
+
+SQL_GET_CATEGORY_RENTAL_PERIOD_PRICE = """
+SELECT
+  crpp.category_id,
+  crpp.rental_period_id,
+  crpp.price,
+  crpp.sort_order,
+  rp.label,
+  rp.min_days,
+  rp.max_days
+FROM category_rental_period_prices crpp
+JOIN rental_periods rp ON rp.id = crpp.rental_period_id
+WHERE crpp.category_id = %s
+  AND crpp.rental_period_id = %s;
+"""
+
+SQL_CREATE_CATEGORY_RENTAL_PERIOD_PRICE = """
+INSERT INTO category_rental_period_prices (
+  category_id,
+  rental_period_id,
+  price,
+  sort_order
+)
+VALUES (%s, %s, %s, %s);
+"""
+
+SQL_UPSERT_CATEGORY_RENTAL_PERIOD_PRICE = """
+INSERT INTO category_rental_period_prices (
+  category_id,
+  rental_period_id,
+  price,
+  sort_order
+)
+VALUES (%s, %s, %s, %s)
+ON CONFLICT (category_id, rental_period_id)
+DO UPDATE SET
+  price = EXCLUDED.price,
+  sort_order = EXCLUDED.sort_order;
+"""
+
+SQL_UPDATE_CATEGORY_RENTAL_PERIOD_PRICE = """
+UPDATE category_rental_period_prices
+SET price = %s,
+    sort_order = %s
+WHERE category_id = %s
+  AND rental_period_id = %s;
+"""
+
+SQL_DELETE_CATEGORY_RENTAL_PERIOD_PRICE = """
+DELETE FROM category_rental_period_prices
+WHERE category_id = %s
+  AND rental_period_id = %s;
+"""
+
 # Bookings
 SQL_CREATE_BOOKING = """
-INSERT INTO bookings (customer_id, start_date, end_date, status)
-VALUES (%s, %s, %s, 'pending')
+INSERT INTO bookings (
+  customer_id,
+  start_date,
+  end_date,
+  status,
+  include_delivery,
+  delivery_fee,
+  include_setup_service,
+  admin_note
+)
+VALUES (%s, %s, %s, 'pending', %s, %s, %s, %s)
 RETURNING id;
 """
 
 SQL_BOOKING_DETAIL = """
-SELECT b.id, b.customer_id, c.full_name, c.email, c.phone,
-       b.start_date, b.end_date, b.status, b.created_at
+SELECT
+  b.id,
+  b.customer_id,
+  c.full_name,
+  c.email,
+  c.phone,
+  b.start_date,
+  b.end_date,
+  b.status,
+  b.include_delivery,
+  b.delivery_fee,
+  b.include_setup_service,
+  b.admin_note,
+  b.created_at
 FROM bookings b
 JOIN customers c ON c.id = b.customer_id
 WHERE b.id = %s;
 """
 
 SQL_BOOKING_DETAIL_FOR_CUSTOMER = """
-SELECT b.id, b.customer_id, c.full_name, c.email, c.phone,
-       b.start_date, b.end_date, b.status, b.created_at
+SELECT
+  b.id,
+  b.customer_id,
+  c.full_name,
+  c.email,
+  c.phone,
+  b.start_date,
+  b.end_date,
+  b.status,
+  b.include_delivery,
+  b.delivery_fee,
+  b.include_setup_service,
+  b.admin_note,
+  b.created_at
 FROM bookings b
 JOIN customers c ON c.id = b.customer_id
-WHERE b.id = %s AND b.customer_id = %s;
+WHERE b.id = %s
+  AND b.customer_id = %s;
 """
 
 SQL_BOOKING_ITEMS = """
 SELECT
   i.id AS item_id,
   i.sku,
+  c.id AS category_id,
   c.display_name,
-  COALESCE(bi.price_per_day, c.daily_rate) AS price_per_day,
+
+  bi.rental_period_id,
+  bi.quoted_period_label,
+  bi.quoted_period_price,
+  bi.setup_service_fee,
+  bi.custom_total_price,
+  bi.custom_price_note,
+  bi.line_note,
+
+  COALESCE(bi.custom_total_price, bi.quoted_period_price) AS effective_rental_price,
+
+  CASE
+    WHEN b.include_setup_service THEN COALESCE(bi.setup_service_fee, 0)
+    ELSE 0
+  END AS effective_setup_fee,
+
+  COALESCE(bi.custom_total_price, bi.quoted_period_price)
+  + CASE
+      WHEN b.include_setup_service THEN COALESCE(bi.setup_service_fee, 0)
+      ELSE 0
+    END AS effective_line_total,
 
   (tc.category_id IS NOT NULL) AS is_tent,
-  tc.construction_cost,
-  tc.deconstruction_cost,
+  tc.capacity,
+  tc.season_rating,
+  tc.setup_service_fee AS current_setup_service_fee,
 
   (fc.category_id IS NOT NULL) AS is_furnishing,
   fc.furnishing_kind
 FROM booking_items bi
+JOIN bookings b ON b.id = bi.booking_id
 JOIN items i ON i.id = bi.item_id
 JOIN categories c ON c.id = i.category_id
 LEFT JOIN tent_categories tc ON tc.category_id = c.id
@@ -330,33 +558,143 @@ SQL_BOOKING_TOTAL = """
 SELECT
   b.id AS booking_id,
   (b.end_date - b.start_date) AS days,
-  SUM( (b.end_date - b.start_date) * COALESCE(bi.price_per_day, c.daily_rate) ) AS rental_cost,
-  SUM( COALESCE(tc.construction_cost, 0) + COALESCE(tc.deconstruction_cost, 0) ) AS tent_setup_cost,
-  SUM( (b.end_date - b.start_date) * COALESCE(bi.price_per_day, c.daily_rate) )
-  + SUM( COALESCE(tc.construction_cost, 0) + COALESCE(tc.deconstruction_cost, 0) ) AS total_cost
+
+  COALESCE(SUM(COALESCE(bi.custom_total_price, bi.quoted_period_price)), 0) AS rental_cost,
+
+  COALESCE(
+    CASE
+      WHEN b.include_setup_service
+      THEN SUM(COALESCE(bi.setup_service_fee, 0))
+      ELSE 0
+    END,
+    0
+  ) AS setup_cost,
+
+  COALESCE(
+    CASE
+      WHEN b.include_delivery
+      THEN COALESCE(b.delivery_fee, 0)
+      ELSE 0
+    END,
+    0
+  ) AS delivery_cost,
+
+  COALESCE(SUM(COALESCE(bi.custom_total_price, bi.quoted_period_price)), 0)
+  + COALESCE(
+      CASE
+        WHEN b.include_setup_service
+        THEN SUM(COALESCE(bi.setup_service_fee, 0))
+        ELSE 0
+      END,
+      0
+    )
+  + COALESCE(
+      CASE
+        WHEN b.include_delivery
+        THEN COALESCE(b.delivery_fee, 0)
+        ELSE 0
+      END,
+      0
+    ) AS total_cost
 FROM bookings b
 JOIN booking_items bi ON bi.booking_id = b.id
-JOIN items i ON i.id = bi.item_id
-JOIN categories c ON c.id = i.category_id
-LEFT JOIN tent_categories tc ON tc.category_id = c.id
 WHERE b.id = %s
-GROUP BY b.id;
+GROUP BY
+  b.id,
+  b.start_date,
+  b.end_date,
+  b.include_setup_service,
+  b.include_delivery,
+  b.delivery_fee;
 """
 
 SQL_LIST_BOOKINGS_FOR_CUSTOMER = """
-SELECT id, start_date, end_date, status, created_at
+SELECT
+  id,
+  start_date,
+  end_date,
+  status,
+  include_delivery,
+  delivery_fee,
+  include_setup_service,
+  admin_note,
+  created_at
 FROM bookings
 WHERE customer_id = %s
 ORDER BY created_at DESC;
 """
 
 SQL_LIST_ALL_BOOKINGS = """
-SELECT b.id, b.start_date, b.end_date, b.status, b.created_at,
-       c.id AS customer_id, c.full_name, c.email
+SELECT
+  b.id,
+  b.start_date,
+  b.end_date,
+  b.status,
+  b.include_delivery,
+  b.delivery_fee,
+  b.include_setup_service,
+  b.admin_note,
+  b.created_at,
+  c.id AS customer_id,
+  c.full_name,
+  c.email
 FROM bookings b
 JOIN customers c ON c.id = b.customer_id
 ORDER BY b.created_at DESC;
 """
 
-SQL_CONFIRM_BOOKING = "UPDATE bookings SET status='confirmed' WHERE id=%s;"
-SQL_CANCEL_BOOKING = "UPDATE bookings SET status='cancelled' WHERE id=%s;"
+SQL_CONFIRM_BOOKING = """
+UPDATE bookings
+SET status = 'confirmed'
+WHERE id = %s;
+"""
+
+SQL_CANCEL_BOOKING = """
+UPDATE bookings
+SET status = 'cancelled'
+WHERE id = %s;
+"""
+
+# Optional booking item edits / overrides
+SQL_UPDATE_BOOKING_ITEM_OVERRIDE = """
+UPDATE booking_items
+SET custom_total_price = %s,
+    custom_price_note = %s,
+    line_note = %s
+WHERE booking_id = %s
+  AND item_id = %s;
+"""
+
+SQL_CLEAR_BOOKING_ITEM_OVERRIDE = """
+UPDATE booking_items
+SET custom_total_price = NULL,
+    custom_price_note = NULL
+WHERE booking_id = %s
+  AND item_id = %s;
+"""
+
+SQL_UPDATE_BOOKING_ADMIN_FIELDS = """
+UPDATE bookings
+SET include_delivery = %s,
+    delivery_fee = %s,
+    include_setup_service = %s,
+    admin_note = %s
+WHERE id = %s;
+"""
+
+SQL_GET_CUSTOMER_FOR_EDIT = """
+SELECT id, full_name, email, phone, address, user_id, created_at
+FROM customers
+WHERE id = %s;
+"""
+
+SQL_UPDATE_CUSTOMER = """
+UPDATE customers
+SET
+    full_name = %s,
+    email = %s,
+    phone = %s,
+    address = %s
+WHERE id = %s
+RETURNING id;
+"""

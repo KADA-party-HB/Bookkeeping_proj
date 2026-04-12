@@ -2,34 +2,64 @@
 {% block content %}
 <div class="max-w-2xl bg-white border rounded-xl p-6 shadow-sm">
   <h2 class="text-xl font-semibold">Edit unit #{{ unit.id }}</h2>
-  <p class="text-sm text-slate-500 mt-1">Edits only affect this physical SKU.</p>
+  <p class="text-sm text-slate-500 mt-1">
+    Changes here only affect this physical inventory unit.
+  </p>
 
   <form method="post" class="mt-4 space-y-4">
     <div>
-      <label class="text-sm font-medium">Category</label>
-      <select name="category_id" required class="mt-1 w-full rounded-lg border px-3 py-2">
+      <label class="text-sm font-medium" for="category_id">Category</label>
+      <select
+        id="category_id"
+        name="category_id"
+        required
+        class="mt-1 w-full rounded-lg border px-3 py-2"
+      >
         {% for c in categories %}
           <option value="{{ c.id }}" {% if c.id == unit.category_id %}selected{% endif %}>
-            {{ c.display_name }} ({{ c.daily_rate }}/day)
+            {{ c.display_name }}
+            {% if c.is_tent %} - Tent{% endif %}
+            {% if c.is_tent and c.capacity %} (cap {{ c.capacity }}){% endif %}
+            {% if c.is_furnishing and c.furnishing_kind %} - {{ c.furnishing_kind }}{% endif %}
           </option>
         {% endfor %}
       </select>
     </div>
 
     <div>
-      <label class="text-sm font-medium">SKU</label>
-      <input name="sku" value="{{ unit.sku }}" required class="mt-1 w-full rounded-lg border px-3 py-2">
+      <label class="text-sm font-medium" for="sku">SKU</label>
+      <input
+        id="sku"
+        name="sku"
+        value="{{ unit.sku }}"
+        required
+        class="mt-1 w-full rounded-lg border px-3 py-2"
+      >
     </div>
 
     <div class="flex items-center gap-2">
-      <input id="is_active" name="is_active" type="checkbox" class="h-4 w-4"
-             {% if unit.is_active %}checked{% endif %}>
-      <label for="is_active" class="text-sm font-medium">Active (available for booking)</label>
+      <input
+        id="is_active"
+        name="is_active"
+        type="checkbox"
+        class="h-4 w-4"
+        {% if unit.is_active %}checked{% endif %}
+      >
+      <label for="is_active" class="text-sm font-medium">
+        Active (available for booking)
+      </label>
     </div>
 
     <div class="flex gap-2">
-      <button class="rounded-lg bg-indigo-600 text-white px-4 py-2 hover:bg-indigo-700">Save</button>
-      <a class="rounded-lg border px-4 py-2 hover:bg-slate-50" href="{{ url_for('routes.admin_items') }}">Cancel</a>
+      <button class="rounded-lg bg-indigo-600 text-white px-4 py-2 hover:bg-indigo-700">
+        Save
+      </button>
+      <a
+        class="rounded-lg border px-4 py-2 hover:bg-slate-50"
+        href="{{ url_for('routes.admin_items') }}"
+      >
+        Cancel
+      </a>
     </div>
   </form>
 </div>

@@ -4,15 +4,29 @@
   <div class="flex items-center gap-3">
     <h2 class="text-xl font-semibold">Categories</h2>
     <div class="ml-auto flex flex-wrap gap-2">
-      <a class="rounded-lg border px-3 py-2 text-sm hover:bg-slate-50"
-         href="{{ url_for('routes.admin_category_tent_new_form') }}">+ New tent category</a>
-      <a class="rounded-lg border px-3 py-2 text-sm hover:bg-slate-50"
-         href="{{ url_for('routes.admin_category_furn_new_form') }}">+ New furnishing category</a>
+      <a
+        class="rounded-lg border px-3 py-2 text-sm hover:bg-slate-50"
+        href="{{ url_for('routes.admin_category_tent_new_form') }}"
+      >
+        + New tent category
+      </a>
+      <a
+        class="rounded-lg border px-3 py-2 text-sm hover:bg-slate-50"
+        href="{{ url_for('routes.admin_category_furn_new_form') }}"
+      >
+        + New furnishing category
+      </a>
+      <a
+        class="rounded-lg border px-3 py-2 text-sm hover:bg-slate-50"
+        href="{{ url_for('routes.admin_rental_periods') }}"
+      >
+        Rental periods
+      </a>
     </div>
   </div>
 
   <p class="text-xs text-slate-500 mt-2">
-    Editing a category affects all units in it.
+    Editing a category affects all units in it and its rental period pricing.
   </p>
 
   <div class="overflow-x-auto border rounded-lg mt-4">
@@ -22,44 +36,79 @@
           <th class="p-3 text-left">ID</th>
           <th class="p-3 text-left">Name</th>
           <th class="p-3 text-left">Type</th>
-          <th class="p-3 text-left">Rate/day</th>
           <th class="p-3 text-left">Units (active/total)</th>
           <th class="p-3 text-left">Details</th>
+          <th class="p-3 text-left">Pricing</th>
           <th class="p-3"></th>
         </tr>
       </thead>
       <tbody>
         {% for c in categories %}
-          <tr class="border-t">
+          <tr class="border-t align-top">
             <td class="p-3">{{ c.id }}</td>
-            <td class="p-3 font-medium">{{ c.display_name }}</td>
+
+            <td class="p-3">
+              <div class="font-medium">{{ c.display_name }}</div>
+              <div class="text-xs text-slate-500">{{ c.created_at }}</div>
+            </td>
+
             <td class="p-3">
               {% if c.is_tent %}
-                <span class="inline-flex rounded-full bg-indigo-50 text-indigo-700 px-2 py-0.5 text-xs">Tent</span>
+                <span class="inline-flex rounded-full bg-indigo-50 text-indigo-700 px-2 py-0.5 text-xs">
+                  Tent
+                </span>
               {% else %}
-                <span class="inline-flex rounded-full bg-emerald-50 text-emerald-700 px-2 py-0.5 text-xs">Furnishing</span>
+                <span class="inline-flex rounded-full bg-emerald-50 text-emerald-700 px-2 py-0.5 text-xs">
+                  Furnishing
+                </span>
               {% endif %}
             </td>
-            <td class="p-3">{{ c.daily_rate }}</td>
+
             <td class="p-3">{{ c.active_units or 0 }}/{{ c.total_units }}</td>
+
             <td class="p-3 text-slate-700">
               {% if c.is_tent %}
-                cap {{ c.capacity }}, season {{ c.season_rating }},
-                build {{ c.estimated_build_time_minutes }} min,
-                setup {{ c.construction_cost }}, teardown {{ c.deconstruction_cost }}
+                <div>Capacity: {{ c.capacity }}</div>
+                <div>Season rating: {{ c.season_rating }}</div>
+                <div>Build time: {{ c.estimated_build_time_minutes }} min</div>
+                <div>Setup service: {{ c.setup_service_fee }} kr</div>
+                {% if c.packed_weight_kg %}
+                  <div>Packed weight: {{ c.packed_weight_kg }} kg</div>
+                {% endif %}
+                {% if c.floor_area_m2 %}
+                  <div>Floor area: {{ c.floor_area_m2 }} m²</div>
+                {% endif %}
               {% else %}
-                {{ c.furnishing_kind }}
+                <div>{{ c.furnishing_kind }}</div>
+                {% if c.weight_kg %}
+                  <div>Weight: {{ c.weight_kg }} kg</div>
+                {% endif %}
+                {% if c.notes %}
+                  <div class="text-xs text-slate-500 mt-1">{{ c.notes }}</div>
+                {% endif %}
               {% endif %}
             </td>
+
+            <td class="p-3 text-slate-600">
+              <div class="text-sm">Period-based pricing</div>
+              <div class="text-xs text-slate-500">
+                Managed on the edit page
+              </div>
+            </td>
+
             <td class="p-3">
-              <a class="rounded-lg border px-3 py-1.5 text-xs hover:bg-slate-50"
-                 href="{{ url_for('routes.admin_category_edit_form', category_id=c.id) }}">
+              <a
+                class="rounded-lg border px-3 py-1.5 text-xs hover:bg-slate-50"
+                href="{{ url_for('routes.admin_category_edit_form', category_id=c.id) }}"
+              >
                 Edit
               </a>
             </td>
           </tr>
         {% else %}
-          <tr><td class="p-3" colspan="7"><i>No categories yet.</i></td></tr>
+          <tr>
+            <td class="p-3" colspan="7"><i>No categories yet.</i></td>
+          </tr>
         {% endfor %}
       </tbody>
     </table>

@@ -1,9 +1,9 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="max-w-lg bg-white border rounded-xl p-6 shadow-sm">
-  <h1 class="text-xl font-semibold">New customer</h1>
+  <h1 class="text-xl font-semibold">Edit customer</h1>
   <p class="text-sm text-slate-500 mt-1">
-    Create a customer profile without a login account.
+    Update customer details. Email is optional.
   </p>
 
   <form method="post" class="mt-4 space-y-3">
@@ -13,6 +13,7 @@
         id="full_name"
         name="full_name"
         required
+        value="{{ customer.full_name }}"
         class="mt-1 w-full rounded-lg border px-3 py-2"
       >
     </div>
@@ -23,6 +24,7 @@
         id="email"
         name="email"
         type="email"
+        value="{{ customer.email or '' }}"
         class="mt-1 w-full rounded-lg border px-3 py-2"
       >
     </div>
@@ -32,6 +34,7 @@
       <input
         id="phone"
         name="phone"
+        value="{{ customer.phone or '' }}"
         class="mt-1 w-full rounded-lg border px-3 py-2"
       >
     </div>
@@ -43,12 +46,21 @@
         name="address"
         rows="3"
         class="mt-1 w-full rounded-lg border px-3 py-2"
-      ></textarea>
+      >{{ customer.address or '' }}</textarea>
     </div>
 
-    <button class="rounded-lg bg-indigo-600 text-white px-4 py-2 hover:bg-indigo-700">
-      Create customer
-    </button>
+    <div class="flex items-center gap-3 pt-2">
+      <button class="rounded-lg bg-indigo-600 text-white px-4 py-2 hover:bg-indigo-700">
+        Save changes
+      </button>
+
+      <a
+        href="{{ url_for('routes.customer_detail', customer_id=customer.id) }}"
+        class="rounded-lg border px-4 py-2 hover:bg-slate-50"
+      >
+        Cancel
+      </a>
+    </div>
   </form>
 </div>
 {% endblock %}

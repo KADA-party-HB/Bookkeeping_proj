@@ -11,46 +11,88 @@
           <th class="p-3 text-left">Customer</th>
           <th class="p-3 text-left">Dates</th>
           <th class="p-3 text-left">Status</th>
+          <th class="p-3 text-left">Options</th>
           <th class="p-3 text-left">Created</th>
         </tr>
       </thead>
       <tbody>
         {% for b in bookings %}
-          <tr class="border-t hover:bg-slate-50">
+          <tr class="border-t hover:bg-slate-50 align-top">
             <td class="p-3 font-medium text-indigo-700">
-              <a class="block w-full h-full"
-                 href="{{ url_for('routes.booking_detail', booking_id=b.id) }}">
+              <a
+                class="block w-full h-full"
+                href="{{ url_for('routes.booking_detail', booking_id=b.id) }}"
+              >
                 #{{ b.id }}
               </a>
             </td>
+
             <td class="p-3">
-              <a class="block w-full h-full"
-                 href="{{ url_for('routes.booking_detail', booking_id=b.id) }}">
+              <a
+                class="block w-full h-full"
+                href="{{ url_for('routes.booking_detail', booking_id=b.id) }}"
+              >
                 <div class="font-medium">{{ b.full_name }}</div>
                 <div class="text-xs text-slate-500">{{ b.email }}</div>
               </a>
             </td>
+
             <td class="p-3">
-              <a class="block w-full h-full"
-                 href="{{ url_for('routes.booking_detail', booking_id=b.id) }}">
+              <a
+                class="block w-full h-full"
+                href="{{ url_for('routes.booking_detail', booking_id=b.id) }}"
+              >
                 {{ b.start_date }} → {{ b.end_date }}
               </a>
             </td>
+
             <td class="p-3">
-              <a class="block w-full h-full"
-                 href="{{ url_for('routes.booking_detail', booking_id=b.id) }}">
+              <a
+                class="block w-full h-full"
+                href="{{ url_for('routes.booking_detail', booking_id=b.id) }}"
+              >
                 {{ b.status }}
               </a>
             </td>
+
+            <td class="p-3 text-xs text-slate-600">
+              <a
+                class="block w-full h-full"
+                href="{{ url_for('routes.booking_detail', booking_id=b.id) }}"
+              >
+                {% if b.include_setup_service %}
+                  <div>Setup included</div>
+                {% endif %}
+
+                {% if b.include_delivery %}
+                  <div>
+                    Delivery included{% if b.delivery_fee is not none %} ({{ b.delivery_fee }} kr){% endif %}
+                  </div>
+                {% endif %}
+
+                {% if b.admin_note %}
+                  <div class="text-slate-500 mt-1">Has admin note</div>
+                {% endif %}
+
+                {% if not b.include_setup_service and not b.include_delivery and not b.admin_note %}
+                  <span class="text-slate-400">No extras</span>
+                {% endif %}
+              </a>
+            </td>
+
             <td class="p-3 text-xs text-slate-500">
-              <a class="block w-full h-full"
-                 href="{{ url_for('routes.booking_detail', booking_id=b.id) }}">
+              <a
+                class="block w-full h-full"
+                href="{{ url_for('routes.booking_detail', booking_id=b.id) }}"
+              >
                 {{ b.created_at }}
               </a>
             </td>
           </tr>
         {% else %}
-          <tr><td class="p-3" colspan="5"><i>No bookings yet.</i></td></tr>
+          <tr>
+            <td class="p-3" colspan="6"><i>No bookings yet.</i></td>
+          </tr>
         {% endfor %}
       </tbody>
     </table>

@@ -1,62 +1,280 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="max-w-3xl bg-white border rounded-xl p-6 shadow-sm">
+<div class="max-w-5xl bg-white border rounded-xl p-6 shadow-sm">
   <h2 class="text-xl font-semibold">Edit category #{{ cat.id }}</h2>
-  <p class="text-sm text-slate-500 mt-1">Edits affect all units in this category.</p>
+  <p class="text-sm text-slate-500 mt-1">
+    Changes here affect all units in this category and its rental period pricing.
+  </p>
 
-  <form method="post" class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-    <div class="md:col-span-2"><h3 class="font-medium">Base</h3></div>
+  {% set pricing_map = {} %}
+  {% for row in pricing_rows %}
+    {% set _ = pricing_map.update({
+      row.rental_period_id: {
+        "price": row.price,
+        "sort_order": row.sort_order,
+        "label": row.label,
+        "min_days": row.min_days,
+        "max_days": row.max_days
+      }
+    }) %}
+  {% endfor %}
 
-    <div>
-      <label class="text-sm font-medium">Display name</label>
-      <input name="display_name" value="{{ cat.display_name }}" required class="mt-1 w-full rounded-lg border px-3 py-2">
-    </div>
+  <form method="post" class="mt-4 space-y-6">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div class="md:col-span-2">
+        <h3 class="font-medium">Base</h3>
+      </div>
 
-    <div>
-      <label class="text-sm font-medium">Daily rate</label>
-      <input name="daily_rate" type="number" step="0.01" value="{{ cat.daily_rate }}" required class="mt-1 w-full rounded-lg border px-3 py-2">
+      <div>
+        <label class="text-sm font-medium" for="display_name">Display name</label>
+        <input
+          id="display_name"
+          name="display_name"
+          value="{{ cat.display_name }}"
+          required
+          class="mt-1 w-full rounded-lg border px-3 py-2"
+        >
+      </div>
     </div>
 
     {% if cat.is_tent %}
-      <div class="md:col-span-2 mt-2"><h3 class="font-medium">Tent details</h3></div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="md:col-span-2">
+          <h3 class="font-medium">Tent details</h3>
+        </div>
 
-      <div><label class="text-sm font-medium">Capacity</label>
-        <input name="capacity" type="number" min="1" value="{{ cat.capacity }}" required class="mt-1 w-full rounded-lg border px-3 py-2"></div>
+        <div>
+          <label class="text-sm font-medium" for="capacity">Capacity</label>
+          <input
+            id="capacity"
+            name="capacity"
+            type="number"
+            min="1"
+            value="{{ cat.capacity }}"
+            required
+            class="mt-1 w-full rounded-lg border px-3 py-2"
+          >
+        </div>
 
-      <div><label class="text-sm font-medium">Season rating (1–5)</label>
-        <input name="season_rating" type="number" min="1" max="5" value="{{ cat.season_rating }}" required class="mt-1 w-full rounded-lg border px-3 py-2"></div>
+        <div>
+          <label class="text-sm font-medium" for="season_rating">Season rating (1–5)</label>
+          <input
+            id="season_rating"
+            name="season_rating"
+            type="number"
+            min="1"
+            max="5"
+            value="{{ cat.season_rating }}"
+            required
+            class="mt-1 w-full rounded-lg border px-3 py-2"
+          >
+        </div>
 
-      <div><label class="text-sm font-medium">Build time (minutes)</label>
-        <input name="estimated_build_time_minutes" type="number" min="0" value="{{ cat.estimated_build_time_minutes }}" required class="mt-1 w-full rounded-lg border px-3 py-2"></div>
+        <div>
+          <label class="text-sm font-medium" for="estimated_build_time_minutes">Build time (minutes)</label>
+          <input
+            id="estimated_build_time_minutes"
+            name="estimated_build_time_minutes"
+            type="number"
+            min="0"
+            value="{{ cat.estimated_build_time_minutes }}"
+            required
+            class="mt-1 w-full rounded-lg border px-3 py-2"
+          >
+        </div>
 
-      <div><label class="text-sm font-medium">Construction cost</label>
-        <input name="construction_cost" type="number" step="0.01" min="0" value="{{ cat.construction_cost }}" required class="mt-1 w-full rounded-lg border px-3 py-2"></div>
+        <div>
+          <label class="text-sm font-medium" for="setup_service_fee">Setup service fee</label>
+          <input
+            id="setup_service_fee"
+            name="setup_service_fee"
+            type="number"
+            step="0.01"
+            min="0"
+            value="{{ cat.setup_service_fee }}"
+            required
+            class="mt-1 w-full rounded-lg border px-3 py-2"
+          >
+          <p class="text-xs text-slate-500 mt-1">
+            Includes construction and deconstruction together.
+          </p>
+        </div>
 
-      <div><label class="text-sm font-medium">Deconstruction cost</label>
-        <input name="deconstruction_cost" type="number" step="0.01" min="0" value="{{ cat.deconstruction_cost }}" required class="mt-1 w-full rounded-lg border px-3 py-2"></div>
+        <div>
+          <label class="text-sm font-medium" for="packed_weight_kg">Packed weight (kg) (optional)</label>
+          <input
+            id="packed_weight_kg"
+            name="packed_weight_kg"
+            type="number"
+            step="0.01"
+            min="0"
+            value="{{ cat.packed_weight_kg or '' }}"
+            class="mt-1 w-full rounded-lg border px-3 py-2"
+          >
+        </div>
 
-      <div><label class="text-sm font-medium">Packed weight (kg) (optional)</label>
-        <input name="packed_weight_kg" type="number" step="0.01" min="0" value="{{ cat.packed_weight_kg or '' }}" class="mt-1 w-full rounded-lg border px-3 py-2"></div>
-
-      <div><label class="text-sm font-medium">Floor area (m²) (optional)</label>
-        <input name="floor_area_m2" type="number" step="0.01" min="0" value="{{ cat.floor_area_m2 or '' }}" class="mt-1 w-full rounded-lg border px-3 py-2"></div>
-
+        <div>
+          <label class="text-sm font-medium" for="floor_area_m2">Floor area (m²) (optional)</label>
+          <input
+            id="floor_area_m2"
+            name="floor_area_m2"
+            type="number"
+            step="0.01"
+            min="0"
+            value="{{ cat.floor_area_m2 or '' }}"
+            class="mt-1 w-full rounded-lg border px-3 py-2"
+          >
+        </div>
+      </div>
     {% else %}
-      <div class="md:col-span-2 mt-2"><h3 class="font-medium">Furnishing details</h3></div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="md:col-span-2">
+          <h3 class="font-medium">Furnishing details</h3>
+        </div>
 
-      <div><label class="text-sm font-medium">Kind</label>
-        <input name="furnishing_kind" value="{{ cat.furnishing_kind }}" required class="mt-1 w-full rounded-lg border px-3 py-2"></div>
+        <div>
+          <label class="text-sm font-medium" for="furnishing_kind">Kind</label>
+          <input
+            id="furnishing_kind"
+            name="furnishing_kind"
+            value="{{ cat.furnishing_kind }}"
+            required
+            class="mt-1 w-full rounded-lg border px-3 py-2"
+          >
+        </div>
 
-      <div><label class="text-sm font-medium">Weight (kg) (optional)</label>
-        <input name="weight_kg" type="number" step="0.01" min="0" value="{{ cat.weight_kg or '' }}" class="mt-1 w-full rounded-lg border px-3 py-2"></div>
+        <div>
+          <label class="text-sm font-medium" for="weight_kg">Weight (kg) (optional)</label>
+          <input
+            id="weight_kg"
+            name="weight_kg"
+            type="number"
+            step="0.01"
+            min="0"
+            value="{{ cat.weight_kg or '' }}"
+            class="mt-1 w-full rounded-lg border px-3 py-2"
+          >
+        </div>
 
-      <div class="md:col-span-2"><label class="text-sm font-medium">Notes (optional)</label>
-        <textarea name="notes" rows="3" class="mt-1 w-full rounded-lg border px-3 py-2">{{ cat.notes or '' }}</textarea></div>
+        <div class="md:col-span-2">
+          <label class="text-sm font-medium" for="notes">Notes (optional)</label>
+          <textarea
+            id="notes"
+            name="notes"
+            rows="3"
+            class="mt-1 w-full rounded-lg border px-3 py-2"
+          >{{ cat.notes or '' }}</textarea>
+        </div>
+      </div>
     {% endif %}
 
-    <div class="md:col-span-2 flex gap-2 mt-2">
-      <button class="rounded-lg bg-indigo-600 text-white px-4 py-2 hover:bg-indigo-700">Save</button>
-      <a class="rounded-lg border px-4 py-2 hover:bg-slate-50" href="{{ url_for('routes.admin_categories') }}">Cancel</a>
+    <div class="border rounded-xl p-4">
+      <div>
+        <h3 class="font-medium">Rental period pricing</h3>
+        <p class="text-sm text-slate-500 mt-1">
+          Choose which rental periods this category uses and set a price for each one.
+        </p>
+      </div>
+
+      <div class="overflow-x-auto border rounded-lg mt-4">
+        <table class="min-w-full text-sm">
+          <thead class="bg-slate-50 text-slate-600">
+            <tr>
+              <th class="p-3 text-left">Use</th>
+              <th class="p-3 text-left">Period</th>
+              <th class="p-3 text-left">Days</th>
+              <th class="p-3 text-left">Price</th>
+              <th class="p-3 text-left">Sort order</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for rp in rental_periods %}
+              {% set existing = pricing_map.get(rp.id) %}
+              {% set checked = existing is not none %}
+
+              <tr class="border-t">
+                <td class="p-3">
+                  <input
+                    type="checkbox"
+                    id="use_period_{{ rp.id }}"
+                    class="h-4 w-4"
+                    {% if checked %}checked{% endif %}
+                    onchange="
+                      const price = document.getElementById('period_price_{{ rp.id }}');
+                      const sort = document.getElementById('period_sort_{{ rp.id }}');
+                      price.disabled = !this.checked;
+                      sort.disabled = !this.checked;
+                      if (!this.checked) { price.value = ''; sort.value = '{{ loop.index0 }}'; }
+                    "
+                  >
+                </td>
+
+                <td class="p-3">
+                  <label for="use_period_{{ rp.id }}" class="font-medium cursor-pointer">
+                    {{ rp.label }}
+                  </label>
+                </td>
+
+                <td class="p-3">
+                  {% if rp.min_days == rp.max_days %}
+                    {{ rp.min_days }} day{% if rp.min_days != 1 %}s{% endif %}
+                  {% else %}
+                    {{ rp.min_days }}–{{ rp.max_days }} days
+                  {% endif %}
+                </td>
+
+                <td class="p-3">
+                  <input
+                    id="period_price_{{ rp.id }}"
+                    name="period_price_{{ rp.id }}"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value="{{ existing.price if existing else '' }}"
+                    {% if not checked %}disabled{% endif %}
+                    class="w-32 rounded-lg border px-3 py-2"
+                    placeholder="Price"
+                  >
+                </td>
+
+                <td class="p-3">
+                  <input
+                    id="period_sort_{{ rp.id }}"
+                    name="period_sort_{{ rp.id }}"
+                    type="number"
+                    min="0"
+                    value="{{ existing.sort_order if existing else loop.index0 }}"
+                    {% if not checked %}disabled{% endif %}
+                    class="w-24 rounded-lg border px-3 py-2"
+                  >
+                </td>
+              </tr>
+            {% else %}
+              <tr>
+                <td class="p-3" colspan="5">
+                  <i>No rental periods available yet. Create rental periods first.</i>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <p class="text-xs text-slate-500 mt-3">
+        At least one rental period price must be entered.
+      </p>
+    </div>
+
+    <div class="flex gap-2">
+      <button class="rounded-lg bg-indigo-600 text-white px-4 py-2 hover:bg-indigo-700">
+        Save
+      </button>
+      <a
+        class="rounded-lg border px-4 py-2 hover:bg-slate-50"
+        href="{{ url_for('routes.admin_categories') }}"
+      >
+        Cancel
+      </a>
     </div>
   </form>
 </div>

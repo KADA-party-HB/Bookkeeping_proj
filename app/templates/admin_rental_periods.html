@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="bg-white border rounded-xl p-6 shadow-sm">
+  <div class="flex items-center gap-3">
+    <div>
+      <h1 class="text-xl font-semibold">Rental periods</h1>
+      <p class="text-sm text-slate-500 mt-1">
+        Reusable rental periods that categories can attach pricing to.
+      </p>
+    </div>
+
+    <div class="ml-auto">
+      <a
+        class="rounded-lg border px-3 py-2 text-sm hover:bg-slate-50"
+        href="{{ url_for('routes.admin_rental_period_new_form') }}"
+      >
+        + New rental period
+      </a>
+    </div>
+  </div>
+
+  <div class="overflow-x-auto border rounded-lg mt-4">
+    <table class="min-w-full text-sm">
+      <thead class="bg-slate-50 text-slate-600">
+        <tr>
+          <th class="p-3 text-left">ID</th>
+          <th class="p-3 text-left">Label</th>
+          <th class="p-3 text-left">Min days</th>
+          <th class="p-3 text-left">Max days</th>
+          <th class="p-3 text-left">Range</th>
+          <th class="p-3 text-left">Created</th>
+          <th class="p-3 text-left">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for rp in rental_periods %}
+          <tr class="border-t">
+            <td class="p-3">{{ rp.id }}</td>
+
+            <td class="p-3">
+              <div class="font-medium">{{ rp.label }}</div>
+            </td>
+
+            <td class="p-3">{{ rp.min_days }}</td>
+            <td class="p-3">{{ rp.max_days }}</td>
+
+            <td class="p-3 text-slate-700">
+              {% if rp.min_days == rp.max_days %}
+                {{ rp.min_days }} day{% if rp.min_days != 1 %}s{% endif %}
+              {% else %}
+                {{ rp.min_days }}–{{ rp.max_days }} days
+              {% endif %}
+            </td>
+
+            <td class="p-3 text-xs text-slate-500">{{ rp.created_at }}</td>
+
+            <td class="p-3">
+              <a
+                class="text-indigo-700 hover:underline"
+                href="{{ url_for('routes.admin_rental_period_edit_form', rental_period_id=rp.id) }}"
+              >
+                Edit
+              </a>
+            </td>
+          </tr>
+        {% else %}
+          <tr>
+            <td class="p-3" colspan="7"><i>No rental periods yet.</i></td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

@@ -3,9 +3,17 @@
 <div class="bg-white border rounded-xl p-6 shadow-sm">
   <div class="flex items-center gap-3">
     <h1 class="text-xl font-semibold">Customers</h1>
-    <div class="ml-auto">
-      <a class="rounded-lg border px-3 py-2 text-sm hover:bg-slate-50" href="{{ url_for('routes.customer_new_form') }}">+ New customer</a>
-    </div>
+
+    {% if role == "admin" %}
+      <div class="ml-auto">
+        <a
+          class="rounded-lg border px-3 py-2 text-sm hover:bg-slate-50"
+          href="{{ url_for('routes.customer_new_form') }}"
+        >
+          + New customer
+        </a>
+      </div>
+    {% endif %}
   </div>
 
   <div class="overflow-x-auto border rounded-lg mt-4">
@@ -16,6 +24,7 @@
           <th class="p-3 text-left">Name</th>
           <th class="p-3 text-left">Email</th>
           <th class="p-3 text-left">Phone</th>
+          <th class="p-3 text-left">Address</th>
           <th class="p-3 text-left">Created</th>
         </tr>
       </thead>
@@ -23,13 +32,23 @@
         {% for c in customers %}
           <tr class="border-t">
             <td class="p-3">{{ c.id }}</td>
-            <td class="p-3"><a class="text-indigo-700 hover:underline" href="{{ url_for('routes.customer_detail', customer_id=c.id) }}">{{ c.full_name }}</a></td>
-            <td class="p-3">{{ c.email }}</td>
+            <td class="p-3">
+              <a
+                class="text-indigo-700 hover:underline"
+                href="{{ url_for('routes.customer_detail', customer_id=c.id) }}"
+              >
+                {{ c.full_name }}
+              </a>
+            </td>
+            <td class="p-3">{{ c.email or "" }}</td>
             <td class="p-3">{{ c.phone or "" }}</td>
+            <td class="p-3">{{ c.address or "" }}</td>
             <td class="p-3 text-xs text-slate-500">{{ c.created_at }}</td>
           </tr>
         {% else %}
-          <tr><td class="p-3" colspan="5"><i>No customers yet.</i></td></tr>
+          <tr>
+            <td class="p-3" colspan="6"><i>No customers yet.</i></td>
+          </tr>
         {% endfor %}
       </tbody>
     </table>

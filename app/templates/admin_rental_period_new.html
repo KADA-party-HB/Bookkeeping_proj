@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-2xl bg-white border rounded-xl p-6 shadow-sm">
+  <h1 class="text-xl font-semibold">New rental period</h1>
+  <p class="text-sm text-slate-500 mt-1">
+    Create a reusable rental period that categories can attach pricing to.
+  </p>
+
+  <form method="post" class="mt-4 space-y-4">
+    <div>
+      <label class="text-sm font-medium" for="label">Label</label>
+      <input
+        id="label"
+        name="label"
+        required
+        class="mt-1 w-full rounded-lg border px-3 py-2"
+        placeholder="e.g. 3 dagar or 4–5 dagar"
+      >
+      <p class="text-xs text-slate-500 mt-1">
+        This is the display name shown in the admin UI and bookings.
+      </p>
+    </div>
+
+    <div class="grid gap-4 md:grid-cols-2">
+      <div>
+        <label class="text-sm font-medium" for="min_days">Minimum days</label>
+        <input
+          id="min_days"
+          name="min_days"
+          type="number"
+          min="1"
+          required
+          class="mt-1 w-full rounded-lg border px-3 py-2"
+          placeholder="e.g. 3"
+        >
+      </div>
+
+      <div>
+        <label class="text-sm font-medium" for="max_days">Maximum days</label>
+        <input
+          id="max_days"
+          name="max_days"
+          type="number"
+          min="1"
+          required
+          class="mt-1 w-full rounded-lg border px-3 py-2"
+          placeholder="e.g. 5"
+        >
+      </div>
+    </div>
+
+    <div class="rounded-lg border bg-slate-50 p-4 text-sm text-slate-600">
+      <p class="font-medium text-slate-800">Examples</p>
+      <ul class="mt-2 space-y-1">
+        <li><span class="font-medium">1 dag</span> → min 1, max 1</li>
+        <li><span class="font-medium">2–3 dagar</span> → min 2, max 3</li>
+        <li><span class="font-medium">4–5 dagar</span> → min 4, max 5</li>
+      </ul>
+    </div>
+
+    <div class="flex gap-2">
+      <button class="rounded-lg bg-indigo-600 text-white px-4 py-2 hover:bg-indigo-700">
+        Create rental period
+      </button>
+      <a
+        class="rounded-lg border px-4 py-2 hover:bg-slate-50"
+        href="{{ url_for('routes.admin_rental_periods') }}"
+      >
+        Cancel
+      </a>
+    </div>
+  </form>
+</div>
+{% endblock %}
