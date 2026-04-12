@@ -558,7 +558,7 @@ ORDER BY c.display_name, i.sku;
 SQL_BOOKING_TOTAL = """
 SELECT
   b.id AS booking_id,
-  (b.end_date - b.start_date) AS days,
+  (b.end_date - b.start_date + 1) AS days,
 
   COALESCE(SUM(COALESCE(bi.custom_total_price, bi.quoted_period_price)), 0) AS rental_cost,
 
