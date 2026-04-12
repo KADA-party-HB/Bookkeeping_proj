@@ -175,7 +175,7 @@ ORDER BY
 
 SQL_CREATE_BOOKING_WITH_ALLOCATIONS = """
 SELECT create_booking_with_allocations(
-  %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+  %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
 ) AS booking_id;
 """
 
@@ -463,9 +463,11 @@ INSERT INTO bookings (
   include_delivery,
   delivery_fee,
   include_setup_service,
+  custom_total_price,
+  custom_price_note,
   admin_note
 )
-VALUES (%s, %s, %s, 'pending', %s, %s, %s, %s)
+VALUES (%s, %s, %s, 'pending', %s, %s, %s, %s, %s, %s)
 RETURNING id;
 """
 
@@ -482,6 +484,8 @@ SELECT
   b.include_delivery,
   b.delivery_fee,
   b.include_setup_service,
+  b.custom_total_price,
+  b.custom_price_note,
   b.admin_note,
   b.created_at
 FROM bookings b
@@ -502,6 +506,8 @@ SELECT
   b.include_delivery,
   b.delivery_fee,
   b.include_setup_service,
+  b.custom_total_price,
+  b.custom_price_note,
   b.admin_note,
   b.created_at
 FROM bookings b
@@ -559,6 +565,9 @@ SQL_BOOKING_TOTAL = """
 SELECT
   b.id AS booking_id,
   (b.end_date - b.start_date + 1) AS days,
+  (b.custom_total_price IS NOT NULL) AS has_booking_override,
+  b.custom_total_price AS booking_custom_total_price,
+  b.custom_price_note AS booking_custom_price_note,
 
   COALESCE(SUM(COALESCE(bi.custom_total_price, bi.quoted_period_price)), 0) AS rental_cost,
 
@@ -580,23 +589,27 @@ SELECT
     0
   ) AS delivery_cost,
 
-  COALESCE(SUM(COALESCE(bi.custom_total_price, bi.quoted_period_price)), 0)
-  + COALESCE(
-      CASE
-        WHEN b.include_setup_service
-        THEN SUM(COALESCE(bi.setup_service_fee, 0))
-        ELSE 0
-      END,
-      0
-    )
-  + COALESCE(
-      CASE
-        WHEN b.include_delivery
-        THEN COALESCE(b.delivery_fee, 0)
-        ELSE 0
-      END,
-      0
-    ) AS total_cost
+  CASE
+    WHEN b.custom_total_price IS NOT NULL THEN b.custom_total_price
+    ELSE
+      COALESCE(SUM(COALESCE(bi.custom_total_price, bi.quoted_period_price)), 0)
+      + COALESCE(
+          CASE
+            WHEN b.include_setup_service
+            THEN SUM(COALESCE(bi.setup_service_fee, 0))
+            ELSE 0
+          END,
+          0
+        )
+      + COALESCE(
+          CASE
+            WHEN b.include_delivery
+            THEN COALESCE(b.delivery_fee, 0)
+            ELSE 0
+          END,
+          0
+        )
+  END AS total_cost
 FROM bookings b
 JOIN booking_items bi ON bi.booking_id = b.id
 WHERE b.id = %s
@@ -606,7 +619,9 @@ GROUP BY
   b.end_date,
   b.include_setup_service,
   b.include_delivery,
-  b.delivery_fee;
+  b.delivery_fee,
+  b.custom_total_price,
+  b.custom_price_note;
 """
 
 SQL_LIST_BOOKINGS_FOR_CUSTOMER = """
@@ -618,6 +633,8 @@ SELECT
   include_delivery,
   delivery_fee,
   include_setup_service,
+  custom_total_price,
+  custom_price_note,
   admin_note,
   created_at
 FROM bookings
@@ -634,6 +651,8 @@ SELECT
   b.include_delivery,
   b.delivery_fee,
   b.include_setup_service,
+  b.custom_total_price,
+  b.custom_price_note,
   b.admin_note,
   b.created_at,
   c.id AS customer_id,
@@ -679,6 +698,8 @@ UPDATE bookings
 SET include_delivery = %s,
     delivery_fee = %s,
     include_setup_service = %s,
+    custom_total_price = %s,
+    custom_price_note = %s,
     admin_note = %s
 WHERE id = %s;
 """

@@ -208,6 +208,7 @@ FOR EACH ROW EXECUTE FUNCTION trg_category_must_have_exactly_one_subtype();
 -- include_delivery = whether delivery is part of booking
 -- include_setup_service = whether setup/teardown is included
 -- delivery_fee is stored as snapshot for the booking
+-- custom_total_price lets admin override the full booking total
 CREATE TABLE bookings (
   id SERIAL PRIMARY KEY,
   customer_id INT NOT NULL REFERENCES customers(id) ON DELETE RESTRICT,
@@ -218,13 +219,16 @@ CREATE TABLE bookings (
   include_delivery BOOLEAN NOT NULL DEFAULT FALSE,
   include_setup_service BOOLEAN NOT NULL DEFAULT FALSE,
   delivery_fee NUMERIC(10,2),
+  custom_total_price NUMERIC(10,2),
+  custom_price_note TEXT,
 
   admin_note TEXT,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
   CONSTRAINT chk_booking_dates CHECK (end_date >= start_date),
   CONSTRAINT chk_booking_status CHECK (status IN ('pending','confirmed','cancelled')),
-  CONSTRAINT chk_delivery_fee CHECK (delivery_fee IS NULL OR delivery_fee >= 0)
+  CONSTRAINT chk_delivery_fee CHECK (delivery_fee IS NULL OR delivery_fee >= 0),
+  CONSTRAINT chk_booking_custom_total CHECK (custom_total_price IS NULL OR custom_total_price >= 0)
 );
 
 CREATE INDEX idx_bookings_customer_created ON bookings(customer_id, created_at);
@@ -448,6 +452,8 @@ CREATE OR REPLACE FUNCTION create_booking_with_allocations(
   p_include_delivery BOOLEAN DEFAULT FALSE,
   p_delivery_fee NUMERIC(10,2) DEFAULT NULL,
   p_include_setup_service BOOLEAN DEFAULT FALSE,
+  p_booking_custom_total_price NUMERIC(10,2) DEFAULT NULL,
+  p_booking_custom_price_note TEXT DEFAULT NULL,
   p_custom_total_prices NUMERIC(10,2)[] DEFAULT NULL,
   p_custom_price_notes TEXT[] DEFAULT NULL
 )
@@ -497,7 +503,9 @@ BEGIN
     status,
     include_delivery,
     delivery_fee,
-    include_setup_service
+    include_setup_service,
+    custom_total_price,
+    custom_price_note
   )
   VALUES (
     p_customer_id,
@@ -506,7 +514,9 @@ BEGIN
     'pending',
     p_include_delivery,
     CASE WHEN p_include_delivery THEN COALESCE(p_delivery_fee, 0) ELSE NULL END,
-    p_include_setup_service
+    p_include_setup_service,
+    p_booking_custom_total_price,
+    p_booking_custom_price_note
   )
   RETURNING id INTO v_booking_id;
 
@@ -548,7 +558,9 @@ BEGIN
       v_custom_price_note := p_custom_price_notes[v_i];
     END IF;
 
-    IF v_rental_period_id IS NULL AND v_custom_total_price IS NULL THEN
+    IF v_rental_period_id IS NULL
+       AND v_custom_total_price IS NULL
+       AND p_booking_custom_total_price IS NULL THEN
       RAISE EXCEPTION
         'No standard pricing configured for category % and % rental days. Custom price required.',
         v_cat, v_rental_days;

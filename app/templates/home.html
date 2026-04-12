@@ -263,31 +263,142 @@
                   </div>
                 </div>
               </div>
+
+              {% if role == 'admin' %}
+                <div class="mt-4 border rounded-lg p-3 bg-white">
+                  <div class="font-medium text-sm">Booking total override</div>
+                  <div class="text-xs text-slate-500 mt-1">
+                    Replaces the whole booking total, including rental, setup, and delivery.
+                  </div>
+
+                  <div class="mt-3 grid gap-4 md:grid-cols-2">
+                    <div>
+                      <label class="text-sm font-medium" for="booking_custom_total_price">Override total</label>
+                      <input
+                        id="booking_custom_total_price"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        name="booking_custom_total_price"
+                        placeholder="e.g. 5000"
+                        class="mt-1 w-full rounded-lg border px-3 py-2"
+                      >
+                    </div>
+
+                    <div>
+                      <label class="text-sm font-medium" for="booking_custom_price_note">Override note</label>
+                      <input
+                        id="booking_custom_price_note"
+                        type="text"
+                        name="booking_custom_price_note"
+                        placeholder="Package deal, manual quote, etc."
+                        class="mt-1 w-full rounded-lg border px-3 py-2"
+                      >
+                    </div>
+                  </div>
+                </div>
+              {% endif %}
             </div>
 
             <div class="mt-4 flex flex-wrap items-end gap-3">
               {% if role == 'admin' %}
-                <div>
-                  <label class="text-sm font-medium" for="customer_id">Customer</label>
-                  <select
-                    id="customer_id"
-                    name="customer_id"
-                    required
-                    class="mt-1 rounded-lg border px-3 py-2 min-w-72"
-                  >
-                    <option value="">-- select --</option>
-                    {% for cu in customers %}
-                      <option value="{{ cu.id }}">{{ cu.full_name }} ({{ cu.email }})</option>
-                    {% endfor %}
-                  </select>
-                </div>
+                <div class="w-full border rounded-xl p-4 bg-slate-50">
+                  <div class="flex items-start gap-3">
+                    <div class="flex-1">
+                      <label class="text-sm font-medium" for="customer_id">Existing customer</label>
+                      <select
+                        id="customer_id"
+                        name="customer_id"
+                        class="mt-1 rounded-lg border px-3 py-2 min-w-72 w-full"
+                      >
+                        <option value="">-- select --</option>
+                        {% for cu in customers %}
+                          <option value="{{ cu.id }}">{{ cu.full_name }} ({{ cu.email }})</option>
+                        {% endfor %}
+                      </select>
+                    </div>
 
-                <a
-                  class="text-sm text-indigo-700 hover:underline self-center"
-                  href="{{ url_for('routes.customer_new_form') }}"
-                >
-                  + Create customer
-                </a>
+                    <label class="self-end flex items-center gap-2 text-sm">
+                      <input
+                        id="create_new_user"
+                        type="checkbox"
+                        name="create_new_user"
+                        value="on"
+                        onchange="
+                          const checked = this.checked;
+                          const existing = document.getElementById('customer_id');
+                          const fields = document.querySelectorAll('[data-new-user-field]');
+                          if (existing) { existing.disabled = checked; if (checked) { existing.value = ''; } }
+                          fields.forEach((field) => {
+                            field.disabled = !checked;
+                            if (!checked) { field.value = ''; }
+                          });
+                        "
+                      >
+                      <span>Create new user</span>
+                    </label>
+                  </div>
+
+                  <div class="mt-4 grid gap-4 md:grid-cols-2">
+                    <div>
+                      <label class="text-sm font-medium" for="new_customer_full_name">Full name</label>
+                      <input
+                        id="new_customer_full_name"
+                        name="new_customer_full_name"
+                        data-new-user-field
+                        disabled
+                        class="mt-1 w-full rounded-lg border px-3 py-2"
+                      >
+                    </div>
+
+                    <div>
+                      <label class="text-sm font-medium" for="new_customer_email">Email</label>
+                      <input
+                        id="new_customer_email"
+                        name="new_customer_email"
+                        type="email"
+                        data-new-user-field
+                        disabled
+                        class="mt-1 w-full rounded-lg border px-3 py-2"
+                      >
+                    </div>
+
+                    <div>
+                      <label class="text-sm font-medium" for="new_customer_phone">Phone</label>
+                      <input
+                        id="new_customer_phone"
+                        name="new_customer_phone"
+                        data-new-user-field
+                        disabled
+                        class="mt-1 w-full rounded-lg border px-3 py-2"
+                      >
+                    </div>
+
+                    <div>
+                      <label class="text-sm font-medium" for="new_customer_password">Password</label>
+                      <input
+                        id="new_customer_password"
+                        name="new_customer_password"
+                        type="password"
+                        data-new-user-field
+                        disabled
+                        class="mt-1 w-full rounded-lg border px-3 py-2"
+                      >
+                    </div>
+
+                    <div class="md:col-span-2">
+                      <label class="text-sm font-medium" for="new_customer_address">Address</label>
+                      <textarea
+                        id="new_customer_address"
+                        name="new_customer_address"
+                        rows="3"
+                        data-new-user-field
+                        disabled
+                        class="mt-1 w-full rounded-lg border px-3 py-2"
+                      ></textarea>
+                    </div>
+                  </div>
+                </div>
               {% else %}
                 <div class="text-sm text-slate-600">
                   Booking will be placed for

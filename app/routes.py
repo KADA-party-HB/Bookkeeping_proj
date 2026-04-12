@@ -1,9 +1,12 @@
 from flask import Blueprint, request, render_template, redirect, url_for, flash, session, abort
 
 from datetime import timedelta
+from werkzeug.security import generate_password_hash
 
 from .db import query, execute, tx
 from .sql import (
+    SQL_CREATE_USER,
+    SQL_LINK_CUSTOMER_TO_USER,
     # customers
     SQL_LIST_CUSTOMERS,
     SQL_GET_CUSTOMER,
@@ -94,6 +97,10 @@ def _to_int_or_none(value):
 def _to_str_or_none(value):
     value = (value or "").strip()
     return value if value != "" else None
+
+
+def _normalize_email(value):
+    return (value or "").strip().lower()
 
 
 def _collect_category_period_prices_from_form():
@@ -192,9 +199,20 @@ def booking_create_from_home():
         return redirect(url_for("routes.home"))
 
     if role == "admin":
+        create_new_user = _to_bool(request.form.get("create_new_user"))
         customer_id = request.form.get("customer_id", "").strip()
-        if not customer_id:
-            flash("Select a customer.", "error")
+        new_full_name = request.form.get("new_customer_full_name", "").strip()
+        new_email = _normalize_email(request.form.get("new_customer_email"))
+        new_phone = _to_str_or_none(request.form.get("new_customer_phone"))
+        new_address = _to_str_or_none(request.form.get("new_customer_address"))
+        new_password = request.form.get("new_customer_password", "")
+
+        if create_new_user:
+            if not new_full_name or not new_email or not new_password:
+                flash("Name, email and password are required to create a new user during booking.", "error")
+                return redirect(url_for("routes.home", start_date=start, end_date=end))
+        elif not customer_id:
+            flash("Select a customer or create a new user.", "error")
             return redirect(url_for("routes.home", start_date=start, end_date=end))
     else:
         cust = query(SQL_GET_CUSTOMER_BY_USER_ID, (uid,), one=True)
@@ -202,10 +220,21 @@ def booking_create_from_home():
             flash("No customer profile linked to this account.", "error")
             return redirect(url_for("routes.home", start_date=start, end_date=end))
         customer_id = str(cust["id"])
+        create_new_user = False
 
     include_delivery = _to_bool(request.form.get("include_delivery"))
     include_setup_service = _to_bool(request.form.get("include_setup_service"))
     delivery_fee = _to_str_or_none(request.form.get("delivery_fee")) if include_delivery else None
+    booking_custom_total_price = (
+        _to_str_or_none(request.form.get("booking_custom_total_price"))
+        if role == "admin"
+        else None
+    )
+    booking_custom_price_note = (
+        _to_str_or_none(request.form.get("booking_custom_price_note"))
+        if role == "admin"
+        else None
+    )
 
     selections = []
     custom_total_prices = []
@@ -261,32 +290,77 @@ def booking_create_from_home():
             )
             return redirect(url_for("routes.home", start_date=start, end_date=end))
 
-        if role == "admin" and not cat_row["has_standard_price"]:
+        if role == "admin" and not cat_row["has_standard_price"] and booking_custom_total_price is None:
             if custom_total_prices[idx] is None:
                 flash(
-                    f"{cat_row['display_name']} needs a custom price because no standard price matches the selected dates.",
+                    f"{cat_row['display_name']} needs a custom price because no standard price matches the selected dates, unless you set a booking total override.",
                     "error",
                 )
                 return redirect(url_for("routes.home", start_date=start, end_date=end))
 
     try:
-        row = query(
-            SQL_CREATE_BOOKING_WITH_ALLOCATIONS,
-            (
-                customer_id,
-                start,
-                end,
-                category_ids,
-                qtys,
-                include_delivery,
-                delivery_fee,
-                include_setup_service,
-                custom_total_prices,
-                custom_price_notes,
-            ),
-            one=True,
-            commit=True,
-        )
+        if role == "admin":
+            def work(cur):
+                effective_customer_id = customer_id
+
+                if create_new_user:
+                    password_hash = generate_password_hash(new_password)
+                    cur.execute(SQL_CREATE_USER, (new_email, password_hash, "customer"))
+                    user = cur.fetchone()
+
+                    cur.execute(SQL_LINK_CUSTOMER_TO_USER, (user["id"], new_email))
+                    customer = cur.fetchone()
+
+                    if not customer:
+                        cur.execute(
+                            SQL_CREATE_CUSTOMER,
+                            (new_full_name, new_email, new_phone, new_address, user["id"]),
+                        )
+                        customer = cur.fetchone()
+
+                    effective_customer_id = customer["id"]
+
+                cur.execute(
+                    SQL_CREATE_BOOKING_WITH_ALLOCATIONS,
+                    (
+                        effective_customer_id,
+                        start,
+                        end,
+                        category_ids,
+                        qtys,
+                        include_delivery,
+                        delivery_fee,
+                        include_setup_service,
+                        booking_custom_total_price,
+                        booking_custom_price_note,
+                        custom_total_prices,
+                        custom_price_notes,
+                    ),
+                )
+                return cur.fetchone()
+
+            row = tx(work)
+        else:
+            row = query(
+                SQL_CREATE_BOOKING_WITH_ALLOCATIONS,
+                (
+                    customer_id,
+                    start,
+                    end,
+                    category_ids,
+                    qtys,
+                    include_delivery,
+                    delivery_fee,
+                    include_setup_service,
+                    booking_custom_total_price,
+                    booking_custom_price_note,
+                    custom_total_prices,
+                    custom_price_notes,
+                ),
+                one=True,
+                commit=True,
+            )
+
         booking_id = row["booking_id"]
         flash(f"Booking created (id={booking_id}).", "success")
         return redirect(url_for("routes.booking_detail", booking_id=booking_id))

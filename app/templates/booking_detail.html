@@ -59,6 +59,15 @@
 
     <div class="border rounded-lg p-4">
       <div><b>Phone:</b> {{ booking.phone or "" }}</div>
+      {% if booking.custom_total_price is not none %}
+        <div class="mt-2">
+          <b>Booking total override:</b>
+          <div class="text-amber-700 font-medium mt-1">{{ booking.custom_total_price }} kr</div>
+          {% if booking.custom_price_note %}
+            <div class="text-slate-600 mt-1">{{ booking.custom_price_note }}</div>
+          {% endif %}
+        </div>
+      {% endif %}
       {% if booking.admin_note %}
         <div class="mt-2">
           <b>Admin note:</b>
@@ -73,6 +82,12 @@
 
 <div class="bg-white border rounded-xl p-6 shadow-sm mt-6">
   <h3 class="text-lg font-semibold">Booked items</h3>
+
+  {% if booking.custom_total_price is not none %}
+    <div class="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+      This booking uses a full booking override, so rental, setup, and delivery do not determine the final total.
+    </div>
+  {% endif %}
 
   <div class="overflow-x-auto border rounded-lg mt-4">
     <table class="min-w-full text-sm">
@@ -175,6 +190,12 @@
       <div><b>Rental cost:</b> {{ total.rental_cost }} kr</div>
       <div><b>Setup cost:</b> {{ total.setup_cost }} kr</div>
       <div><b>Delivery cost:</b> {{ total.delivery_cost }} kr</div>
+      {% if total.has_booking_override %}
+        <div><b>Booking override:</b> {{ total.booking_custom_total_price }} kr</div>
+        {% if total.booking_custom_price_note %}
+          <div><b>Override note:</b> {{ total.booking_custom_price_note }}</div>
+        {% endif %}
+      {% endif %}
       <div class="text-base pt-2"><b>Total:</b> {{ total.total_cost }} kr</div>
     </div>
   {% else %}
