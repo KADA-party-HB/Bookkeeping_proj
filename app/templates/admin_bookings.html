@@ -3,6 +3,8 @@
 <section class="relative overflow-hidden rounded-[2rem] border border-sky-100 bg-gradient-to-br from-white via-sky-50 to-slate-50 shadow-sm">
   <div class="absolute inset-y-0 right-0 hidden w-1/3 bg-[radial-gradient(circle_at_top,rgba(14,165,233,0.16),transparent_58%)] lg:block"></div>
   <div class="relative px-6 py-8 md:px-8">
+    {% set total_income = bookings|sum(attribute='total_cost') %}
+    {% set average_booking = (total_income / (bookings|length)) if bookings else 0 %}
     <div class="flex flex-wrap items-start justify-between gap-4">
       <div>
         <div class="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-white/80 px-3 py-1 text-xs font-medium uppercase tracking-[0.2em] text-sky-700">
@@ -24,22 +26,33 @@
       </a>
     </div>
 
-    <div class="mt-6 grid gap-3 md:grid-cols-4">
+    <div class="mt-6 grid gap-3 lg:grid-cols-[1.15fr_1fr_1fr]">
       <div class="rounded-2xl border border-white/80 bg-white/80 p-4 shadow-sm backdrop-blur">
-        <div class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">Total</div>
-        <div class="mt-2 text-2xl font-semibold text-slate-900">{{ bookings|length }}</div>
+        <div class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">Booking revenue</div>
+        <div class="mt-2 text-2xl font-semibold text-slate-900">{{ total_income }} kr</div>
+        <div class="mt-2 text-sm text-slate-500">Across {{ bookings|length }} bookings in the register.</div>
       </div>
       <div class="rounded-2xl border border-white/80 bg-white/80 p-4 shadow-sm backdrop-blur">
-        <div class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">Confirmed</div>
-        <div class="mt-2 text-2xl font-semibold text-emerald-700">{{ bookings|selectattr('status', 'equalto', 'confirmed')|list|length }}</div>
+        <div class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">Average booking</div>
+        <div class="mt-2 text-2xl font-semibold text-sky-700">{{ "%.2f"|format(average_booking) }} kr</div>
+        <div class="mt-2 text-sm text-slate-500">Quick read on the typical booking value.</div>
       </div>
       <div class="rounded-2xl border border-white/80 bg-white/80 p-4 shadow-sm backdrop-blur">
-        <div class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">Pending</div>
-        <div class="mt-2 text-2xl font-semibold text-amber-700">{{ bookings|selectattr('status', 'equalto', 'pending')|list|length }}</div>
-      </div>
-      <div class="rounded-2xl border border-white/80 bg-white/80 p-4 shadow-sm backdrop-blur">
-        <div class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">Contains tents</div>
-        <div class="mt-2 text-2xl font-semibold text-sky-700">{{ bookings|selectattr('has_tent')|list|length }}</div>
+        <div class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">At a glance</div>
+        <div class="mt-2 flex flex-wrap gap-2">
+          <span class="inline-flex rounded-full bg-slate-900 px-3 py-1 text-xs font-medium text-white">
+            {{ bookings|length }} total
+          </span>
+          <span class="inline-flex rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-800">
+            {{ bookings|selectattr('status', 'equalto', 'confirmed')|list|length }} confirmed
+          </span>
+          <span class="inline-flex rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-800">
+            {{ bookings|selectattr('status', 'equalto', 'pending')|list|length }} pending
+          </span>
+          <span class="inline-flex rounded-full bg-sky-100 px-3 py-1 text-xs font-medium text-sky-800">
+            {{ bookings|selectattr('has_tent')|list|length }} with tents
+          </span>
+        </div>
       </div>
     </div>
   </div>
@@ -70,6 +83,7 @@
                 <th class="p-3 text-left font-medium">Dates</th>
                 <th class="p-3 text-left font-medium">Status</th>
                 <th class="p-3 text-left font-medium">Tent</th>
+                <th class="p-3 text-left font-medium">Total</th>
                 <th class="p-3 text-left font-medium">Options</th>
                 <th class="p-3 text-left font-medium">Created</th>
               </tr>
@@ -130,13 +144,22 @@
                     >
                       {% if b.has_tent %}
                         <span class="inline-flex rounded-full bg-sky-100 px-2.5 py-1 text-xs font-medium text-sky-800">
-                          Contains tent
+                          {{ b.tent_summary }}
                         </span>
                       {% else %}
                         <span class="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">
                           No tent
                         </span>
                       {% endif %}
+                    </a>
+                  </td>
+
+                  <td class="p-3">
+                    <a
+                      class="block w-full h-full"
+                      href="{{ url_for('routes.booking_detail', booking_id=b.id) }}"
+                    >
+                      <div class="font-medium text-slate-900">{{ b.total_cost }} kr</div>
                     </a>
                   </td>
 

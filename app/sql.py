@@ -659,6 +659,53 @@ SELECT
     JOIN tent_categories tc2 ON tc2.category_id = i2.category_id
     WHERE bi2.booking_id = b.id
   ) AS has_tent,
+  CASE
+    WHEN (
+      SELECT COUNT(DISTINCT c2.id)
+      FROM booking_items bi3
+      JOIN items i3 ON i3.id = bi3.item_id
+      JOIN categories c2 ON c2.id = i3.category_id
+      JOIN tent_categories tc3 ON tc3.category_id = c2.id
+      WHERE bi3.booking_id = b.id
+    ) = 1 THEN (
+      SELECT MIN(c3.display_name)
+      FROM booking_items bi4
+      JOIN items i4 ON i4.id = bi4.item_id
+      JOIN categories c3 ON c3.id = i4.category_id
+      JOIN tent_categories tc4 ON tc4.category_id = c3.id
+      WHERE bi4.booking_id = b.id
+    )
+    WHEN (
+      SELECT COUNT(DISTINCT c4.id)
+      FROM booking_items bi5
+      JOIN items i5 ON i5.id = bi5.item_id
+      JOIN categories c4 ON c4.id = i5.category_id
+      JOIN tent_categories tc5 ON tc5.category_id = c4.id
+      WHERE bi5.booking_id = b.id
+    ) >= 2 THEN '2+'
+    ELSE NULL
+  END AS tent_summary,
+  CASE
+    WHEN b.custom_total_price IS NOT NULL THEN b.custom_total_price
+    ELSE
+      COALESCE((
+        SELECT SUM(COALESCE(bi6.custom_total_price, bi6.quoted_period_price))
+        FROM booking_items bi6
+        WHERE bi6.booking_id = b.id
+      ), 0)
+      + CASE
+          WHEN b.include_setup_service THEN COALESCE((
+            SELECT SUM(COALESCE(bi7.setup_service_fee, 0))
+            FROM booking_items bi7
+            WHERE bi7.booking_id = b.id
+          ), 0)
+          ELSE 0
+        END
+      + CASE
+          WHEN b.include_delivery THEN COALESCE(b.delivery_fee, 0)
+          ELSE 0
+        END
+  END AS total_cost,
   b.include_delivery,
   b.delivery_fee,
   b.include_setup_service,
