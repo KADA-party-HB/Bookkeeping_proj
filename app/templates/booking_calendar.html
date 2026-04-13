@@ -10,7 +10,7 @@
         </div>
         <h1 class="mt-4 text-3xl font-semibold tracking-tight text-slate-900 md:text-4xl">Booking calendar</h1>
         <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-          Browse bookings across the month and jump straight into the detail page from any event.
+          Browse bookings across the month and open a clean popup with the most useful booking details.
         </p>
       </div>
       <a class="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white transition hover:bg-sky-700" href="{{ url_for('routes.admin_bookings') }}">
@@ -24,6 +24,56 @@
   <div id="booking-calendar"></div>
 </section>
 
+<div id="calendar-booking-popup" class="fixed inset-0 z-50 hidden">
+  <div class="absolute inset-0 bg-slate-950/45" data-popup-close></div>
+  <div class="absolute inset-x-4 bottom-4 top-auto rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-2xl md:inset-x-auto md:right-6 md:top-24 md:bottom-auto md:w-[24rem]">
+    <div class="flex items-start justify-between gap-4">
+      <div>
+        <div id="calendar-popup-ref" class="text-xs font-medium uppercase tracking-[0.2em] text-slate-400"></div>
+        <h3 id="calendar-popup-title" class="mt-2 text-xl font-semibold text-slate-900"></h3>
+        <div id="calendar-popup-status" class="mt-2"></div>
+      </div>
+      <button
+        type="button"
+        class="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:bg-slate-50 hover:text-slate-800"
+        data-popup-close
+      >
+        x
+      </button>
+    </div>
+
+    <div class="mt-5 grid gap-3 text-sm text-slate-600">
+      <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+        <div class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">Total</div>
+        <div id="calendar-popup-price" class="mt-1 text-lg font-semibold text-slate-900"></div>
+      </div>
+
+      <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+        <div class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">Tent</div>
+        <div id="calendar-popup-tent" class="mt-1 font-medium text-slate-900"></div>
+      </div>
+
+      <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+        <div class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">Extras</div>
+        <div id="calendar-popup-extras" class="mt-1 font-medium text-slate-900"></div>
+      </div>
+    </div>
+
+    <div class="mt-5 flex flex-wrap gap-3">
+      <a id="calendar-popup-open" class="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white transition hover:bg-sky-700" href="#">
+        Open booking
+      </a>
+      <button
+        type="button"
+        class="inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+        data-popup-close
+      >
+        Close
+      </button>
+    </div>
+  </div>
+</div>
+
 <style>
   #booking-calendar .fc .fc-event {
     border: 0;
@@ -31,76 +81,88 @@
   }
 
   #booking-calendar .fc .fc-daygrid-event-harness {
-    margin-top: 0.3rem;
+    margin-top: 0.25rem;
   }
 
   #booking-calendar .fc-event-main {
     padding: 0;
   }
 
-  .booking-event-card {
+  #booking-calendar .fc-daygrid-day-frame {
+    min-height: 7.5rem;
+  }
+
+  .booking-event-chip {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    width: 100%;
     border: 1px solid rgb(186 230 253);
-    border-radius: 0.9rem;
-    background: linear-gradient(135deg, rgb(239 246 255), rgb(248 250 252));
-    box-shadow: 0 8px 18px -14px rgba(15, 23, 42, 0.7);
+    border-radius: 999px;
+    background: linear-gradient(90deg, rgb(255 255 255), rgb(240 249 255));
+    padding: 0.42rem 0.65rem;
+    color: rgb(15 23 42);
+    box-shadow: 0 8px 18px -16px rgba(15, 23, 42, 0.95);
     overflow: hidden;
   }
 
-  .booking-event-card[data-status="confirmed"] {
+  .booking-event-chip[data-status="confirmed"] {
     border-color: rgb(167 243 208);
-    background: linear-gradient(135deg, rgb(236 253 245), rgb(248 250 252));
+    background: linear-gradient(90deg, rgb(236 253 245), rgb(248 250 252));
   }
 
-  .booking-event-card[data-status="cancelled"] {
+  .booking-event-chip[data-status="cancelled"] {
     border-color: rgb(254 202 202);
-    background: linear-gradient(135deg, rgb(254 242 242), rgb(248 250 252));
+    background: linear-gradient(90deg, rgb(254 242 242), rgb(248 250 252));
+  }
+
+  .booking-event-dot {
+    flex: 0 0 auto;
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 999px;
+    background: rgb(14 165 233);
+  }
+
+  .booking-event-chip[data-status="confirmed"] .booking-event-dot {
+    background: rgb(16 185 129);
+  }
+
+  .booking-event-chip[data-status="cancelled"] .booking-event-dot {
+    background: rgb(244 63 94);
+  }
+
+  .booking-event-text {
+    min-width: 0;
+    display: flex;
+    align-items: baseline;
+    gap: 0.4rem;
+    overflow: hidden;
   }
 
   .booking-event-ref {
-    display: block;
-    padding: 0.45rem 0.6rem;
-    font-size: 0.74rem;
+    flex: 0 0 auto;
+    font-size: 0.66rem;
     font-weight: 700;
-    color: rgb(15 23 42);
-    text-decoration: none;
-  }
-
-  .booking-event-ref:hover {
-    color: rgb(3 105 161);
-  }
-
-  .booking-event-details {
-    border-top: 1px solid rgba(148, 163, 184, 0.18);
-  }
-
-  .booking-event-details summary {
-    cursor: pointer;
-    list-style: none;
-    padding: 0.35rem 0.6rem 0.5rem;
-    font-size: 0.7rem;
-    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
     color: rgb(71 85 105);
   }
 
-  .booking-event-details summary::-webkit-details-marker {
-    display: none;
-  }
-
-  .booking-event-details[open] summary {
-    color: rgb(15 23 42);
-  }
-
-  .booking-event-meta {
-    display: grid;
-    gap: 0.18rem;
-    padding: 0 0.6rem 0.55rem;
-    font-size: 0.68rem;
-    color: rgb(51 65 85);
-  }
-
-  .booking-event-price {
+  .booking-event-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.76rem;
     font-weight: 700;
     color: rgb(15 23 42);
+  }
+
+  @media (max-width: 767px) {
+    #booking-calendar .fc-daygrid-day-frame {
+      min-height: 6.5rem;
+    }
   }
 </style>
 
@@ -109,7 +171,7 @@
   {% for b in bookings %}
     {
       "id": {{ b.id|tojson }},
-      "title": {{ ("Ref #" ~ b.id)|tojson }},
+      "title": {{ ("Ref #" ~ b.id ~ " - " ~ (b.full_name or "Unknown customer"))|tojson }},
       "start": {{ (b.start_date|string)|tojson }},
       "end": {{ ((b.end_date_plus_one|string) if b.end_date_plus_one is defined else (b.end_date|string))|tojson }},
       "url": {{ url_for('routes.booking_detail', booking_id=b.id)|tojson }},
@@ -134,7 +196,54 @@
   document.addEventListener("DOMContentLoaded", function () {
     const calendarEl = document.getElementById("booking-calendar");
     const eventsDataEl = document.getElementById("booking-events-data");
+    const popupEl = document.getElementById("calendar-booking-popup");
+    const popupRefEl = document.getElementById("calendar-popup-ref");
+    const popupTitleEl = document.getElementById("calendar-popup-title");
+    const popupStatusEl = document.getElementById("calendar-popup-status");
+    const popupPriceEl = document.getElementById("calendar-popup-price");
+    const popupTentEl = document.getElementById("calendar-popup-tent");
+    const popupExtrasEl = document.getElementById("calendar-popup-extras");
+    const popupOpenEl = document.getElementById("calendar-popup-open");
     const events = JSON.parse(eventsDataEl.textContent);
+
+    const closePopup = () => {
+      popupEl.classList.add("hidden");
+    };
+
+    const openPopup = (event) => {
+      const props = event.extendedProps;
+      const extras = [];
+      if (props.include_setup_service) extras.push("Setup");
+      if (props.include_delivery) extras.push("Delivery");
+
+      popupRefEl.textContent = `Booking #${event.id}`;
+      popupTitleEl.textContent = props.customer || "Unknown customer";
+
+      let statusClass = "inline-flex rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-800";
+      if (props.status === "confirmed") {
+        statusClass = "inline-flex rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-800";
+      } else if (props.status === "cancelled") {
+        statusClass = "inline-flex rounded-full bg-rose-100 px-3 py-1 text-xs font-medium text-rose-800";
+      }
+      popupStatusEl.innerHTML = `<span class="${statusClass}">${props.status}</span>`;
+
+      popupPriceEl.textContent = `${props.total_cost} kr`;
+      popupTentEl.textContent = props.tent_summary || "No tent";
+      popupExtrasEl.textContent = extras.length ? extras.join(" - ") : "No extras";
+      popupOpenEl.href = event.url || "#";
+
+      popupEl.classList.remove("hidden");
+    };
+
+    popupEl.querySelectorAll("[data-popup-close]").forEach((el) => {
+      el.addEventListener("click", closePopup);
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        closePopup();
+      }
+    });
 
     const calendar = new FullCalendar.Calendar(calendarEl, {
       initialView: "dayGridMonth",
@@ -152,55 +261,35 @@
       events: events,
       eventContent: function(arg) {
         const props = arg.event.extendedProps;
-        const wrapper = document.createElement("div");
-        wrapper.className = "booking-event-card";
-        wrapper.dataset.status = props.status || "pending";
+        const chip = document.createElement("button");
+        chip.type = "button";
+        chip.className = "booking-event-chip";
+        chip.dataset.status = props.status || "pending";
 
-        const refLink = document.createElement("a");
-        refLink.className = "booking-event-ref";
-        refLink.href = arg.event.url || "#";
-        refLink.textContent = `Ref #${arg.event.id}`;
-        wrapper.appendChild(refLink);
+        const dot = document.createElement("span");
+        dot.className = "booking-event-dot";
+        chip.appendChild(dot);
 
-        const details = document.createElement("details");
-        details.className = "booking-event-details";
+        const textWrap = document.createElement("div");
+        textWrap.className = "booking-event-text";
 
-        const summary = document.createElement("summary");
-        summary.textContent = "Info";
-        details.appendChild(summary);
+        const ref = document.createElement("span");
+        ref.className = "booking-event-ref";
+        ref.textContent = `#${arg.event.id}`;
+        textWrap.appendChild(ref);
 
-        const meta = document.createElement("div");
-        meta.className = "booking-event-meta";
+        const name = document.createElement("span");
+        name.className = "booking-event-name";
+        name.textContent = props.customer || "Unknown customer";
+        textWrap.appendChild(name);
 
-        const price = document.createElement("div");
-        price.className = "booking-event-price";
-        price.textContent = `${props.total_cost} kr`;
-        meta.appendChild(price);
+        chip.appendChild(textWrap);
+        chip.addEventListener("click", () => openPopup(arg.event));
 
-        const tent = document.createElement("div");
-        tent.textContent = props.tent_summary;
-        meta.appendChild(tent);
-
-        const extras = document.createElement("div");
-        const extrasBits = [];
-        if (props.include_setup_service) extrasBits.push("Setup");
-        if (props.include_delivery) extrasBits.push("Delivery");
-        extras.textContent = extrasBits.length ? extrasBits.join(" • ") : "No extras";
-        meta.appendChild(extras);
-
-        details.appendChild(meta);
-        wrapper.appendChild(details);
-
-        return { domNodes: [wrapper] };
+        return { domNodes: [chip] };
       },
       eventClick: function(info) {
-        if (info.jsEvent.target.closest("summary")) {
-          return;
-        }
         info.jsEvent.preventDefault();
-        if (info.event.url) {
-          window.location.href = info.event.url;
-        }
       },
       eventDidMount: function(info) {
         const status = info.event.extendedProps.status;
