@@ -38,6 +38,7 @@ Put these files there:
 Example `.env`:
 ```dotenv
 DATABASE_URL=postgresql://postgres:CHANGE_ME@localhost:5432/tentrental
+SECRET_KEY=put-a-long-random-secret-here
 ```
 
 If the GHCR package is private, log in once on the server with a PAT that has `read:packages`:

@@ -1,8 +1,9 @@
 services:
   bookingservice:
-    image: ghcr.io/REPLACE_WITH_GH_OWNER/dv1703-bookingservice:latest
+    image: ghcr.io/kada-party-hb/dv1703-bookingservice:latest
     container_name: dv1703-bookingservice
     restart: unless-stopped
     network_mode: host
     environment:
       DATABASE_URL: ${DATABASE_URL}
+      SECRET_KEY: ${SECRET_KEY}
