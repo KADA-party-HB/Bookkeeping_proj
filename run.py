@@ -17,7 +17,7 @@ app = create_app()
 if __name__ == "__main__":
     app.run(
         host="0.0.0.0",
-        port=9342,
+        port=9343,
         ssl_context=(CERT_FILE, KEY_FILE),
         debug=True,
     )
