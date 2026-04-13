@@ -26,7 +26,7 @@
 
 <div id="calendar-booking-popup" class="fixed inset-0 z-50 hidden">
   <div class="absolute inset-0 bg-slate-950/45" data-popup-close></div>
-  <div class="absolute inset-x-4 bottom-4 top-auto rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-2xl md:inset-x-auto md:right-6 md:top-24 md:bottom-auto md:w-[24rem]">
+  <div class="absolute left-1/2 top-1/2 w-[calc(100%-2rem)] max-w-[24rem] -translate-x-1/2 -translate-y-1/2 rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-2xl">
     <div class="flex items-start justify-between gap-4">
       <div>
         <div id="calendar-popup-ref" class="text-xs font-medium uppercase tracking-[0.2em] text-slate-400"></div>
@@ -215,12 +215,7 @@
       popupRefEl.textContent = `Booking #${event.id}`;
       popupTitleEl.textContent = props.customer || "Unknown customer";
 
-      let statusClass = "inline-flex rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-800";
-      if (props.status === "confirmed") {
-        statusClass = "inline-flex rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-800";
-      } else if (props.status === "cancelled") {
-        statusClass = "inline-flex rounded-full bg-rose-100 px-3 py-1 text-xs font-medium text-rose-800";
-      }
+      const statusClass = "inline-flex rounded-full bg-sky-100 px-3 py-1 text-xs font-medium text-sky-800";
       popupStatusEl.innerHTML = `<span class="${statusClass}">${props.status}</span>`;
 
       popupPriceEl.textContent = `${props.total_cost} kr`;
