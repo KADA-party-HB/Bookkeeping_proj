@@ -107,6 +107,16 @@
     overflow: hidden;
   }
 
+  .booking-event-chip[data-continues-before="true"] {
+    border-top-left-radius: 0.45rem;
+    border-bottom-left-radius: 0.45rem;
+  }
+
+  .booking-event-chip[data-continues-after="true"] {
+    border-top-right-radius: 0.45rem;
+    border-bottom-right-radius: 0.45rem;
+  }
+
   .booking-event-dot {
     flex: 0 0 auto;
     width: 0.38rem;
@@ -246,6 +256,8 @@
         chip.type = "button";
         chip.className = "booking-event-chip";
         chip.dataset.status = props.status || "pending";
+        chip.dataset.continuesBefore = String(!arg.isStart);
+        chip.dataset.continuesAfter = String(!arg.isEnd);
 
         const dot = document.createElement("span");
         dot.className = "booking-event-dot";
