@@ -3,7 +3,24 @@ services:
     image: ghcr.io/kada-party-hb/dv1703-bookingservice:latest
     container_name: dv1703-bookingservice
     restart: unless-stopped
-    network_mode: host
     environment:
       DATABASE_URL: ${DATABASE_URL}
       SECRET_KEY: ${SECRET_KEY}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    expose:
+      - "9342"
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: dv1703-bookingservice-nginx
+    restart: unless-stopped
+    depends_on:
+      - bookingservice
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./docker/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./certs/devcert.crt:/etc/nginx/certs/devcert.crt:ro
+      - ./certs/devcert.key:/etc/nginx/certs/devcert.key:ro

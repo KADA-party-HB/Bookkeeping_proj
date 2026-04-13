@@ -5,6 +5,7 @@ Copy these files into the repo root:
 - Dockerfile
 - docker/entrypoint.sh
 - docker/migrate.py
+- docker/nginx.conf
 - wsgi.py
 - .dockerignore
 - docker-compose.yml
@@ -34,10 +35,13 @@ cd /opt/dv1703-bookingservice
 Put these files there:
 - docker-compose.yml
 - .env
+- docker/nginx.conf
+- certs/devcert.crt
+- certs/devcert.key
 
 Example `.env`:
 ```dotenv
-DATABASE_URL=postgresql://postgres:CHANGE_ME@localhost:5432/tentrental
+DATABASE_URL=postgresql://postgres:CHANGE_ME@host.docker.internal:5432/tentrental
 SECRET_KEY=put-a-long-random-secret-here
 ```
 
@@ -57,11 +61,13 @@ Check logs:
 docker compose logs -f
 ```
 
-## 5) LAN access
-Because the compose file uses `network_mode: host`, the app binds directly on the server network.
+## 5) HTTPS access
+The compose file exposes Nginx on ports 80 and 443. Nginx redirects HTTP to HTTPS and proxies to the Flask app over Docker's internal network.
 Open it from another machine on your LAN with:
 
-http://YOUR_SERVER_IP:9342
+https://YOUR_SERVER_IP
+
+Because `devcert.crt` is self-signed, browsers will show a certificate warning unless that certificate is trusted on the client device.
 
 ## 6) New migrations
 Add a new file to `migrations/`, for example:
