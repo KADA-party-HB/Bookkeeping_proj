@@ -24,6 +24,92 @@
   <div id="booking-calendar"></div>
 </section>
 
+<section id="calendar-day-summary-section" class="mt-6 hidden rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm md:p-8">
+  <div class="flex flex-wrap items-start justify-between gap-4">
+    <div>
+      <div class="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-medium uppercase tracking-[0.2em] text-sky-700">
+        Day Summary
+      </div>
+      <h2 id="calendar-day-summary-title" class="mt-4 text-2xl font-semibold tracking-tight text-slate-900">
+        Day summary
+      </h2>
+      <p id="calendar-day-summary-description" class="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+        Grouped view of all category lines active on the selected day.
+      </p>
+    </div>
+    <div class="flex flex-wrap items-center gap-3">
+      <button
+        type="button"
+        id="calendar-free-toggle"
+        class="hidden inline-flex items-center gap-3 rounded-full border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+      >
+        <span>Free inventory</span>
+        <span
+          id="calendar-free-toggle-track"
+          class="flex h-6 w-11 items-center justify-start rounded-full bg-slate-200 px-1 transition duration-200"
+        >
+          <span
+            id="calendar-free-toggle-knob"
+            class="h-4 w-4 rounded-full border border-slate-200 bg-white shadow-sm transition duration-200"
+          ></span>
+        </span>
+        <span id="calendar-free-toggle-state" class="min-w-[2rem] text-left text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+          Off
+        </span>
+      </button>
+      <div id="calendar-day-summary-booking-count" class="rounded-full bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700">
+        0 bookings
+      </div>
+    </div>
+  </div>
+
+  <div id="calendar-day-summary-empty" class="mt-6 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-600">
+    No booked items on this day.
+  </div>
+
+  <div id="calendar-day-summary-table-wrap" class="mt-6 hidden overflow-x-auto rounded-2xl border border-slate-200">
+    <table class="min-w-full text-sm">
+      <thead class="bg-slate-50 text-slate-600">
+        <tr>
+          <th class="p-3 text-left">Qty</th>
+          <th class="p-3 text-left">Item</th>
+          <th class="p-3 text-left">Type</th>
+          <th class="p-3 text-left">Rental period</th>
+          <th class="p-3 text-left">Base price</th>
+          <th class="p-3 text-left">Setup</th>
+          <th class="p-3 text-left">Override</th>
+          <th class="p-3 text-left">Summary total</th>
+        </tr>
+      </thead>
+      <tbody id="calendar-day-summary-body" class="divide-y divide-slate-200 bg-white"></tbody>
+    </table>
+  </div>
+
+  <div id="calendar-day-summary-override-note" class="mt-4 hidden rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+    One or more bookings on this day use a full booking override, so the grouped totals below reflect booked lines rather than final booking totals.
+  </div>
+
+  <div id="calendar-free-summary-wrap" class="mt-6 hidden">
+    <div id="calendar-free-summary-empty" class="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-600">
+      No free inventory on this day.
+    </div>
+
+    <div id="calendar-free-summary-table-wrap" class="mt-4 hidden overflow-x-auto rounded-2xl border border-slate-200">
+      <table class="min-w-full text-sm">
+        <thead class="bg-slate-50 text-slate-600">
+          <tr>
+            <th class="p-3 text-left">Free qty</th>
+            <th class="p-3 text-left">Category</th>
+            <th class="p-3 text-left">Type</th>
+            <th class="p-3 text-left">Total active</th>
+          </tr>
+        </thead>
+        <tbody id="calendar-free-summary-body" class="divide-y divide-slate-200 bg-white"></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
 <div id="calendar-booking-popup" class="fixed inset-0 z-50 hidden">
   <div class="absolute inset-0 bg-slate-950/45" data-popup-close></div>
   <div class="absolute left-1/2 top-1/2 w-[calc(100%-2rem)] max-w-[24rem] -translate-x-1/2 -translate-y-1/2 rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-2xl">
@@ -191,13 +277,21 @@
         "customer": {{ (b.full_name or "")|tojson }},
         "email": {{ (b.email or "")|tojson }},
         "total_cost": {{ b.total_cost|tojson }},
+        "booking_start_date": {{ (b.start_date|string)|tojson }},
+        "booking_end_date": {{ (b.end_date|string)|tojson }},
+        "item_summary": {{ b.calendar_item_summary|tojson }},
         "tent_summary": {{ (b.tent_summary or "No tent")|tojson }},
+        "has_booking_override": {{ (b.custom_total_price is not none)|tojson }},
         "include_delivery": {{ b.include_delivery|tojson }},
         "include_setup_service": {{ b.include_setup_service|tojson }}
       }
     }{% if not loop.last %},{% endif %}
   {% endfor %}
 ]
+</script>
+
+<script id="booking-category-inventory-data" type="application/json">
+{{ category_inventory|tojson }}
 </script>
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.css">
@@ -215,8 +309,32 @@
     const popupTentEl = document.getElementById("calendar-popup-tent");
     const popupExtrasEl = document.getElementById("calendar-popup-extras");
     const popupOpenEl = document.getElementById("calendar-popup-open");
+    const categoryInventoryDataEl = document.getElementById("booking-category-inventory-data");
+    const daySummarySectionEl = document.getElementById("calendar-day-summary-section");
+    const daySummaryTitleEl = document.getElementById("calendar-day-summary-title");
+    const daySummaryDescriptionEl = document.getElementById("calendar-day-summary-description");
+    const daySummaryBookingCountEl = document.getElementById("calendar-day-summary-booking-count");
+    const daySummaryEmptyEl = document.getElementById("calendar-day-summary-empty");
+    const daySummaryTableWrapEl = document.getElementById("calendar-day-summary-table-wrap");
+    const daySummaryBodyEl = document.getElementById("calendar-day-summary-body");
+    const daySummaryOverrideNoteEl = document.getElementById("calendar-day-summary-override-note");
+    const freeToggleEl = document.getElementById("calendar-free-toggle");
+    const freeToggleTrackEl = document.getElementById("calendar-free-toggle-track");
+    const freeToggleStateEl = document.getElementById("calendar-free-toggle-state");
+    const freeSummaryWrapEl = document.getElementById("calendar-free-summary-wrap");
+    const freeSummaryEmptyEl = document.getElementById("calendar-free-summary-empty");
+    const freeSummaryTableWrapEl = document.getElementById("calendar-free-summary-table-wrap");
+    const freeSummaryBodyEl = document.getElementById("calendar-free-summary-body");
     const events = JSON.parse(eventsDataEl.textContent);
+    const categoryInventory = JSON.parse(categoryInventoryDataEl.textContent);
     const mobileQuery = window.matchMedia("(max-width: 767px)");
+    const dayLabelFormatter = new Intl.DateTimeFormat("sv-SE", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+    let showFreeInventory = false;
 
     const closePopup = () => {
       popupEl.classList.add("hidden");
@@ -242,6 +360,218 @@
       popupEl.classList.remove("hidden");
     };
 
+    const formatIsoDateLocal = (date) => {
+      const year = date.getFullYear();
+      const month = `${date.getMonth() + 1}`.padStart(2, "0");
+      const day = `${date.getDate()}`.padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    };
+
+    const parseAmount = (value) => {
+      const parsed = parseFloat(`${value ?? ""}`.replace(",", "."));
+      return Number.isFinite(parsed) ? parsed : 0;
+    };
+
+    const formatAmount = (value) => `${parseAmount(value).toFixed(2)} kr`;
+    const createSummaryCell = ({ className = "", text = null, html = null }) => {
+      const cell = document.createElement("td");
+      cell.className = className;
+      if (html !== null) {
+        cell.innerHTML = html;
+      } else {
+        cell.textContent = text ?? "";
+      }
+      return cell;
+    };
+
+    const renderDaySummary = (view) => {
+      const isDayView = view.type === "dayGridDay" || view.type === "timeGridDay";
+      if (!isDayView) {
+        daySummarySectionEl.classList.add("hidden");
+        freeToggleEl.classList.add("hidden");
+        freeSummaryWrapEl.classList.add("hidden");
+        daySummaryEmptyEl.classList.add("hidden");
+        daySummaryTableWrapEl.classList.add("hidden");
+        daySummaryOverrideNoteEl.classList.add("hidden");
+        return;
+      }
+
+      const selectedDate = formatIsoDateLocal(view.currentStart);
+      const selectedBookings = events.filter((event) => {
+        const props = event.extendedProps || {};
+        return (
+          props.booking_start_date &&
+          props.booking_end_date &&
+          props.booking_start_date <= selectedDate &&
+          props.booking_end_date >= selectedDate
+        );
+      });
+
+      const summaryMap = new Map();
+      let hasBookingOverride = false;
+
+      selectedBookings.forEach((event) => {
+        const props = event.extendedProps || {};
+        if (props.has_booking_override) {
+          hasBookingOverride = true;
+        }
+
+        (props.item_summary || []).forEach((row) => {
+          const key = JSON.stringify([
+            row.display_name,
+            row.type_label,
+            row.quoted_period_label,
+            row.quoted_period_price,
+            row.effective_setup_fee,
+            row.custom_total_price,
+            row.effective_line_total,
+          ]);
+
+          if (!summaryMap.has(key)) {
+            summaryMap.set(key, {
+              display_name: row.display_name,
+              type_label: row.type_label,
+              quoted_period_label: row.quoted_period_label,
+              quoted_period_price: row.quoted_period_price,
+              effective_setup_fee: row.effective_setup_fee,
+              custom_total_price: row.custom_total_price,
+              quantity: 0,
+              group_total: 0,
+            });
+          }
+
+          const summaryRow = summaryMap.get(key);
+          summaryRow.quantity += Number(row.quantity || 0);
+          summaryRow.group_total += parseAmount(row.group_total);
+        });
+      });
+
+      const summaryRows = Array.from(summaryMap.values()).sort((left, right) => (
+        `${left.display_name}`.localeCompare(`${right.display_name}`, "sv")
+      ));
+
+      const selectedDayLabel = dayLabelFormatter.format(view.currentStart);
+      daySummaryTitleEl.textContent = `Day summary for ${selectedDayLabel}`;
+      daySummarySectionEl.classList.remove("hidden");
+      daySummaryBookingCountEl.classList.remove("hidden");
+      freeToggleEl.classList.remove("hidden");
+      freeToggleTrackEl.classList.toggle("justify-end", showFreeInventory);
+      freeToggleTrackEl.classList.toggle("justify-start", !showFreeInventory);
+      freeToggleTrackEl.classList.toggle("bg-sky-400", showFreeInventory);
+      freeToggleTrackEl.classList.toggle("bg-slate-200", !showFreeInventory);
+      freeToggleStateEl.textContent = showFreeInventory ? "On" : "Off";
+
+      const bookedByCategory = new Map();
+      selectedBookings.forEach((event) => {
+        (event.extendedProps?.item_summary || []).forEach((row) => {
+          const categoryId = Number(row.category_id);
+          bookedByCategory.set(
+            categoryId,
+            (bookedByCategory.get(categoryId) || 0) + Number(row.quantity || 0),
+          );
+        });
+      });
+
+      const freeRows = categoryInventory
+        .map((row) => {
+          const totalActive = Number(row.total_active || 0);
+          const bookedQty = bookedByCategory.get(Number(row.category_id)) || 0;
+          return {
+            ...row,
+            free_qty: Math.max(totalActive - bookedQty, 0),
+          };
+        })
+        .filter((row) => row.free_qty > 0)
+        .sort((left, right) => `${left.display_name}`.localeCompare(`${right.display_name}`, "sv"));
+
+      freeSummaryWrapEl.classList.toggle("hidden", !showFreeInventory);
+
+      if (showFreeInventory) {
+        daySummaryDescriptionEl.textContent = "See which categories still have free active units on the selected day.";
+        daySummaryBookingCountEl.textContent = `${freeRows.length} categor${freeRows.length === 1 ? "y" : "ies"} free`;
+        daySummaryEmptyEl.classList.add("hidden");
+        daySummaryTableWrapEl.classList.add("hidden");
+        daySummaryOverrideNoteEl.classList.add("hidden");
+
+        if (!freeRows.length) {
+          freeSummaryEmptyEl.classList.remove("hidden");
+          freeSummaryTableWrapEl.classList.add("hidden");
+          freeSummaryBodyEl.innerHTML = "";
+          return;
+        }
+
+        freeSummaryEmptyEl.classList.add("hidden");
+        freeSummaryTableWrapEl.classList.remove("hidden");
+        freeSummaryBodyEl.innerHTML = "";
+
+        freeRows.forEach((row) => {
+          const tr = document.createElement("tr");
+          tr.className = "align-top";
+          tr.appendChild(createSummaryCell({ className: "p-3 font-medium text-emerald-700", text: String(row.free_qty) }));
+          tr.appendChild(createSummaryCell({ className: "p-3 font-medium text-slate-900", text: row.display_name }));
+          tr.appendChild(createSummaryCell({ className: "p-3", text: row.type_label }));
+          tr.appendChild(createSummaryCell({ className: "p-3", text: String(row.total_active) }));
+          freeSummaryBodyEl.appendChild(tr);
+        });
+        return;
+      }
+
+      daySummaryDescriptionEl.textContent = "Grouped view of all category lines active on the selected day.";
+      daySummaryBookingCountEl.textContent = `${selectedBookings.length} booking${selectedBookings.length === 1 ? "" : "s"}`;
+      daySummaryOverrideNoteEl.classList.toggle("hidden", !hasBookingOverride);
+      freeSummaryWrapEl.classList.add("hidden");
+
+      if (!summaryRows.length) {
+        daySummaryEmptyEl.classList.remove("hidden");
+        daySummaryTableWrapEl.classList.add("hidden");
+        daySummaryBodyEl.innerHTML = "";
+        return;
+      }
+
+      daySummaryEmptyEl.classList.add("hidden");
+      daySummaryTableWrapEl.classList.remove("hidden");
+      daySummaryBodyEl.innerHTML = "";
+
+      summaryRows.forEach((row) => {
+        const tr = document.createElement("tr");
+        tr.className = "align-top";
+        tr.appendChild(createSummaryCell({ className: "p-3 font-medium", text: String(row.quantity) }));
+        tr.appendChild(createSummaryCell({ className: "p-3 font-medium text-slate-900", text: row.display_name }));
+        tr.appendChild(createSummaryCell({ className: "p-3", text: row.type_label }));
+        tr.appendChild(
+          createSummaryCell({
+            className: "p-3",
+            html: row.quoted_period_label
+              ? null
+              : '<span class="text-slate-400">&mdash;</span>',
+            text: row.quoted_period_label || null,
+          })
+        );
+        tr.appendChild(
+          createSummaryCell({
+            className: "p-3",
+            html: row.quoted_period_price !== null && row.quoted_period_price !== undefined
+              ? null
+              : '<span class="text-slate-400">&mdash;</span>',
+            text: row.quoted_period_price !== null && row.quoted_period_price !== undefined
+              ? `${row.quoted_period_price} kr`
+              : null,
+          })
+        );
+        tr.appendChild(createSummaryCell({ className: "p-3", text: formatAmount(row.effective_setup_fee) }));
+        tr.appendChild(
+          createSummaryCell({
+            className: "p-3",
+            html: row.custom_total_price !== null && row.custom_total_price !== undefined
+              ? `<span class="font-medium text-amber-700">${row.custom_total_price} kr</span>`
+              : '<span class="text-slate-400">No override</span>',
+          })
+        );
+        tr.appendChild(createSummaryCell({ className: "p-3 font-medium", text: formatAmount(row.group_total) }));
+        daySummaryBodyEl.appendChild(tr);
+      });
+    };
+
     popupEl.querySelectorAll("[data-popup-close]").forEach((el) => {
       el.addEventListener("click", closePopup);
     });
@@ -251,18 +581,22 @@
         closePopup();
       }
     });
+    freeToggleEl?.addEventListener("click", () => {
+      showFreeInventory = !showFreeInventory;
+      renderDaySummary(calendar.view);
+    });
 
     const getHeaderToolbar = () => (
       mobileQuery.matches
         ? {
             left: "prev,next",
             center: "title",
-            right: "dayGridMonth,listMonth"
+            right: "dayGridMonth,dayGridDay,listMonth"
           }
         : {
             left: "prev,next today",
             center: "title",
-            right: "dayGridMonth,timeGridWeek,listMonth"
+            right: "dayGridMonth,dayGridDay,timeGridWeek,listMonth"
           }
     );
 
@@ -279,6 +613,9 @@
       eventTextColor: "#0f172a",
       headerToolbar: getHeaderToolbar(),
       events: events,
+      datesSet: function(info) {
+        renderDaySummary(info.view);
+      },
       eventContent: function(arg) {
         const props = arg.event.extendedProps;
         const chip = document.createElement("button");

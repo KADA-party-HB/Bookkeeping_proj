@@ -623,6 +623,52 @@ WHERE bi.booking_id = %s
 ORDER BY c.display_name, i.sku;
 """
 
+SQL_BOOKING_ITEMS_FOR_BOOKINGS = """
+SELECT
+  bi.booking_id,
+  i.id AS item_id,
+  i.sku,
+  c.id AS category_id,
+  c.display_name,
+
+  bi.rental_period_id,
+  bi.quoted_period_label,
+  bi.quoted_period_price,
+  bi.setup_service_fee,
+  bi.custom_total_price,
+  bi.custom_price_note,
+  bi.line_note,
+
+  COALESCE(bi.custom_total_price, bi.quoted_period_price) AS effective_rental_price,
+
+  CASE
+    WHEN b.include_setup_service THEN COALESCE(bi.setup_service_fee, 0)
+    ELSE 0
+  END AS effective_setup_fee,
+
+  COALESCE(bi.custom_total_price, bi.quoted_period_price)
+  + CASE
+      WHEN b.include_setup_service THEN COALESCE(bi.setup_service_fee, 0)
+      ELSE 0
+    END AS effective_line_total,
+
+  (tc.category_id IS NOT NULL) AS is_tent,
+  tc.capacity,
+  tc.season_rating,
+  tc.setup_service_fee AS current_setup_service_fee,
+
+  (fc.category_id IS NOT NULL) AS is_furnishing,
+  fc.furnishing_kind
+FROM booking_items bi
+JOIN bookings b ON b.id = bi.booking_id
+JOIN items i ON i.id = bi.item_id
+JOIN categories c ON c.id = i.category_id
+LEFT JOIN tent_categories tc ON tc.category_id = c.id
+LEFT JOIN furnishing_categories fc ON fc.category_id = c.id
+WHERE bi.booking_id = ANY(%s)
+ORDER BY bi.booking_id, c.display_name, i.sku;
+"""
+
 SQL_BOOKING_TOTAL = """
 SELECT
   b.id AS booking_id,

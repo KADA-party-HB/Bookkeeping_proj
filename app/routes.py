@@ -57,6 +57,7 @@ from .sql import (
     SQL_BOOKING_DETAIL,
     SQL_BOOKING_DETAIL_FOR_CUSTOMER,
     SQL_BOOKING_ITEMS,
+    SQL_BOOKING_ITEMS_FOR_BOOKINGS,
     SQL_BOOKING_TOTAL,
     SQL_LIST_ALL_BOOKINGS,
     SQL_CONFIRM_BOOKING,
@@ -156,6 +157,7 @@ def _build_booking_item_summary(items):
             type_label = "Item"
 
         key = (
+            item.get("category_id"),
             item.get("display_name"),
             type_label,
             item.get("quoted_period_label"),
@@ -167,6 +169,7 @@ def _build_booking_item_summary(items):
 
         if key not in summary_map:
             summary_map[key] = {
+                "category_id": item.get("category_id"),
                 "display_name": item.get("display_name"),
                 "type_label": type_label,
                 "quoted_period_label": item.get("quoted_period_label"),
@@ -1511,12 +1514,47 @@ def customer_edit_save(customer_id: int):
 def admin_bookings_calendar():
     require_admin()
     bookings = [b for b in query(SQL_LIST_ALL_BOOKINGS) if b["status"] != "cancelled"]
+    booking_ids = [b["id"] for b in bookings]
+    items_by_booking_id = {}
+    category_inventory = {}
+
+    if booking_ids:
+        calendar_items = query(SQL_BOOKING_ITEMS_FOR_BOOKINGS, (booking_ids,))
+        for row in calendar_items:
+            items_by_booking_id.setdefault(row["booking_id"], []).append(row)
+
+    for item in query(SQL_LIST_ITEMS):
+        if not item["is_active"]:
+            continue
+
+        category_id = item["category_id"]
+        if item["is_tent"]:
+            type_label = "Tent"
+        elif item["is_furnishing"]:
+            type_label = "Furnishing"
+        else:
+            type_label = "Item"
+
+        if category_id not in category_inventory:
+            category_inventory[category_id] = {
+                "category_id": category_id,
+                "display_name": item["display_name"],
+                "type_label": type_label,
+                "total_active": 0,
+            }
+
+        category_inventory[category_id]["total_active"] += 1
 
     for b in bookings:
         b["end_date_plus_one"] = b["end_date"] + timedelta(days=1)
+        b["calendar_item_summary"] = [
+            dict(row)
+            for row in _build_booking_item_summary(items_by_booking_id.get(b["id"], []))
+        ]
 
     return render_template(
         "booking_calendar.html",
         bookings=bookings,
+        category_inventory=list(category_inventory.values()),
         role="admin",
     )
