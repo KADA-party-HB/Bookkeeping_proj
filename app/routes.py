@@ -1,6 +1,6 @@
 from flask import Blueprint, request, render_template, redirect, url_for, flash, session, abort
 
-from datetime import timedelta
+from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 from .db import query, execute, tx
@@ -25,6 +25,7 @@ from .sql import (
 
     # booking
     SQL_AVAILABLE_CATEGORIES,
+    SQL_FIND_CATEGORY_RENTAL_PRICING,
     SQL_CREATE_BOOKING_WITH_ALLOCATIONS,
 
     # items
@@ -61,7 +62,9 @@ from .sql import (
     SQL_CANCEL_BOOKING,
     SQL_DELETE_BOOKING,
     SQL_UPDATE_BOOKING_ADMIN_FIELDS,
-    SQL_BOOKING_ITEM_DATE_CONFLICT,
+    SQL_BOOKING_REALLOCATION_CANDIDATES,
+    SQL_DELETE_BOOKING_ITEMS_FOR_BOOKING,
+    SQL_INSERT_BOOKING_ITEM,
 )
 
 bp = Blueprint("routes", __name__)
@@ -179,6 +182,128 @@ def _build_booking_item_summary(items):
         summary_map[key]["group_total"] += item.get("effective_line_total") or 0
 
     return summary_rows
+
+
+def _reallocate_booking_items_for_dates(
+    cur,
+    booking_id: int,
+    start_date: str,
+    end_date: str,
+    *,
+    include_setup_service: bool,
+    booking_has_total_override: bool,
+):
+    cur.execute(SQL_BOOKING_ITEMS, (booking_id,))
+    current_items = cur.fetchall()
+    if not current_items:
+        return 0, 0
+
+    rows_by_category = {}
+    for row in current_items:
+        rows_by_category.setdefault(row["category_id"], []).append(row)
+
+    reassigned_rows = []
+    moved_rows_with_metadata = 0
+    rental_days = (date.fromisoformat(end_date) - date.fromisoformat(start_date)).days + 1
+    pricing_by_category = {}
+
+    for category_rows in rows_by_category.values():
+        category_id = category_rows[0]["category_id"]
+        display_name = category_rows[0]["display_name"]
+        current_item_ids = {row["item_id"] for row in category_rows}
+
+        cur.execute(SQL_FIND_CATEGORY_RENTAL_PRICING, (category_id, rental_days))
+        pricing_by_category[category_id] = cur.fetchone()
+
+        cur.execute(
+            SQL_BOOKING_REALLOCATION_CANDIDATES,
+            (category_id, booking_id, booking_id, start_date, end_date),
+        )
+        candidates = cur.fetchall()
+        candidates.sort(
+            key=lambda candidate: (
+                0 if candidate["item_id"] in current_item_ids else 1,
+                candidate["item_id"],
+            )
+        )
+
+        needed_count = len(category_rows)
+        chosen_candidates = candidates[:needed_count]
+        if len(chosen_candidates) < needed_count:
+            raise ValueError(
+                f'Cannot move booking to these dates because only {len(chosen_candidates)} of {needed_count} items are available in "{display_name}".'
+            )
+
+        chosen_ids = {candidate["item_id"] for candidate in chosen_candidates}
+        kept_ids = set()
+        pending_rows = []
+
+        for row in category_rows:
+            if row["item_id"] in chosen_ids and row["item_id"] not in kept_ids:
+                reassigned_rows.append((row, row["item_id"]))
+                kept_ids.add(row["item_id"])
+            else:
+                pending_rows.append(row)
+
+        remaining_ids = [
+            candidate["item_id"]
+            for candidate in chosen_candidates
+            if candidate["item_id"] not in kept_ids
+        ]
+
+        for row, new_item_id in zip(pending_rows, remaining_ids):
+            reassigned_rows.append((row, new_item_id))
+
+    cur.execute(SQL_DELETE_BOOKING_ITEMS_FOR_BOOKING, (booking_id,))
+
+    reallocated_count = 0
+    for row, new_item_id in reassigned_rows:
+        pricing_row = pricing_by_category[row["category_id"]]
+
+        if pricing_row:
+            rental_period_id = pricing_row["rental_period_id"]
+            quoted_period_label = pricing_row["period_label"]
+            quoted_period_price = pricing_row["period_price"]
+        else:
+            has_line_override = row["custom_total_price"] is not None
+            if not has_line_override and not booking_has_total_override:
+                raise ValueError(
+                    f'Cannot move booking to these dates because "{row["display_name"]}" has no standard price configured for {rental_days} day{"s" if rental_days != 1 else ""}.'
+                )
+            rental_period_id = None
+            quoted_period_label = None
+            quoted_period_price = None
+
+        setup_service_fee = (
+            row["current_setup_service_fee"]
+            if include_setup_service and row["is_tent"]
+            else None
+        )
+
+        cur.execute(
+            SQL_INSERT_BOOKING_ITEM,
+            (
+                booking_id,
+                new_item_id,
+                rental_period_id,
+                quoted_period_label,
+                quoted_period_price,
+                setup_service_fee,
+                row["custom_total_price"],
+                row["custom_price_note"],
+                row["line_note"],
+            ),
+        )
+        if row["item_id"] != new_item_id:
+            reallocated_count += 1
+            if (
+                row["line_note"]
+                or row["custom_total_price"] is not None
+                or row["custom_price_note"]
+            ):
+                moved_rows_with_metadata += 1
+
+    return reallocated_count, moved_rows_with_metadata
 
 
 def _collect_category_period_prices_from_form():
@@ -1092,39 +1217,68 @@ def admin_booking_edit_save(booking_id: int):
         flash("End date cannot be earlier than start date.", "error")
         return redirect(url_for("routes.admin_booking_edit_form", booking_id=booking_id))
 
-    if status != "cancelled":
-        conflict = query(
-            SQL_BOOKING_ITEM_DATE_CONFLICT,
-            (booking_id, booking_id, start_date, end_date),
-            one=True,
-        )
-        if conflict:
-            flash(
-                f"Cannot move booking to these dates because {conflict['display_name']} ({conflict['sku']}) overlaps with booking #{conflict['conflicting_booking_id']}.",
-                "error",
-            )
-            return redirect(url_for("routes.admin_booking_edit_form", booking_id=booking_id))
-
     try:
-        execute(
-            SQL_UPDATE_BOOKING_ADMIN_FIELDS,
-            (
-                customer_id,
+        def work(cur):
+            cur.execute(
+                SQL_UPDATE_BOOKING_ADMIN_FIELDS,
+                (
+                    customer_id,
+                    start_date,
+                    end_date,
+                    status,
+                    include_delivery,
+                    delivery_fee,
+                    include_setup_service,
+                    custom_total_price,
+                    custom_price_note,
+                    booking_note,
+                    admin_note,
+                    booking_id,
+                ),
+            )
+
+            if status == "cancelled":
+                return 0, 0
+
+            return _reallocate_booking_items_for_dates(
+                cur,
+                booking_id,
                 start_date,
                 end_date,
-                status,
-                include_delivery,
-                delivery_fee,
-                include_setup_service,
-                custom_total_price,
-                custom_price_note,
-                booking_note,
-                admin_note,
-                booking_id,
-            ),
-        )
-        flash("Booking updated.", "success")
+                include_setup_service=include_setup_service,
+                booking_has_total_override=custom_total_price is not None,
+            )
+
+        reallocated_count, metadata_warning_count = tx(work)
+
+        if reallocated_count or metadata_warning_count:
+            print(
+                "[booking-reallocation]",
+                {
+                    "booking_id": booking_id,
+                    "start_date": start_date,
+                    "end_date": end_date,
+                    "reallocated_count": reallocated_count,
+                    "metadata_warning_count": metadata_warning_count,
+                },
+            )
+
+        if reallocated_count:
+            flash(
+                f"Booking updated. {reallocated_count} item{'s' if reallocated_count != 1 else ''} {'were' if reallocated_count != 1 else 'was'} reallocated to match the new dates.",
+                "success",
+            )
+        else:
+            flash("Booking updated.", "success")
+        if metadata_warning_count:
+            flash(
+                f'Review {metadata_warning_count} reallocated item{"s" if metadata_warning_count != 1 else ""}: existing line notes or custom pricing were kept on the reassigned booking line.',
+                "warning",
+            )
         return redirect(url_for("routes.booking_detail", booking_id=booking_id))
+    except ValueError as e:
+        flash(str(e), "error")
+        return redirect(url_for("routes.admin_booking_edit_form", booking_id=booking_id))
     except Exception as e:
         flash(f"Update failed: {str(e)}", "error")
         return redirect(url_for("routes.admin_booking_edit_form", booking_id=booking_id))

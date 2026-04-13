@@ -181,6 +181,19 @@ ORDER BY
   c.display_name;
 """
 
+SQL_FIND_CATEGORY_RENTAL_PRICING = """
+SELECT
+  rp.id AS rental_period_id,
+  rp.label AS period_label,
+  crpp.price AS period_price
+FROM category_rental_period_prices crpp
+JOIN rental_periods rp ON rp.id = crpp.rental_period_id
+WHERE crpp.category_id = %s
+  AND %s BETWEEN rp.min_days AND rp.max_days
+ORDER BY crpp.sort_order, rp.min_days, rp.max_days, rp.id
+LIMIT 1;
+"""
+
 SQL_CREATE_BOOKING_WITH_ALLOCATIONS = """
 SELECT create_booking_with_allocations(
   %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
@@ -748,6 +761,35 @@ WHERE id = %s
   AND status = 'cancelled';
 """
 
+SQL_BOOKING_REALLOCATION_CANDIDATES = """
+SELECT
+  i.id AS item_id,
+  i.sku
+FROM items i
+WHERE i.category_id = %s
+  AND (
+    i.is_active = TRUE
+    OR EXISTS (
+      SELECT 1
+      FROM booking_items current_bi
+      WHERE current_bi.booking_id = %s
+        AND current_bi.item_id = i.id
+    )
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM booking_items bi
+    JOIN bookings b ON b.id = bi.booking_id
+    WHERE bi.item_id = i.id
+      AND bi.booking_id <> %s
+      AND b.status <> 'cancelled'
+      AND %s <= b.end_date
+      AND %s >= b.start_date
+  )
+ORDER BY i.id
+FOR UPDATE SKIP LOCKED;
+"""
+
 SQL_BOOKING_ITEM_DATE_CONFLICT = """
 SELECT
   i.id AS item_id,
@@ -767,6 +809,26 @@ WHERE current_bi.booking_id = %s
   AND %s <= b2.end_date
   AND %s >= b2.start_date
 LIMIT 1;
+"""
+
+SQL_DELETE_BOOKING_ITEMS_FOR_BOOKING = """
+DELETE FROM booking_items
+WHERE booking_id = %s;
+"""
+
+SQL_INSERT_BOOKING_ITEM = """
+INSERT INTO booking_items (
+  booking_id,
+  item_id,
+  rental_period_id,
+  quoted_period_label,
+  quoted_period_price,
+  setup_service_fee,
+  custom_total_price,
+  custom_price_note,
+  line_note
+)
+VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s);
 """
 
 # Optional booking item edits / overrides
