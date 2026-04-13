@@ -528,6 +528,9 @@ def booking_create_from_home():
     if not start or not end:
         flash("Choose dates first.", "error")
         return redirect(url_for("routes.home"))
+    if end < start:
+        flash("End date cannot be earlier than start date.", "error")
+        return redirect(url_for("routes.home", start_date=start, end_date=end))
 
     if role == "admin":
         customer_id = request.form.get("customer_id", "").strip()
