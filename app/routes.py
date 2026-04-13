@@ -1116,7 +1116,7 @@ def customer_edit_save(customer_id: int):
 @bp.get("/admin/bookings/calendar")
 def admin_bookings_calendar():
     require_admin()
-    bookings = query(SQL_LIST_ALL_BOOKINGS)
+    bookings = [b for b in query(SQL_LIST_ALL_BOOKINGS) if b["status"] != "cancelled"]
 
     for b in bookings:
         b["end_date_plus_one"] = b["end_date"] + timedelta(days=1)

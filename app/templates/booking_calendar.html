@@ -107,6 +107,24 @@
     overflow: hidden;
   }
 
+  .booking-event-chip[data-status="pending"] {
+    border-color: rgb(253 224 71);
+    background: rgb(254 252 232);
+    color: rgb(133 77 14);
+  }
+
+  .booking-event-chip[data-status="pending"] .booking-event-dot {
+    background: rgb(202 138 4);
+  }
+
+  .booking-event-chip[data-status="pending"] .booking-event-ref {
+    color: rgb(161 98 7);
+  }
+
+  .booking-event-chip[data-status="pending"] .booking-event-name {
+    color: rgb(133 77 14);
+  }
+
   .booking-event-chip[data-continues-before="true"] {
     border-top-left-radius: 0.45rem;
     border-bottom-left-radius: 0.45rem;
