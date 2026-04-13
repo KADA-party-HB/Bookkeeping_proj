@@ -57,6 +57,7 @@ from .sql import (
     SQL_LIST_ALL_BOOKINGS,
     SQL_CONFIRM_BOOKING,
     SQL_CANCEL_BOOKING,
+    SQL_DELETE_BOOKING,
     SQL_UPDATE_BOOKING_ADMIN_FIELDS,
     SQL_BOOKING_ITEM_DATE_CONFLICT,
 )
@@ -1008,6 +1009,19 @@ def booking_cancel(booking_id: int):
     require_admin()
     execute(SQL_CANCEL_BOOKING, (booking_id,))
     flash("Booking cancelled.", "success")
+    return redirect(url_for("routes.booking_detail", booking_id=booking_id))
+
+
+@bp.post("/bookings/<int:booking_id>/delete")
+def booking_delete(booking_id: int):
+    require_admin()
+
+    deleted = execute(SQL_DELETE_BOOKING, (booking_id,))
+    if deleted:
+        flash("Cancelled booking deleted.", "success")
+        return redirect(url_for("routes.admin_bookings"))
+
+    flash("Only cancelled bookings can be deleted.", "error")
     return redirect(url_for("routes.booking_detail", booking_id=booking_id))
 
 @bp.get("/customers/<int:customer_id>/edit")

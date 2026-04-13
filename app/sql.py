@@ -734,6 +734,12 @@ SET status = 'cancelled'
 WHERE id = %s;
 """
 
+SQL_DELETE_BOOKING = """
+DELETE FROM bookings
+WHERE id = %s
+  AND status = 'cancelled';
+"""
+
 SQL_BOOKING_ITEM_DATE_CONFLICT = """
 SELECT
   i.id AS item_id,

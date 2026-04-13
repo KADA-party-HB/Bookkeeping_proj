@@ -40,6 +40,21 @@
             Cancel
           </button>
         </form>
+
+        {% if booking.status == 'cancelled' %}
+          <form
+            method="post"
+            action="{{ url_for('routes.booking_delete', booking_id=booking.id) }}"
+            onsubmit="return confirm('Delete this cancelled booking? This cannot be undone.');"
+          >
+            <button
+              class="rounded-lg bg-slate-900 text-white px-3 py-2 text-sm hover:bg-slate-800"
+              type="submit"
+            >
+              Delete
+            </button>
+          </form>
+        {% endif %}
       </div>
     {% endif %}
   </div>
