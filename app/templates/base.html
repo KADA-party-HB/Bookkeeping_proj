@@ -22,7 +22,7 @@
 
           {% if session.get('role') == 'admin' %}
             <a class="rounded-full px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-sky-50 hover:text-sky-800" href="{{ url_for('routes.admin_items') }}">
-              Units
+              Items
             </a>
             <a class="rounded-full px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-sky-50 hover:text-sky-800" href="{{ url_for('routes.admin_categories') }}">
               Categories

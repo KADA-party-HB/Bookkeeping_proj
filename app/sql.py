@@ -149,7 +149,7 @@ SELECT
   fc.weight_kg,
   fc.notes,
 
-  COUNT(ai.id) AS available_units
+  COUNT(ai.id) AS available_items
 FROM categories c
 LEFT JOIN available_items ai
   ON ai.category_id = c.id
@@ -179,8 +179,8 @@ SELECT create_booking_with_allocations(
 ) AS booking_id;
 """
 
-# Units list
-SQL_LIST_UNITS = """
+# Items list
+SQL_LIST_ITEMS = """
 SELECT
   i.id,
   i.sku,
@@ -223,8 +223,8 @@ LEFT JOIN furnishing_categories fc ON fc.category_id = c.id
 ORDER BY c.display_name;
 """
 
-# Unit edit
-SQL_GET_UNIT_FOR_EDIT = """
+# Item edit
+SQL_GET_ITEM_FOR_EDIT = """
 SELECT
   i.id,
   i.sku,
@@ -237,7 +237,7 @@ JOIN categories c ON c.id = i.category_id
 WHERE i.id = %s;
 """
 
-SQL_UPDATE_UNIT = """
+SQL_UPDATE_ITEM = """
 UPDATE items
 SET category_id = %s,
     sku = %s,
@@ -245,12 +245,12 @@ SET category_id = %s,
 WHERE id = %s;
 """
 
-# Unit create
+# Item create
 SQL_ADD_ITEM_UNIT = """
 SELECT add_item_unit(%s, %s, %s) AS new_item_id;
 """
 
-# Unit delete safety
+# Item delete safety
 SQL_ITEM_HAS_ACTIVE_OR_FUTURE_BOOKING = """
 SELECT 1
 FROM booking_items bi
@@ -291,8 +291,8 @@ SELECT
   fc.weight_kg,
   fc.notes,
 
-  COUNT(i.id) AS total_units,
-  COALESCE(SUM(CASE WHEN i.is_active THEN 1 ELSE 0 END), 0) AS active_units
+  COUNT(i.id) AS total_items,
+  COALESCE(SUM(CASE WHEN i.is_active THEN 1 ELSE 0 END), 0) AS active_items
 FROM categories c
 LEFT JOIN items i ON i.category_id = c.id
 LEFT JOIN tent_categories tc ON tc.category_id = c.id

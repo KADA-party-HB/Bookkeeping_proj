@@ -25,11 +25,11 @@ from .sql import (
     SQL_AVAILABLE_CATEGORIES,
     SQL_CREATE_BOOKING_WITH_ALLOCATIONS,
 
-    # units
-    SQL_LIST_UNITS,
+    # items
+    SQL_LIST_ITEMS,
     SQL_LIST_CATEGORIES_FOR_DROPDOWN,
-    SQL_GET_UNIT_FOR_EDIT,
-    SQL_UPDATE_UNIT,
+    SQL_GET_ITEM_FOR_EDIT,
+    SQL_UPDATE_ITEM,
     SQL_ADD_ITEM_UNIT,
     SQL_ITEM_HAS_ACTIVE_OR_FUTURE_BOOKING,
     SQL_DELETE_BOOKING_ITEMS_FOR_ITEM,
@@ -272,8 +272,8 @@ def booking_create_from_home():
             flash(f"Category {cat_id} is no longer available.", "error")
             return redirect(url_for("routes.home", start_date=start, end_date=end))
 
-        if cat_row["available_units"] <= 0:
-            flash(f"{cat_row['display_name']} has no available units.", "error")
+        if cat_row["available_items"] <= 0:
+            flash(f"{cat_row['display_name']} has no available items.", "error")
             return redirect(url_for("routes.home", start_date=start, end_date=end))
 
         if role != "admin" and not cat_row["has_standard_price"]:
@@ -533,22 +533,22 @@ def admin_rental_period_delete(rental_period_id: int):
     return redirect(url_for("routes.admin_rental_periods"))
 
 
-# Admin: Units
+# Admin: Items
 @bp.get("/admin/items")
 def admin_items():
     require_admin()
-    return render_template("admin_items.html", items=query(SQL_LIST_UNITS), role="admin")
+    return render_template("admin_items.html", items=query(SQL_LIST_ITEMS), role="admin")
 
 
-@bp.get("/admin/items/unit/new")
-def admin_unit_new_form():
+@bp.get("/admin/items/new")
+def admin_item_new_form():
     require_admin()
     categories = query(SQL_LIST_CATEGORIES_FOR_DROPDOWN)
-    return render_template("admin_unit_new.html", categories=categories, role="admin")
+    return render_template("admin_item_new.html", categories=categories, role="admin")
 
 
-@bp.post("/admin/items/unit/new")
-def admin_unit_new():
+@bp.post("/admin/items/new")
+def admin_item_new():
     require_admin()
 
     category_id = request.form.get("category_id", "").strip()
@@ -557,33 +557,33 @@ def admin_unit_new():
 
     if not category_id or not sku:
         flash("Category and SKU are required.", "error")
-        return redirect(url_for("routes.admin_unit_new_form"))
+        return redirect(url_for("routes.admin_item_new_form"))
 
     try:
         cat_id_int = int(category_id)
         row = query(SQL_ADD_ITEM_UNIT, (cat_id_int, sku, is_active), one=True, commit=True)
-        flash(f"Unit created (item_id={row['new_item_id']}).", "success")
+        flash(f"Item created (item_id={row['new_item_id']}).", "success")
         return redirect(url_for("routes.admin_items"))
     except Exception as e:
         flash(f"Failed: {str(e)}", "error")
-        return redirect(url_for("routes.admin_unit_new_form"))
+        return redirect(url_for("routes.admin_item_new_form"))
 
 
 @bp.get("/admin/items/<int:item_id>/edit")
-def admin_unit_edit_form(item_id: int):
+def admin_item_edit_form(item_id: int):
     require_admin()
 
-    unit = query(SQL_GET_UNIT_FOR_EDIT, (item_id,), one=True)
-    if not unit:
-        flash("Unit not found.", "error")
+    item = query(SQL_GET_ITEM_FOR_EDIT, (item_id,), one=True)
+    if not item:
+        flash("Item not found.", "error")
         return redirect(url_for("routes.admin_items"))
 
     categories = query(SQL_LIST_CATEGORIES_FOR_DROPDOWN)
-    return render_template("admin_unit_edit.html", unit=unit, categories=categories, role="admin")
+    return render_template("admin_item_edit.html", item=item, categories=categories, role="admin")
 
 
 @bp.post("/admin/items/<int:item_id>/edit")
-def admin_unit_edit_save(item_id: int):
+def admin_item_edit_save(item_id: int):
     require_admin()
 
     category_id = request.form.get("category_id", "").strip()
@@ -592,16 +592,16 @@ def admin_unit_edit_save(item_id: int):
 
     if not category_id or not sku:
         flash("Category and SKU are required.", "error")
-        return redirect(url_for("routes.admin_unit_edit_form", item_id=item_id))
+        return redirect(url_for("routes.admin_item_edit_form", item_id=item_id))
 
     try:
         cat_id_int = int(category_id)
-        query(SQL_UPDATE_UNIT, (cat_id_int, sku, is_active, item_id), commit=True)
-        flash("Unit updated.", "success")
+        query(SQL_UPDATE_ITEM, (cat_id_int, sku, is_active, item_id), commit=True)
+        flash("Item updated.", "success")
         return redirect(url_for("routes.admin_items"))
     except Exception as e:
         flash(f"Update failed: {str(e)}", "error")
-        return redirect(url_for("routes.admin_unit_edit_form", item_id=item_id))
+        return redirect(url_for("routes.admin_item_edit_form", item_id=item_id))
 
 
 @bp.post("/admin/items/<int:item_id>/delete")
@@ -610,7 +610,7 @@ def admin_item_delete(item_id: int):
 
     blocked = query(SQL_ITEM_HAS_ACTIVE_OR_FUTURE_BOOKING, (item_id,), one=True)
     if blocked:
-        flash("Cannot delete unit: it is booked now or in the future.", "error")
+        flash("Cannot delete item: it is booked now or in the future.", "error")
         return redirect(url_for("routes.admin_items"))
 
     def work(cur):
@@ -620,7 +620,7 @@ def admin_item_delete(item_id: int):
 
     try:
         tx(work)
-        flash("Unit deleted.", "success")
+        flash("Item deleted.", "success")
     except Exception as e:
         flash(f"Delete failed: {str(e)}", "error")
 
