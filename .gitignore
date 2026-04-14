@@ -47,3 +47,5 @@ desktop.ini
 node_modules/
 
 certs
+
+generate*.py
