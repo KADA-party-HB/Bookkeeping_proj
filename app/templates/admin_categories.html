@@ -69,7 +69,7 @@
           <table class="min-w-full text-sm">
             <thead class="bg-slate-900 text-slate-100">
               <tr>
-                <th class="p-3 text-left font-medium">ID</th>
+                <th class="p-3 text-left font-medium" data-sort-type="number">ID</th>
                 <th class="p-3 text-left font-medium">Name</th>
                 <th class="p-3 text-left font-medium">Type</th>
                 <th class="p-3 text-left font-medium">Items</th>
@@ -82,18 +82,18 @@
               {% for c in categories %}
                 <tr class="align-top transition hover:bg-sky-50/60">
                   <td class="p-3 text-slate-500">{{ c.id }}</td>
-                  <td class="p-3">
+                  <td class="p-3" data-sort-value="{{ c.display_name }}">
                     <div class="font-medium text-slate-900">{{ c.display_name }}</div>
                     <div class="mt-1 text-xs text-slate-500">{{ c.created_at }}</div>
                   </td>
-                  <td class="p-3">
+                  <td class="p-3" data-sort-value="{{ 'Tent' if c.is_tent else 'Furnishing' }}">
                     {% if c.is_tent %}
                       <span class="inline-flex rounded-full bg-sky-100 px-2.5 py-1 text-xs font-medium text-sky-800">Tent</span>
                     {% else %}
                       <span class="inline-flex rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-800">Furnishing</span>
                     {% endif %}
                   </td>
-                  <td class="p-3"><span class="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">{{ c.active_items or 0 }}/{{ c.total_items }} active</span></td>
+                  <td class="p-3" data-sort-value="{{ '%05d/%05d'|format(c.active_items or 0, c.total_items) }}"><span class="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">{{ c.active_items or 0 }}/{{ c.total_items }} active</span></td>
                   <td class="p-3 text-slate-700">
                     {% if c.is_tent %}
                       <div>Capacity: {{ c.capacity }}</div>

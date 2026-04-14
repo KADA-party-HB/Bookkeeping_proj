@@ -75,7 +75,7 @@
           <table class="min-w-full text-sm">
             <thead class="bg-slate-900 text-slate-100">
               <tr>
-                <th class="p-3 text-left font-medium">Item ID</th>
+                <th class="p-3 text-left font-medium" data-sort-type="number">Item ID</th>
                 <th class="p-3 text-left font-medium">SKU</th>
                 <th class="p-3 text-left font-medium">Active</th>
                 <th class="p-3 text-left font-medium">Category</th>
@@ -88,22 +88,22 @@
               {% for it in items %}
                 <tr class="align-top transition hover:bg-sky-50/60">
                   <td class="p-3 text-slate-500">{{ it.id }}</td>
-                  <td class="p-3">
+                  <td class="p-3" data-sort-value="{{ it.sku }}">
                     <div class="font-medium text-slate-900">{{ it.sku }}</div>
                     <div class="mt-1 text-xs text-slate-500">{{ it.created_at }}</div>
                   </td>
-                  <td class="p-3">
+                  <td class="p-3" data-sort-value="{{ 1 if it.is_active else 0 }}">
                     {% if it.is_active %}
                       <span class="inline-flex rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-800">Active</span>
                     {% else %}
                       <span class="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">Inactive</span>
                     {% endif %}
                   </td>
-                  <td class="p-3">
+                  <td class="p-3" data-sort-value="{{ it.display_name }}">
                     <div class="font-medium text-slate-900">{{ it.display_name }}</div>
                     <div class="mt-1 text-xs text-slate-500">Category #{{ it.category_id }}</div>
                   </td>
-                  <td class="p-3">
+                  <td class="p-3" data-sort-value="{{ 'Tent' if it.is_tent else 'Furnishing' if it.is_furnishing else 'Item' }}">
                     {% if it.is_tent %}
                       <span class="inline-flex rounded-full bg-sky-100 px-2.5 py-1 text-xs font-medium text-sky-800">Tent</span>
                     {% endif %}

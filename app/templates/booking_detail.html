@@ -124,21 +124,21 @@
         <table class="min-w-full text-sm">
           <thead class="bg-white text-slate-600">
             <tr>
-              <th class="p-3 text-left">Qty</th>
+              <th class="p-3 text-left" data-sort-type="number">Qty</th>
               <th class="p-3 text-left">Item</th>
               <th class="p-3 text-left">Type</th>
               <th class="p-3 text-left">Rental period</th>
-              <th class="p-3 text-left">Base price</th>
-              <th class="p-3 text-left">Setup</th>
-              <th class="p-3 text-left">Override</th>
-              <th class="p-3 text-left">Summary total</th>
+              <th class="p-3 text-left" data-sort-type="number">Base price</th>
+              <th class="p-3 text-left" data-sort-type="number">Setup</th>
+              <th class="p-3 text-left" data-sort-type="number">Override</th>
+              <th class="p-3 text-left" data-sort-type="number">Summary total</th>
             </tr>
           </thead>
           <tbody>
             {% for row in item_summary %}
               <tr class="border-t align-top">
                 <td class="p-3 font-medium">{{ row.quantity }}</td>
-                <td class="p-3 font-medium">{{ row.display_name }}</td>
+                <td class="p-3 font-medium" data-sort-value="{{ row.display_name }}">{{ row.display_name }}</td>
                 <td class="p-3">{{ row.type_label }}</td>
                 <td class="p-3">
                   {% if row.quoted_period_label %}
@@ -197,16 +197,16 @@
             <th class="p-3 text-left">Item</th>
             <th class="p-3 text-left">Type</th>
             <th class="p-3 text-left">Rental period</th>
-            <th class="p-3 text-left">Base price</th>
-            <th class="p-3 text-left">Setup</th>
-            <th class="p-3 text-left">Override</th>
-            <th class="p-3 text-left">Line total</th>
+            <th class="p-3 text-left" data-sort-type="number">Base price</th>
+            <th class="p-3 text-left" data-sort-type="number">Setup</th>
+            <th class="p-3 text-left" data-sort-type="number">Override</th>
+            <th class="p-3 text-left" data-sort-type="number">Line total</th>
           </tr>
         </thead>
         <tbody>
           {% for it in items %}
             <tr class="border-t align-top">
-              <td class="p-3">
+              <td class="p-3" data-sort-value="{{ it.display_name }}">
                 <div class="font-medium">{{ it.display_name }}</div>
                 <div class="text-xs text-slate-500">{{ it.sku }}</div>
                 {% if it.line_note %}

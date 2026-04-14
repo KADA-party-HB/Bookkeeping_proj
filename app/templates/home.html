@@ -269,12 +269,12 @@
                         <th class="p-3 text-left font-medium">Category</th>
                         <th class="p-3 text-left font-medium">Type</th>
                         <th class="p-3 text-left font-medium">Rental period</th>
-                        <th class="p-3 text-left font-medium">Price</th>
-                        <th class="p-3 text-left font-medium">Available</th>
-                        <th class="p-3 text-left font-medium">Qty</th>
+                        <th class="p-3 text-left font-medium" data-sort-type="number">Price</th>
+                        <th class="p-3 text-left font-medium" data-sort-type="number">Available</th>
+                        <th class="p-3 text-left font-medium" data-sort-type="number">Qty</th>
                         <th class="p-3 text-left font-medium">Details</th>
                         {% if role == 'admin' %}
-                          <th class="p-3 text-left font-medium">Custom price</th>
+                          <th class="p-3 text-left font-medium" data-sort-type="number">Custom price</th>
                           <th class="p-3 text-left font-medium">Admin note</th>
                         {% endif %}
                       </tr>
@@ -334,7 +334,7 @@
                             {% endif %}
                           </td>
 
-                          <td class="p-3">
+                          <td class="p-3" data-sort-value="{{ c.quoted_period_price if c.has_standard_price else '' }}">
                             {% if bookable_available == 0 %}
                               <span class="font-medium text-rose-600">None available</span>
                             {% else %}
@@ -349,7 +349,7 @@
                             {% endif %}
                           </td>
 
-                          <td class="p-3">
+                          <td class="p-3" data-sort-value="{{ bookable_available }}">
                             <input
                               type="number"
                               min="0"

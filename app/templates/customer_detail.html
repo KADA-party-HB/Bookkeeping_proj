@@ -66,25 +66,25 @@
           <table class="min-w-full text-sm">
             <thead class="bg-slate-900 text-slate-100">
               <tr>
-                <th class="p-3 text-left font-medium">ID</th>
-                <th class="p-3 text-left font-medium">Dates</th>
+                <th class="p-3 text-left font-medium" data-sort-type="number">ID</th>
+                <th class="p-3 text-left font-medium" data-sort-type="date">Dates</th>
                 <th class="p-3 text-left font-medium">Status</th>
                 <th class="p-3 text-left font-medium">Options</th>
-                <th class="p-3 text-left font-medium">Created</th>
+                <th class="p-3 text-left font-medium" data-sort-type="date">Created</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-200 bg-white">
               {% for b in bookings %}
                 <tr class="transition hover:bg-sky-50/60">
-                  <td class="p-3 font-medium text-sky-700">
+                  <td class="p-3 font-medium text-sky-700" data-sort-value="{{ b.id }}">
                     <a class="block w-full h-full" href="{{ url_for('routes.booking_detail', booking_id=b.id) }}">#{{ b.id }}</a>
                   </td>
-                  <td class="p-3">
+                  <td class="p-3" data-sort-value="{{ b.start_date }}">
                     <a class="block w-full h-full text-slate-700" href="{{ url_for('routes.booking_detail', booking_id=b.id) }}">
                       {{ b.start_date }} - {{ b.end_date }}
                     </a>
                   </td>
-                  <td class="p-3">
+                  <td class="p-3" data-sort-value="{{ b.status }}">
                     <a class="block w-full h-full" href="{{ url_for('routes.booking_detail', booking_id=b.id) }}">
                       {% if b.status == 'confirmed' %}
                         <span class="inline-flex rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-800">Confirmed</span>
@@ -105,7 +105,7 @@
                       {% endif %}
                     </a>
                   </td>
-                  <td class="p-3 text-xs text-slate-500">
+                  <td class="p-3 text-xs text-slate-500" data-sort-value="{{ b.created_at }}">
                     <a class="block w-full h-full" href="{{ url_for('routes.booking_detail', booking_id=b.id) }}">{{ b.created_at }}</a>
                   </td>
                 </tr>

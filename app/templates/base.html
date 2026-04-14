@@ -5,6 +5,35 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Kada Party Rentals</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .sortable-header-button {
+      display: inline-flex;
+      width: 100%;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      border: 0;
+      background: transparent;
+      padding: 0;
+      color: inherit;
+      font: inherit;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .sortable-header-button:focus-visible {
+      outline: 2px solid rgb(125 211 252);
+      outline-offset: 3px;
+      border-radius: 0.375rem;
+    }
+
+    .sortable-header-indicator {
+      opacity: 0.75;
+      font-size: 0.75rem;
+      line-height: 1;
+      white-space: nowrap;
+    }
+  </style>
 </head>
 <body class="min-h-screen bg-[linear-gradient(180deg,#f6fbff_0%,#f8fafc_38%,#ffffff_100%)] text-slate-900">
   <nav class="sticky top-0 z-30 border-b border-white/70 bg-white/85 backdrop-blur">
@@ -134,5 +163,244 @@
 
     {% block content %}{% endblock %}
   </main>
+
+  <script>
+    (() => {
+      const tables = Array.from(document.querySelectorAll("table"));
+      const actionHeaderPattern = /^(action|actions)$/i;
+
+      const normalizeText = (value) => (value || "").replace(/\s+/g, " ").trim();
+
+      const parseNumber = (value) => {
+        const text = normalizeText(value).replace(/\u2212/g, "-");
+        if (!text) {
+          return null;
+        }
+
+        const ratioMatch = text.match(/^(-?\d+(?:[.,]\d+)?)\s*\/\s*(-?\d+(?:[.,]\d+)?)/);
+        if (ratioMatch) {
+          const ratioValue = Number(ratioMatch[1].replace(",", "."));
+          return Number.isFinite(ratioValue) ? ratioValue : null;
+        }
+
+        const cleaned = text.replace(/[^0-9,.\-]/g, "");
+        if (!cleaned || cleaned === "-" || cleaned === "." || cleaned === ",") {
+          return null;
+        }
+
+        const normalized = cleaned.includes(",") && !cleaned.includes(".")
+          ? cleaned.replace(",", ".")
+          : cleaned.replace(/,/g, "");
+        const number = Number(normalized);
+        return Number.isFinite(number) ? number : null;
+      };
+
+      const parseDateValue = (value) => {
+        const text = normalizeText(value);
+        if (!text) {
+          return null;
+        }
+
+        const rangeMatch = text.match(/^(\d{4}-\d{2}-\d{2})/);
+        const candidate = rangeMatch ? rangeMatch[1] : text;
+        const parsed = Date.parse(candidate);
+        return Number.isFinite(parsed) ? parsed : null;
+      };
+
+      const getCellSortValue = (cell) => {
+        if (!cell) {
+          return "";
+        }
+
+        if (cell.dataset.sortValue !== undefined) {
+          return normalizeText(cell.dataset.sortValue);
+        }
+
+        const nestedSortValue = cell.querySelector("[data-sort-value]");
+        if (nestedSortValue && nestedSortValue.dataset.sortValue !== undefined) {
+          return normalizeText(nestedSortValue.dataset.sortValue);
+        }
+
+        const control = cell.querySelector("input, select, textarea");
+        if (control) {
+          if (control.type === "checkbox" || control.type === "radio") {
+            return control.checked ? "1" : "0";
+          }
+          return normalizeText(control.value);
+        }
+
+        return normalizeText(cell.textContent);
+      };
+
+      const detectSortType = (headerCell, rows, columnIndex) => {
+        if (headerCell.dataset.sortType) {
+          return headerCell.dataset.sortType;
+        }
+
+        const values = rows
+          .map((row) => getCellSortValue(row.cells[columnIndex]))
+          .filter(Boolean);
+
+        if (!values.length) {
+          return "text";
+        }
+
+        if (values.every((value) => parseNumber(value) !== null)) {
+          return "number";
+        }
+
+        if (values.every((value) => parseDateValue(value) !== null)) {
+          return "date";
+        }
+
+        return "text";
+      };
+
+      const updateHeaderState = (headerRow, activeIndex, direction) => {
+        Array.from(headerRow.cells).forEach((cell, index) => {
+          const button = cell.querySelector(".sortable-header-button");
+          const indicator = cell.querySelector(".sortable-header-indicator");
+          if (!button || !indicator) {
+            return;
+          }
+
+          if (index === activeIndex) {
+            cell.setAttribute("aria-sort", direction === "asc" ? "ascending" : "descending");
+            indicator.textContent = direction === "asc" ? "↑" : "↓";
+          } else {
+            cell.setAttribute("aria-sort", "none");
+            indicator.textContent = "↕";
+          }
+        });
+      };
+
+      const sortTable = (table, headerRow, columnIndex) => {
+        const tbody = table.tBodies[0];
+        if (!tbody) {
+          return;
+        }
+
+        const rows = Array.from(tbody.rows);
+        rows.forEach((row, rowIndex) => {
+          if (!row.dataset.initialSortIndex) {
+            row.dataset.initialSortIndex = String(rowIndex);
+          }
+        });
+
+        const headerCell = headerRow.cells[columnIndex];
+        const currentColumn = Number(table.dataset.sortColumn ?? -1);
+        const currentDirection = table.dataset.sortDirection || "none";
+        const nextDirection = currentColumn === columnIndex && currentDirection === "asc" ? "desc" : "asc";
+        const sortType = detectSortType(headerCell, rows, columnIndex);
+
+        rows.sort((leftRow, rightRow) => {
+          const leftValue = getCellSortValue(leftRow.cells[columnIndex]);
+          const rightValue = getCellSortValue(rightRow.cells[columnIndex]);
+          let comparison = 0;
+
+          if (sortType === "number") {
+            const leftNumber = parseNumber(leftValue);
+            const rightNumber = parseNumber(rightValue);
+
+            if (leftNumber === null && rightNumber === null) {
+              comparison = 0;
+            } else if (leftNumber === null) {
+              comparison = 1;
+            } else if (rightNumber === null) {
+              comparison = -1;
+            } else {
+              comparison = leftNumber - rightNumber;
+            }
+          } else if (sortType === "date") {
+            const leftDate = parseDateValue(leftValue);
+            const rightDate = parseDateValue(rightValue);
+
+            if (leftDate === null && rightDate === null) {
+              comparison = 0;
+            } else if (leftDate === null) {
+              comparison = 1;
+            } else if (rightDate === null) {
+              comparison = -1;
+            } else {
+              comparison = leftDate - rightDate;
+            }
+          } else {
+            if (!leftValue && !rightValue) {
+              comparison = 0;
+            } else if (!leftValue) {
+              comparison = 1;
+            } else if (!rightValue) {
+              comparison = -1;
+            } else {
+              comparison = leftValue.localeCompare(rightValue, undefined, {
+                numeric: true,
+                sensitivity: "base",
+              });
+            }
+          }
+
+          if (comparison !== 0) {
+            return nextDirection === "asc" ? comparison : -comparison;
+          }
+
+          return Number(leftRow.dataset.initialSortIndex) - Number(rightRow.dataset.initialSortIndex);
+        });
+
+        rows.forEach((row) => tbody.appendChild(row));
+
+        table.dataset.sortColumn = String(columnIndex);
+        table.dataset.sortDirection = nextDirection;
+        updateHeaderState(headerRow, columnIndex, nextDirection);
+      };
+
+      const initTableSorting = (table) => {
+        if (!table.tHead || !table.tBodies.length || table.dataset.sortReady === "true") {
+          return;
+        }
+
+        const headerRow = table.tHead.rows[table.tHead.rows.length - 1];
+        if (!headerRow) {
+          return;
+        }
+
+        Array.from(headerRow.cells).forEach((cell, columnIndex) => {
+          const label = normalizeText(cell.textContent);
+          if (
+            !label ||
+            actionHeaderPattern.test(label) ||
+            cell.dataset.sort === "false" ||
+            cell.querySelector("button, a, input, select, textarea")
+          ) {
+            return;
+          }
+
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "sortable-header-button";
+          button.setAttribute("aria-label", `Sort by ${label}`);
+
+          const labelSpan = document.createElement("span");
+          labelSpan.textContent = label;
+
+          const indicator = document.createElement("span");
+          indicator.className = "sortable-header-indicator";
+          indicator.textContent = "↕";
+
+          button.append(labelSpan, indicator);
+          cell.textContent = "";
+          cell.appendChild(button);
+          cell.setAttribute("aria-sort", "none");
+
+          button.addEventListener("click", () => {
+            sortTable(table, headerRow, columnIndex);
+          });
+        });
+
+        table.dataset.sortReady = "true";
+      };
+
+      tables.forEach(initTableSorting);
+    })();
+  </script>
 </body>
 </html>
