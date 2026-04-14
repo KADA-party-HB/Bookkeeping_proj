@@ -1,5 +1,8 @@
 #!/bin/sh
 set -eu
 
-python docker/migrate.py
+if [ "${RUN_DB_MIGRATIONS:-1}" = "1" ]; then
+    python docker/migrate.py
+fi
+
 exec "$@"

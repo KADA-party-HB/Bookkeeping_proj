@@ -1,78 +1,68 @@
-# Deployment steps
+# Railway Backend Deployment
 
-## 1) Add the files to your repo
-Copy these files into the repo root:
-- Dockerfile
-- docker/entrypoint.sh
-- docker/migrate.py
-- docker/nginx.conf
-- wsgi.py
-- .dockerignore
-- docker-compose.yml
-- .github/workflows/docker-publish.yml
+This repo is now set up to deploy as a backend-only Railway service.
 
-## 2) Commit and push
-```bash
-git add Dockerfile docker/ wsgi.py .dockerignore docker-compose.yml .github/workflows/docker-publish.yml
-git commit -m "Add container build, migrations, and GHCR publish workflow"
-git push origin main
-```
+- The root `Dockerfile` is used directly by Railway.
+- The app is served by Gunicorn through `wsgi.py`.
+- Gunicorn binds to `0.0.0.0:$PORT`, which matches Railway's public networking requirement.
+- Database migrations run on container startup through `docker/entrypoint.sh`.
+- Nginx is no longer part of this repo's deployment flow.
 
-## 3) Enable package permissions
-In the GitHub repo:
-- Settings -> Actions -> General -> Workflow permissions
-- Allow read and write permissions
+## 1. Create the backend service
+In Railway, create a service from this repository. Railway will automatically use the root `Dockerfile` as long as it is named `Dockerfile`.
 
-## 4) Pull on the server
-Install Docker + Compose plugin if needed.
+## 2. Add the required variables
+Set these service variables for the backend:
 
-Create a deployment directory on the server, for example:
-```bash
-mkdir -p /opt/dv1703-bookingservice
-cd /opt/dv1703-bookingservice
-```
-
-Put these files there:
-- docker-compose.yml
-- .env
-- docker/nginx.conf
-- certs/devcert.crt
-- certs/devcert.key
-
-Example `.env`:
 ```dotenv
-DATABASE_URL=postgresql://postgres:CHANGE_ME@host.docker.internal:5432/tentrental
+APP_ENV=production
+DATABASE_URL=${{Postgres.DATABASE_URL}}
 SECRET_KEY=put-a-long-random-secret-here
+TRUST_PROXY_HEADERS=1
+RUN_DB_MIGRATIONS=1
 ```
 
-If the GHCR package is private, log in once on the server with a PAT that has `read:packages`:
+Notes:
+- `PORT` is injected automatically by Railway, so do not set it unless you have a special reason.
+- If your PostgreSQL service has a different Railway service name than `Postgres`, update the reference accordingly.
+- `TRUST_PROXY_HEADERS=1` should only be enabled when the app is actually behind Railway or your separate Nginx service and forwarded headers are being set correctly.
+
+## 3. Deploy
+Deploy the service from Railway. Startup works like this:
+
+1. Railway builds the image from the root `Dockerfile`.
+2. `docker/entrypoint.sh` runs `docker/migrate.py`.
+3. Gunicorn starts `wsgi:application`.
+
+The migration runner already uses a PostgreSQL advisory lock, so parallel starts will not apply the same migration twice.
+
+## 4. Backend networking
+For the final production setup, keep this backend service private and let your separate Nginx Railway service proxy to it over Railway's private network. We can wire up the exact Nginx config later when you are ready.
+
+## 5. Optional tuning
+You can tune Gunicorn with extra Railway variables if needed:
+
+```dotenv
+GUNICORN_WORKERS=2
+GUNICORN_THREADS=4
+GUNICORN_TIMEOUT=120
+GUNICORN_GRACEFUL_TIMEOUT=30
+```
+
+## 6. Local container check
+If you want to smoke-test the backend container locally:
+
 ```bash
-echo YOUR_GH_PAT | docker login ghcr.io -u YOUR_GITHUB_USERNAME --password-stdin
+docker compose up --build
 ```
 
-Start or update:
-```bash
-docker compose pull
-docker compose up -d
-```
+That compose file is now backend-only and exposes the app on `http://localhost:8080`.
 
-Check logs:
-```bash
-docker compose logs -f
-```
+## 7. New migrations
+Add each schema change as a new `.sql` file in `migrations/`, for example:
 
-## 5) HTTPS access
-The compose file exposes Nginx on ports 80 and 443. Nginx redirects HTTP to HTTPS and proxies to the Flask app over Docker's internal network.
-Open it from another machine on your LAN with:
-
-https://YOUR_SERVER_IP
-
-Because `devcert.crt` is self-signed, browsers will show a certificate warning unless that certificate is trusted on the client device.
-
-## 6) New migrations
-Add a new file to `migrations/`, for example:
 ```text
 2026-04-14_add_xyz.sql
 ```
 
-On the next container start after `docker compose pull && docker compose up -d`, the entrypoint runs all unapplied migration files in sorted order and records them in `public.schema_migrations`.
+On the next deployment, the container applies unapplied migration files in sorted order and records them in `public.schema_migrations`.
