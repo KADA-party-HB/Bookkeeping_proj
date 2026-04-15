@@ -3,8 +3,8 @@ import os
 from pathlib import Path
 
 import psycopg
+from dotenv import load_dotenv
 
-MIGRATIONS_DIR = Path(os.getenv("MIGRATIONS_DIR", "/app/migrations"))
 LOCK_KEY = 86031742
 
 
@@ -31,15 +31,26 @@ def ensure_table(cur) -> None:
     )
 
 
-def list_migrations() -> list[Path]:
-    if not MIGRATIONS_DIR.exists():
+def get_migrations_dir() -> Path:
+    configured = os.getenv("MIGRATIONS_DIR")
+    if configured:
+        return Path(configured)
+    container_path = Path("/app/migrations")
+    if container_path.exists():
+        return container_path
+    return Path(__file__).resolve().parent.parent / "migrations"
+
+
+def list_migrations(migrations_dir: Path) -> list[Path]:
+    if not migrations_dir.exists():
         return []
-    return sorted(p for p in MIGRATIONS_DIR.iterdir() if p.is_file() and p.suffix == ".sql")
+    return sorted(p for p in migrations_dir.iterdir() if p.is_file() and p.suffix == ".sql")
 
 
 def main() -> None:
+    load_dotenv()
     dsn = get_dsn()
-    files = list_migrations()
+    files = list_migrations(get_migrations_dir())
 
     with psycopg.connect(dsn) as conn:
         with conn.cursor() as cur:

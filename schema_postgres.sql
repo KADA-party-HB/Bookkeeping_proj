@@ -28,6 +28,7 @@ CREATE TABLE customers (
   email VARCHAR(255) UNIQUE,
   phone VARCHAR(50),
   address TEXT,
+  postal_city TEXT,
   user_id INT UNIQUE REFERENCES users(id) ON DELETE SET NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -219,6 +220,10 @@ CREATE TABLE bookings (
   include_delivery BOOLEAN NOT NULL DEFAULT FALSE,
   include_setup_service BOOLEAN NOT NULL DEFAULT FALSE,
   delivery_fee NUMERIC(10,2),
+  address TEXT,
+  postal_city TEXT,
+  delivery_address TEXT,
+  delivery_distance_km NUMERIC(10,2),
   custom_total_price NUMERIC(10,2),
   custom_price_note TEXT,
   booking_note TEXT,
@@ -229,6 +234,7 @@ CREATE TABLE bookings (
   CONSTRAINT chk_booking_dates CHECK (end_date >= start_date),
   CONSTRAINT chk_booking_status CHECK (status IN ('pending','confirmed','cancelled')),
   CONSTRAINT chk_delivery_fee CHECK (delivery_fee IS NULL OR delivery_fee >= 0),
+  CONSTRAINT chk_delivery_distance CHECK (delivery_distance_km IS NULL OR delivery_distance_km >= 0),
   CONSTRAINT chk_booking_custom_total CHECK (custom_total_price IS NULL OR custom_total_price >= 0)
 );
 
@@ -452,10 +458,14 @@ CREATE OR REPLACE FUNCTION create_booking_with_allocations(
   p_qtys INT[],
   p_include_delivery BOOLEAN DEFAULT FALSE,
   p_delivery_fee NUMERIC(10,2) DEFAULT NULL,
+  p_address TEXT DEFAULT NULL,
+  p_postal_city TEXT DEFAULT NULL,
   p_include_setup_service BOOLEAN DEFAULT FALSE,
   p_booking_custom_total_price NUMERIC(10,2) DEFAULT NULL,
   p_booking_custom_price_note TEXT DEFAULT NULL,
   p_booking_note TEXT DEFAULT NULL,
+  p_delivery_address TEXT DEFAULT NULL,
+  p_delivery_distance_km NUMERIC(10,2) DEFAULT NULL,
   p_custom_total_prices NUMERIC(10,2)[] DEFAULT NULL,
   p_custom_price_notes TEXT[] DEFAULT NULL
 )
@@ -505,6 +515,10 @@ BEGIN
     status,
     include_delivery,
     delivery_fee,
+    address,
+    postal_city,
+    delivery_address,
+    delivery_distance_km,
     include_setup_service,
     custom_total_price,
     custom_price_note,
@@ -517,6 +531,10 @@ BEGIN
     'pending',
     p_include_delivery,
     CASE WHEN p_include_delivery THEN COALESCE(p_delivery_fee, 0) ELSE NULL END,
+    p_address,
+    p_postal_city,
+    CASE WHEN p_include_delivery THEN p_delivery_address ELSE NULL END,
+    CASE WHEN p_include_delivery THEN p_delivery_distance_km ELSE NULL END,
     p_include_setup_service,
     p_booking_custom_total_price,
     p_booking_custom_price_note,

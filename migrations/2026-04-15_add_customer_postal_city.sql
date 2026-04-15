@@ -1,0 +1,6 @@
+BEGIN;
+
+ALTER TABLE customers
+  ADD COLUMN IF NOT EXISTS postal_city TEXT;
+
+COMMIT;

@@ -1,11 +1,34 @@
-from flask import Blueprint, current_app, request, render_template, redirect, url_for, flash, session, abort
+from flask import (
+    Blueprint,
+    current_app,
+    request,
+    render_template,
+    redirect,
+    url_for,
+    flash,
+    session,
+    abort,
+    jsonify,
+)
 
 from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+import re
+from werkzeug.security import generate_password_hash
 
-from .db import query, execute, tx
+from .db import PaginationOptions, paginate_query, query, execute, tx
+from .delivery import (
+    DeliveryAddressValidationError,
+    DeliveryServiceError,
+    resolve_delivery_quote,
+)
 from .sql import (
+    # auth / users
+    SQL_CREATE_USER,
+    SQL_GET_USER_BY_EMAIL,
+
     # customers
+    SQL_GET_CUSTOMER_BY_EMAIL,
     SQL_LIST_CUSTOMERS,
     SQL_GET_CUSTOMER,
     SQL_GET_CUSTOMER_BY_FULL_NAME,
@@ -76,6 +99,8 @@ bp = Blueprint("routes", __name__)
 DELIVERY_BASE_FEE = Decimal("449.00")
 DELIVERY_INCLUDED_DISTANCE_KM = Decimal("10")
 DELIVERY_EXTRA_FEE_PER_KM = Decimal("5.00")
+DEFAULT_PAGE_SIZE = 25
+MAX_PAGE_SIZE = 100
 
 
 def current_user():
@@ -112,6 +137,10 @@ def _to_str_or_none(value):
     return value if value != "" else None
 
 
+def _normalize_email(value):
+    return (value or "").strip().lower()
+
+
 def _expire_stale_pending_bookings():
     execute(
         SQL_EXPIRE_STALE_PENDING_BOOKINGS,
@@ -136,6 +165,55 @@ def _customer_pending_booking_limit_reached(customer_id: int) -> bool:
 def _pending_booking_hold_label() -> str:
     days = current_app.config["PENDING_BOOKING_HOLD_DAYS"]
     return f"{days} day{'s' if days != 1 else ''}"
+
+
+def _pagination_options(*, default_per_page=DEFAULT_PAGE_SIZE):
+    return PaginationOptions.from_mapping(
+        request.args,
+        default_per_page=default_per_page,
+        max_per_page=MAX_PAGE_SIZE,
+    )
+
+
+@bp.app_context_processor
+def inject_pagination_helpers():
+    def pagination_url(*, page=None, per_page=None):
+        if not request.endpoint:
+            return "#"
+
+        args = request.args.to_dict(flat=True)
+        if page is not None:
+            args["page"] = page
+        if per_page is not None:
+            args["per_page"] = per_page
+            if page is None:
+                args["page"] = 1
+
+        return url_for(request.endpoint, **(request.view_args or {}), **args)
+
+    return {"pagination_url": pagination_url}
+
+
+def _delivery_validation_error_message(code: str) -> str:
+    error_map = {
+        "missing_address": "Enter a delivery address.",
+        "address_not_found": "We could not find that address.",
+        "address_too_broad": "Enter a more exact street address.",
+        "address_low_confidence": "We could not verify that address closely enough. Please add more detail.",
+    }
+    return error_map.get(code, "We could not validate that delivery address.")
+
+
+def _delivery_service_error_message(code: str) -> str:
+    error_map = {
+        "map_api_not_configured": "Delivery address validation is not configured yet.",
+        "delivery_origin_not_configured": "Delivery origin is not configured yet.",
+        "map_api_connection_error": "We could not reach the map service right now.",
+        "map_api_http_error": "The map service returned an error.",
+        "map_api_invalid_response": "The map service returned invalid data.",
+        "route_not_found": "We could not calculate a delivery route for that address.",
+    }
+    return error_map.get(code, "We could not calculate delivery right now.")
 
 
 @bp.before_app_request
@@ -244,6 +322,32 @@ def _format_turnaround_item_labels(item_labels):
     labels = [label for label in dict.fromkeys(item_labels) if label]
     return ", ".join(labels)
 
+def _build_full_delivery_address(address, postal_city):
+    parts = []
+    address_text = (address or "").strip()
+    postal_city_text = _sanitize_postal_city(postal_city) or ""
+
+    if address_text:
+        parts.append(address_text)
+    if postal_city_text:
+        parts.append(postal_city_text)
+
+    return ", ".join(parts) if parts else None
+
+
+_POSTAL_CITY_POSTAL_CODE_RE = re.compile(r"^(?:SE[-\s]?)?\d{3}\s?\d{2}\s*", re.IGNORECASE)
+
+
+def _sanitize_postal_city(value):
+    text = _to_str_or_none(value)
+    if text is None:
+        return None
+
+    text = re.sub(r"\s+", " ", text).strip(" ,")
+    text = _POSTAL_CITY_POSTAL_CODE_RE.sub("", text).strip(" ,")
+    text = re.sub(r"\s+", " ", text).strip(" ,")
+    return text or None
+
 
 def _create_admin_booking_with_allocations(
     cur,
@@ -254,6 +358,10 @@ def _create_admin_booking_with_allocations(
     selections,
     include_delivery: bool,
     delivery_fee,
+    address,
+    postal_city,
+    delivery_address,
+    delivery_distance_km,
     include_setup_service: bool,
     booking_custom_total_price,
     booking_custom_price_note,
@@ -270,6 +378,10 @@ def _create_admin_booking_with_allocations(
             end_date,
             include_delivery,
             delivery_fee,
+            address,
+            postal_city,
+            delivery_address,
+            delivery_distance_km,
             include_setup_service,
             booking_custom_total_price,
             booking_custom_price_note,
@@ -520,6 +632,56 @@ def _collect_category_period_prices_from_form():
     return rows
 
 
+def _load_customer_profile_for_user(user_id: int):
+    if not user_id:
+        return None
+    return query(SQL_GET_CUSTOMER_BY_USER_ID, (user_id,), one=True)
+
+def _collect_selected_quantities_from_form():
+    """
+    Reads duplicate qty_<category_id> fields safely.
+    This handles responsive forms where both mobile and desktop inputs
+    may exist with the same field name, and uses the highest submitted qty.
+    """
+    selections = []
+    seen_category_ids = set()
+
+    for key in request.form.keys():
+        if not key.startswith("qty_"):
+            continue
+
+        try:
+            category_id = int(key.split("_", 1)[1])
+        except Exception:
+            continue
+
+        if category_id in seen_category_ids:
+            continue
+        seen_category_ids.add(category_id)
+
+        raw_values = request.form.getlist(key)
+
+        parsed_values = []
+        for raw in raw_values:
+            raw = (raw or "").strip()
+            if raw == "":
+                parsed_values.append(0)
+                continue
+            try:
+                parsed_values.append(int(raw))
+            except ValueError:
+                parsed_values.append(0)
+
+        qty = max(parsed_values) if parsed_values else 0
+
+        if qty <= 0:
+            continue
+
+        selections.append((category_id, qty))
+
+    return selections
+
+
 # Home (category availability)
 @bp.get("/")
 def home():
@@ -529,27 +691,301 @@ def home():
 
     categories = None
     customers = None
+    customer_profile = None
 
     if start and end:
         categories = _query_available_categories(start, end)
 
         if role == "admin":
             customers = query(SQL_LIST_CUSTOMERS)
-        elif role == "customer" and uid:
-            cust = query(SQL_GET_CUSTOMER_BY_USER_ID, (uid,), one=True)
-            customers = [cust] if cust else None
-        else:
-            customers = None
+
+    if role == "customer" and uid:
+        customer_profile = _load_customer_profile_for_user(uid)
+
+    if role == "admin":
+        return render_template(
+            "home.html",
+            start_date=start,
+            end_date=end,
+            categories=categories,
+            customers=customers,
+            role=role,
+        )
 
     return render_template(
-        "home.html",
+        "guest_home.html",
         start_date=start,
         end_date=end,
         categories=categories,
-        customers=customers,
+        customer_profile=customer_profile,
         role=role,
     )
 
+
+@bp.post("/guest/delivery-quote")
+def guest_delivery_quote():
+    payload = request.get_json(silent=True) or {}
+    address = (payload.get("address") or "").strip()
+    current_app.logger.info(
+        "guest_delivery_quote_requested address=%r",
+        address,
+    )
+
+    try:
+        quote = resolve_delivery_quote(address)
+    except DeliveryAddressValidationError as exc:
+        current_app.logger.info(
+            "guest_delivery_quote_validation_failed address=%r error_code=%s",
+            address,
+            exc.code,
+        )
+        return (
+            jsonify(
+                {
+                    "ok": False,
+                    "error": _delivery_validation_error_message(exc.code),
+                    "error_code": exc.code,
+                }
+            ),
+            422,
+        )
+    except DeliveryServiceError as exc:
+        current_app.logger.warning(
+            "guest_delivery_quote_service_failed address=%r error_code=%s",
+            address,
+            exc.code,
+        )
+        return (
+            jsonify(
+                {
+                    "ok": False,
+                    "error": _delivery_service_error_message(exc.code),
+                    "error_code": exc.code,
+                }
+            ),
+            503,
+        )
+
+    delivery_fee = _calculate_delivery_fee_from_distance(str(quote["distance_km"]))
+    current_app.logger.info(
+        "guest_delivery_quote_succeeded address=%r formatted=%r distance_km=%s delivery_fee=%s confidence=%s result_type=%r",
+        address,
+        quote["formatted_address"],
+        str(quote["distance_km"]),
+        str(delivery_fee),
+        str(quote["confidence"]),
+        quote["result_type"],
+    )
+    return jsonify(
+        {
+            "ok": True,
+            "formatted_address": quote["formatted_address"],
+            "distance_km": str(quote["distance_km"]),
+            "delivery_fee": str(delivery_fee),
+            "confidence": str(quote["confidence"]),
+            "result_type": quote["result_type"],
+        }
+    )
+
+@bp.post("/guest/bookings/create")
+def guest_booking_create():
+    uid, role = current_user()
+    if role == "admin":
+        abort(403)
+
+    start = request.form.get("start_date", "").strip()
+    end = request.form.get("end_date", "").strip()
+    if not start or not end:
+        flash("Choose dates first.", "error")
+        return redirect(url_for("routes.home"))
+    if end < start:
+        flash("End date cannot be earlier than start date.", "error")
+        return redirect(url_for("routes.home", start_date=start, end_date=end))
+
+    customer = _load_customer_profile_for_user(uid) if uid else None
+    if uid and not customer:
+        flash("No customer profile linked to this account.", "error")
+        return redirect(url_for("routes.home", start_date=start, end_date=end))
+    if customer and _customer_pending_booking_limit_reached(customer["id"]):
+        flash(
+            f"You already have the maximum number of active pending bookings. Pending bookings expire after {_pending_booking_hold_label()}.",
+            "error",
+        )
+        return redirect(url_for("routes.customer_detail", customer_id=customer["id"]))
+
+    include_delivery = _to_bool(request.form.get("include_delivery"))
+    include_setup_service = _to_bool(request.form.get("include_setup_service"))
+    booking_note = _to_str_or_none(request.form.get("booking_note"))
+
+    if include_setup_service and not include_delivery:
+        flash("Setup service requires delivery on the guest booking form.", "error")
+        return redirect(url_for("routes.home", start_date=start, end_date=end))
+
+    account_full_name = request.form.get("full_name", "").strip()
+    account_email = _normalize_email(request.form.get("email")) or None
+    account_phone = _to_str_or_none(request.form.get("phone"))
+    account_address = _to_str_or_none(request.form.get("address"))
+    account_postal_city = _sanitize_postal_city(request.form.get("postal_city"))
+    account_password = request.form.get("password", "")
+
+    if customer:
+        account_full_name = customer["full_name"]
+        account_email = customer["email"] or account_email
+        account_phone = account_phone if account_phone is not None else customer["phone"]
+        account_address = account_address if account_address is not None else customer["address"]
+    else:
+        if not account_full_name or not account_email or not account_password:
+            flash("Name, email, and password are required to create an account.", "error")
+            return redirect(url_for("routes.home", start_date=start, end_date=end))
+
+        if query(SQL_GET_USER_BY_EMAIL, (account_email,), one=True):
+            flash("That email address is already registered. Please log in instead.", "error")
+            return redirect(url_for("auth.login_form"))
+
+        if query(SQL_GET_CUSTOMER_BY_EMAIL, (account_email,), one=True):
+            flash(
+                "That email already belongs to an existing customer profile. Please contact staff to connect it to an account.",
+                "error",
+            )
+            return redirect(url_for("routes.home", start_date=start, end_date=end))
+
+    delivery_lookup_address = _build_full_delivery_address(account_address, account_postal_city)
+
+    selections = _collect_selected_quantities_from_form()
+    category_ids = [category_id for category_id, _ in selections]
+    qtys = [qty for _, qty in selections]
+
+    if not selections:
+        flash("Select at least one category quantity.", "error")
+        return redirect(url_for("routes.home", start_date=start, end_date=end))
+
+    visible_categories = _query_available_categories(start, end)
+    visible_by_id = {row["id"]: row for row in visible_categories}
+
+    for category_id, requested_qty in selections:
+        category = visible_by_id.get(category_id)
+        allowed_items = category["available_items"] if category else 0
+
+        if not category:
+            flash(f"Category {category_id} is no longer available.", "error")
+            return redirect(url_for("routes.home", start_date=start, end_date=end))
+
+        if allowed_items <= 0:
+            flash(f"{category['display_name']} has no available items.", "error")
+            return redirect(url_for("routes.home", start_date=start, end_date=end))
+
+        if requested_qty > allowed_items:
+            flash(
+                f'{category["display_name"]} only has {allowed_items} item{"s" if allowed_items != 1 else ""} available for these dates.',
+                "error",
+            )
+            return redirect(url_for("routes.home", start_date=start, end_date=end))
+
+        if not category["has_standard_price"]:
+            flash(
+                f"{category['display_name']} has no standard price for the selected dates.",
+                "error",
+            )
+            return redirect(url_for("routes.home", start_date=start, end_date=end))
+
+    if include_delivery and not delivery_lookup_address:
+        flash("Enter the delivery address before placing the booking.", "error")
+        return redirect(url_for("routes.home", start_date=start, end_date=end))
+
+    try:
+        if include_delivery:
+            quote = resolve_delivery_quote(delivery_lookup_address)
+            delivery_fee = str(_calculate_delivery_fee_from_distance(str(quote["distance_km"])))
+            delivery_address = quote["formatted_address"]
+            delivery_distance_km = str(quote["distance_km"])
+        else:
+            delivery_fee = None
+            delivery_address = None
+            delivery_distance_km = None
+    except DeliveryAddressValidationError as exc:
+        flash(_delivery_validation_error_message(exc.code), "error")
+        return redirect(url_for("routes.home", start_date=start, end_date=end))
+    except DeliveryServiceError as exc:
+        flash(_delivery_service_error_message(exc.code), "error")
+        return redirect(url_for("routes.home", start_date=start, end_date=end))
+
+    try:
+        def work(cur):
+            effective_customer_id = customer["id"] if customer else None
+            created_user = None
+
+            if customer:
+                cur.execute(
+                    SQL_UPDATE_CUSTOMER,
+                    (
+                        account_full_name,
+                        account_email,
+                        account_phone,
+                        account_address,
+                        account_postal_city,
+                        customer["id"],
+                    ),
+                )
+                cur.fetchone()
+            else:
+                password_hash = generate_password_hash(account_password)
+                cur.execute(SQL_CREATE_USER, (account_email, password_hash, "customer"))
+                created_user = cur.fetchone()
+
+                cur.execute(
+                    SQL_CREATE_CUSTOMER,
+                    (
+                        account_full_name,
+                        account_email,
+                        account_phone,
+                        account_address,
+                        account_postal_city,
+                        created_user["id"],
+                    ),
+                )
+                effective_customer_id = cur.fetchone()["id"]
+
+            cur.execute(
+                SQL_CREATE_BOOKING_WITH_ALLOCATIONS,
+                (
+                    effective_customer_id,
+                    start,
+                    end,
+                    category_ids,
+                    qtys,
+                    include_delivery,
+                    delivery_fee,
+                    account_address,
+                    account_postal_city,
+                    include_setup_service,
+                    None,
+                    None,
+                    booking_note,
+                    delivery_address,
+                    delivery_distance_km,
+                    [None] * len(category_ids),
+                    [None] * len(category_ids),
+                ),
+            )
+            booking_row = cur.fetchone()
+            return booking_row["booking_id"], created_user, effective_customer_id
+
+        booking_id, created_user, effective_customer_id = tx(work)
+
+        if created_user:
+            session.clear()
+            session["user_id"] = created_user["id"]
+            session["role"] = created_user["role"]
+
+        flash(f"Booking created (id={booking_id}).", "success")
+        flash(
+            f"Pending bookings hold stock for {_pending_booking_hold_label()} unless staff confirms them.",
+            "success",
+        )
+        return redirect(url_for("routes.booking_detail", booking_id=booking_id))
+    except Exception as exc:
+        flash(f"Could not place booking: {str(exc)}", "error")
+        return redirect(url_for("routes.home", start_date=start, end_date=end))
 
 # Booking create
 @bp.post("/bookings/create")
@@ -558,6 +994,9 @@ def booking_create_from_home():
     if not uid:
         flash("Please log in to place a booking.", "error")
         return redirect(url_for("auth.login_form"))
+    if role != "admin":
+        flash("Use the guest booking form for customer bookings.", "error")
+        return redirect(url_for("routes.home"))
 
     start = request.form.get("start_date", "").strip()
     end = request.form.get("end_date", "").strip()
@@ -575,6 +1014,7 @@ def booking_create_from_home():
         new_email = _to_str_or_none(request.form.get("new_customer_email"))
         new_phone = _to_str_or_none(request.form.get("new_customer_phone"))
         new_address = _to_str_or_none(request.form.get("new_customer_address"))
+        new_postal_city = _sanitize_postal_city(request.form.get("new_customer_postal_city"))
 
         if create_new_customer:
             if not new_full_name:
@@ -643,25 +1083,11 @@ def booking_create_from_home():
         else None
     )
 
-    selections = []
+    selections = _collect_selected_quantities_from_form()
     custom_total_prices = []
     custom_price_notes = []
 
-    for key, value in request.form.items():
-        if not key.startswith("qty_"):
-            continue
-
-        try:
-            cat_id = int(key.split("_", 1)[1])
-            qty = int(value) if value.strip() else 0
-        except Exception:
-            continue
-
-        if qty <= 0:
-            continue
-
-        selections.append((cat_id, qty))
-
+    for cat_id, _qty in selections:
         if role == "admin":
             custom_total_prices.append(_to_str_or_none(request.form.get(f"custom_price_{cat_id}")))
             custom_price_notes.append(_to_str_or_none(request.form.get(f"custom_price_note_{cat_id}")))
@@ -734,6 +1160,7 @@ def booking_create_from_home():
                                 new_email if new_email is not None else existing_customer["email"],
                                 new_phone if new_phone is not None else existing_customer["phone"],
                                 new_address if new_address is not None else existing_customer["address"],
+                                new_postal_city if new_postal_city is not None else existing_customer["postal_city"],
                                 existing_customer["id"],
                             ),
                         )
@@ -741,7 +1168,7 @@ def booking_create_from_home():
                     else:
                         cur.execute(
                             SQL_CREATE_CUSTOMER,
-                            (new_full_name, new_email, new_phone, new_address, None),
+                            (new_full_name, new_email, new_phone, new_address, new_postal_city, None),
                         )
                         customer = cur.fetchone()
 
@@ -755,6 +1182,10 @@ def booking_create_from_home():
                     selections=selections,
                     include_delivery=include_delivery,
                     delivery_fee=delivery_fee,
+                    address=None,
+                    postal_city=None,
+                    delivery_address=None,
+                    delivery_distance_km=None,
                     include_setup_service=include_setup_service,
                     booking_custom_total_price=booking_custom_total_price,
                     booking_custom_price_note=booking_custom_price_note,
@@ -776,10 +1207,14 @@ def booking_create_from_home():
                     qtys,
                     include_delivery,
                     delivery_fee,
+                    None,
+                    None,
                     include_setup_service,
                     booking_custom_total_price,
                     booking_custom_price_note,
                     booking_note,
+                    None,
+                    None,
                     custom_total_prices,
                     custom_price_notes,
                 ),
@@ -813,7 +1248,16 @@ def customers():
         return redirect(url_for("auth.login_form"))
 
     if role == "admin":
-        return render_template("customers.html", customers=query(SQL_LIST_CUSTOMERS), role=role)
+        customers_page = paginate_query(
+            SQL_LIST_CUSTOMERS,
+            pagination=_pagination_options(),
+        )
+        return render_template(
+            "customers.html",
+            customers=customers_page.items,
+            customers_page=customers_page,
+            role=role,
+        )
 
     cust = query(SQL_GET_CUSTOMER_BY_USER_ID, (uid,), one=True)
     if not cust:
@@ -837,13 +1281,14 @@ def customer_new():
     email = request.form.get("email", "").strip().lower() or None
     phone = request.form.get("phone", "").strip() or None
     address = request.form.get("address", "").strip() or None
+    postal_city = _sanitize_postal_city(request.form.get("postal_city"))
 
     if not full_name:
         flash("Full name is required.", "error")
         return redirect(url_for("routes.customer_new_form"))
 
     try:
-        row = query(SQL_CREATE_CUSTOMER, (full_name, email, phone, address, None), one=True, commit=True)
+        row = query(SQL_CREATE_CUSTOMER, (full_name, email, phone, address, postal_city, None), one=True, commit=True)
         flash(f"Customer created (id={row['id']}).", "success")
     except Exception as e:
         flash(f"Could not create customer: {str(e)}", "error")
@@ -866,26 +1311,48 @@ def customer_detail(customer_id: int):
         if not self_cust or self_cust["id"] != customer_id:
             abort(403)
 
-    bookings = query(SQL_LIST_BOOKINGS_FOR_CUSTOMER, (customer_id,))
-    return render_template("customer_detail.html", customer=cust, bookings=bookings, role=role)
+    bookings_page = paginate_query(
+        SQL_LIST_BOOKINGS_FOR_CUSTOMER,
+        (customer_id,),
+        pagination=_pagination_options(default_per_page=10),
+    )
+    return render_template(
+        "customer_detail.html",
+        customer=cust,
+        bookings=bookings_page.items,
+        bookings_page=bookings_page,
+        role=role,
+    )
 
 
 # Admin: Bookings list
 @bp.get("/admin/bookings")
 def admin_bookings():
     require_admin()
-    bookings = query(SQL_LIST_ALL_BOOKINGS)
-    return render_template("admin_bookings.html", bookings=bookings, role="admin")
+    bookings_page = paginate_query(
+        SQL_LIST_ALL_BOOKINGS,
+        pagination=_pagination_options(default_per_page=20),
+    )
+    return render_template(
+        "admin_bookings.html",
+        bookings=bookings_page.items,
+        bookings_page=bookings_page,
+        role="admin",
+    )
 
 
 # Admin: Rental periods
 @bp.get("/admin/rental-periods")
 def admin_rental_periods():
     require_admin()
-    rental_periods = query(SQL_LIST_RENTAL_PERIODS)
+    rental_periods_page = paginate_query(
+        SQL_LIST_RENTAL_PERIODS,
+        pagination=_pagination_options(),
+    )
     return render_template(
         "admin_rental_periods.html",
-        rental_periods=rental_periods,
+        rental_periods=rental_periods_page.items,
+        rental_periods_page=rental_periods_page,
         role="admin",
     )
 
@@ -988,7 +1455,16 @@ def admin_rental_period_delete(rental_period_id: int):
 @bp.get("/admin/items")
 def admin_items():
     require_admin()
-    return render_template("admin_items.html", items=query(SQL_LIST_ITEMS), role="admin")
+    items_page = paginate_query(
+        SQL_LIST_ITEMS,
+        pagination=_pagination_options(),
+    )
+    return render_template(
+        "admin_items.html",
+        items=items_page.items,
+        items_page=items_page,
+        role="admin",
+    )
 
 
 @bp.get("/admin/items/new")
@@ -1082,8 +1558,16 @@ def admin_item_delete(item_id: int):
 @bp.get("/admin/categories")
 def admin_categories():
     require_admin()
-    categories = query(SQL_LIST_CATEGORIES)
-    return render_template("admin_categories.html", categories=categories, role="admin")
+    categories_page = paginate_query(
+        SQL_LIST_CATEGORIES,
+        pagination=_pagination_options(),
+    )
+    return render_template(
+        "admin_categories.html",
+        categories=categories_page.items,
+        categories_page=categories_page,
+        role="admin",
+    )
 
 
 @bp.get("/admin/categories/tent/new")
@@ -1542,6 +2026,7 @@ def customer_edit_save(customer_id: int):
     email = request.form.get("email", "").strip().lower() or None
     phone = request.form.get("phone", "").strip() or None
     address = request.form.get("address", "").strip() or None
+    postal_city = _sanitize_postal_city(request.form.get("postal_city"))
 
     if not full_name:
         flash("Full name is required.", "error")
@@ -1550,7 +2035,7 @@ def customer_edit_save(customer_id: int):
     try:
         query(
             SQL_UPDATE_CUSTOMER,
-            (full_name, email, phone, address, customer_id),
+            (full_name, email, phone, address, postal_city, customer_id),
             one=True,
             commit=True,
         )

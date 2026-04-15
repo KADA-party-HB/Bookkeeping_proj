@@ -39,18 +39,18 @@
       <div class="rounded-2xl border border-white/80 bg-white/80 p-4 shadow-sm backdrop-blur">
         <div class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">Booking revenue</div>
         <div class="mt-2 text-2xl font-semibold text-slate-900">{{ total_income }} kr</div>
-        <div class="mt-2 text-sm text-slate-500">Across {{ revenue_bookings|length }} non-pending bookings in the register.</div>
+        <div class="mt-2 text-sm text-slate-500">Across {{ revenue_bookings|length }} non-pending bookings shown on this page.</div>
       </div>
       <div class="rounded-2xl border border-white/80 bg-white/80 p-4 shadow-sm backdrop-blur">
         <div class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">Average booking</div>
         <div class="mt-2 text-2xl font-semibold text-sky-700">{{ "%.2f"|format(average_booking) }} kr</div>
-        <div class="mt-2 text-sm text-slate-500">Pending bookings are excluded from this average.</div>
+        <div class="mt-2 text-sm text-slate-500">Pending bookings shown on this page are excluded from this average.</div>
       </div>
       <div class="rounded-2xl border border-white/80 bg-white/80 p-4 shadow-sm backdrop-blur">
         <div class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">At a glance</div>
         <div class="mt-2 flex flex-wrap gap-2">
           <span class="inline-flex rounded-full bg-slate-900 px-3 py-1 text-xs font-medium text-white">
-            {{ bookings|length }} total
+            {{ bookings_page.total_items if bookings_page else bookings|length }} total
           </span>
           <span class="inline-flex rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-800">
             {{ bookings|selectattr('status', 'equalto', 'confirmed')|list|length }} confirmed
@@ -62,6 +62,10 @@
             {{ bookings|selectattr('has_tent')|list|length }} with tents
           </span>
         </div>
+      </div>
+
+      <div class="mt-3 text-xs text-slate-500">
+        This page shows {{ bookings|length }} booking{{ '' if bookings|length == 1 else 's' }}.
       </div>
     </div>
   </div>
@@ -258,6 +262,10 @@
         <i>No bookings yet.</i>
       </div>
     {% endif %}
+
+    {% with page_obj=bookings_page %}
+      {% include "_pagination.html" %}
+    {% endwith %}
   </div>
 </section>
 {% endblock %}

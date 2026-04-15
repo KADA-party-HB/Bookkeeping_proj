@@ -6,7 +6,8 @@ Flask + PostgreSQL backend prepared to run as a standalone WSGI service on Railw
 1. Install the dependencies and make sure PostgreSQL is available.
 2. Copy `.env.example` to `.env` and set at least `DATABASE_URL` and `SECRET_KEY`.
 3. Create the database and apply `schema_postgres.sql` or the SQL files in `migrations/`.
-4. Run the app with `flask --app run.py --debug run`.
+4. If you want guest delivery quotes, also set `MAP_API_KEY` and `DELIVERY_ORIGIN_ADDRESS` in `.env`.
+5. Run the app with `flask --app run.py --debug run`.
 
 ## Local container smoke test
 Run `docker compose up --build` and open `http://localhost:8080`.

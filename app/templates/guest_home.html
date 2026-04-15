@@ -1,0 +1,990 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="mx-auto max-w-6xl">
+  <div class="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+    <div class="relative overflow-hidden rounded-[2rem] border border-pink-100 bg-[linear-gradient(135deg,#fffdfd_0%,#ffffff_50%,#fbfffc_100%)] shadow-[0_28px_70px_-42px_rgba(15,23,42,0.12)]">
+      <div class="absolute -left-12 top-0 h-36 w-36 rounded-full bg-emerald-200/30 blur-3xl"></div>
+      <div class="absolute right-8 top-8 h-28 w-28 rounded-full bg-pink-200/25 blur-3xl"></div>
+      <div class="absolute bottom-0 right-0 h-40 w-40 translate-x-1/4 translate-y-1/4 rounded-full bg-pink-100/55"></div>
+      <div class="relative px-6 py-8 md:px-8">
+        <div>
+          <div class="inline-flex items-center gap-2 rounded-full border border-pink-200 bg-white/90 px-3 py-1 text-xs font-medium uppercase tracking-[0.2em] text-rose-500">
+            Kada Party Booking
+          </div>
+          <h1 class="mt-3 max-w-2xl text-3xl font-black tracking-tight text-slate-950 md:text-5xl">
+          Search availability first, then create the customer account as part of the booking.
+          </h1>
+          <p class="mt-3 max-w-2xl text-sm leading-6 text-slate-700 md:text-base">
+            This view only offers standard-priced items and strict availability. Same-day turnaround items are excluded here even if staff could place them manually.
+          </p>
+        </div>
+
+        <div class="mt-5 grid gap-3 sm:grid-cols-3">
+          <div class="rounded-2xl border border-emerald-100 bg-white/90 p-4 shadow-sm backdrop-blur">
+            <div class="text-xs font-medium uppercase tracking-[0.18em] text-emerald-600">Availability</div>
+            <div class="mt-2 text-sm font-semibold text-slate-900">Only fully free stock is bookable</div>
+          </div>
+          <div class="rounded-2xl border border-pink-100 bg-white/90 p-4 shadow-sm backdrop-blur">
+            <div class="text-xs font-medium uppercase tracking-[0.18em] text-rose-400">Pricing</div>
+            <div class="mt-2 text-sm font-semibold text-slate-900">Only categories with a standard price are shown as bookable</div>
+          </div>
+          <div class="rounded-2xl border border-emerald-100 bg-white/90 p-4 shadow-sm backdrop-blur">
+            <div class="text-xs font-medium uppercase tracking-[0.18em] text-emerald-600">Delivery</div>
+            <div class="mt-2 text-sm font-semibold text-slate-900">Address is checked before we calculate the delivery fee</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_24px_60px_-42px_rgba(15,23,42,0.16)] md:p-8">
+      <div class="flex items-center justify-between gap-3">
+        <div>
+          <h2 class="text-lg font-bold text-slate-950">Search dates</h2>
+          <p class="mt-1 text-sm text-slate-600">Pick the rental window to load available items.</p>
+        </div>
+        <div class="rounded-full bg-pink-500 px-3 py-1 text-xs font-medium text-white shadow-sm">Step 1</div>
+      </div>
+
+      <form method="get" class="mt-5 grid gap-4">
+        <div>
+          <label class="text-sm font-medium text-slate-700" for="start_date">Start date</label>
+          <input
+            id="start_date"
+            type="date"
+            name="start_date"
+            value="{{ start_date }}"
+            required
+            class="mt-1 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 shadow-sm transition focus:border-pink-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-pink-100"
+          >
+        </div>
+
+        <div>
+          <label class="text-sm font-medium text-slate-700" for="end_date">End date</label>
+          <input
+            id="end_date"
+            type="date"
+            name="end_date"
+            value="{{ end_date }}"
+            required
+            class="mt-1 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 shadow-sm transition focus:border-pink-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-pink-100"
+          >
+        </div>
+
+        <button class="inline-flex items-center justify-center rounded-2xl bg-pink-500 px-4 py-3 text-sm font-medium text-white transition hover:bg-rose-600 focus:outline-none focus:ring-4 focus:ring-pink-100">
+          Search bookings
+        </button>
+      </form>
+
+      {% if role == "customer" and customer_profile %}
+        <div class="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm text-emerald-900">
+          Signed in as <span class="font-medium">{{ customer_profile.full_name }}</span>.
+          New bookings will be placed on your existing account.
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+{% if categories is not none %}
+  <form
+    method="post"
+    action="{{ url_for('routes.guest_booking_create') }}"
+    class="mt-6 space-y-6"
+    id="guest-booking-form"
+    data-delivery-quote-url="{{ url_for('routes.guest_delivery_quote') }}"
+  >
+    <input type="hidden" name="start_date" value="{{ start_date }}">
+    <input type="hidden" name="end_date" value="{{ end_date }}">
+
+    <section class="rounded-[2rem] border border-slate-200 bg-white shadow-[0_24px_60px_-42px_rgba(15,23,42,0.16)]">
+      <div class="border-b border-pink-100 bg-[linear-gradient(180deg,rgba(253,242,248,0.55),rgba(255,255,255,0.96))] px-6 py-5 md:px-8">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <div class="text-xs font-medium uppercase tracking-[0.2em] text-rose-400">Step 2</div>
+            <h2 class="mt-1 text-2xl font-black text-slate-950">Choose items</h2>
+            <p class="mt-1 text-sm text-slate-600">Only fully available stock can be booked here.</p>
+          </div>
+          <div class="rounded-full border border-pink-200 bg-white px-4 py-2 text-sm font-medium text-slate-700">
+            {{ categories|length }} categories checked
+          </div>
+        </div>
+
+        {% if categories|length > 0 %}
+          <div class="mt-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div class="max-w-xl">
+              <label class="text-sm font-medium text-slate-700" for="item-search-input">Search items</label>
+              <p class="mt-1 text-xs text-slate-500">Filter by name, type, rental period, or visible details.</p>
+            </div>
+            <div class="flex w-full flex-col gap-3 sm:flex-row lg:max-w-2xl lg:items-center">
+              <input
+                id="item-search-input"
+                type="search"
+                placeholder="Search tents, furnishings, pricing..."
+                class="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-900 shadow-sm transition focus:border-pink-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-pink-100"
+              >
+              <div class="inline-flex items-center justify-center rounded-full border border-pink-200 bg-pink-50 px-3 py-2 text-xs font-medium text-rose-500 shadow-sm" id="item-search-count">
+                {{ categories|length }} shown
+              </div>
+            </div>
+          </div>
+        {% endif %}
+      </div>
+
+      <div class="px-6 py-6 md:px-8">
+        {% if categories|length == 0 %}
+          <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-600">
+            <i>No categories are available for those dates.</i>
+          </div>
+        {% else %}
+          <div class="grid gap-4 md:hidden">
+            {% for c in categories %}
+              {% set disabled = c.available_items == 0 or not c.has_standard_price %}
+              <div
+                class="rounded-[1.4rem] border border-slate-200 bg-[linear-gradient(180deg,#fffdfd_0%,#ffffff_100%)] p-4 shadow-[0_18px_45px_-36px_rgba(15,23,42,0.12)]"
+                data-item-card
+                data-search-text="{{ (
+                  c.display_name ~ ' ' ~
+                  ('tent ' if c.is_tent else '') ~
+                  ('furnishing ' if c.is_furnishing else '') ~
+                  (c.furnishing_kind or '') ~ ' ' ~
+                  (c.rental_period_label or '') ~ ' ' ~
+                  (c.notes or '')
+                )|lower }}"
+              >
+                <div class="flex items-start justify-between gap-3">
+                  <div>
+                    <div class="font-semibold text-slate-900">{{ c.display_name }}</div>
+                    <div class="mt-1 flex flex-wrap gap-2">
+                      {% if c.is_tent %}
+                        <span class="inline-flex rounded-full border border-pink-200 bg-pink-50 px-2.5 py-1 text-xs font-medium text-rose-600">Tent</span>
+                      {% endif %}
+                      {% if c.is_furnishing %}
+                        <span class="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">Furnishing</span>
+                      {% endif %}
+                    </div>
+                  </div>
+                  <span class="inline-flex rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700">
+                    {{ c.available_items }} free
+                  </span>
+                </div>
+
+                <div class="mt-4 grid gap-3 text-sm text-slate-600">
+                  <div>
+                    {% if c.has_standard_price %}
+                      <div class="font-medium text-slate-900">{{ c.quoted_period_price }} kr</div>
+                      <div class="text-xs text-slate-500">{{ c.rental_period_label }}</div>
+                    {% else %}
+                      <div class="font-medium text-amber-700">Not bookable for these dates</div>
+                    {% endif %}
+                  </div>
+
+                  <div class="space-y-1">
+                    {% if c.is_tent %}
+                      <div>Capacity: {{ c.capacity }}</div>
+                      <div>Season: {{ c.season_rating }}</div>
+                      <div>Setup: {{ c.setup_service_fee }} kr</div>
+                    {% else %}
+                      <div>{{ c.furnishing_kind }}</div>
+                      {% if c.weight_kg %}<div>Weight: {{ c.weight_kg }} kg</div>{% endif %}
+                    {% endif %}
+                  </div>
+
+                  <div>
+                    <label class="text-sm font-medium text-slate-700" for="qty_mobile_{{ c.id }}">Quantity</label>
+                    <input
+                      id="qty_mobile_{{ c.id }}"
+                      type="number"
+                      min="0"
+                      max="{{ c.available_items }}"
+                      step="1"
+                      value="0"
+                      name="qty_{{ c.id }}"
+                      inputmode="numeric"
+                      {% if disabled %}disabled{% endif %}
+                      data-booking-qty
+                      data-unit-price="{{ c.quoted_period_price if c.has_standard_price else 0 }}"
+                      data-setup-fee="{{ c.setup_service_fee if c.is_tent else 0 }}"
+                      data-is-tent="{{ 'true' if c.is_tent else 'false' }}"
+                      class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 shadow-sm transition focus:border-pink-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-pink-100"
+                    >
+                  </div>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+
+          <div class="hidden overflow-hidden rounded-[1.5rem] border border-slate-200 md:block">
+            <div class="overflow-x-auto">
+              <table class="min-w-full text-sm">
+                <thead class="bg-[linear-gradient(90deg,#ec4899_0%,#f472b6_72%,#22c55e_140%)] text-white">
+                  <tr>
+                    <th class="p-3 text-left font-medium">Category</th>
+                    <th class="p-3 text-left font-medium">Type</th>
+                    <th class="p-3 text-left font-medium">Period</th>
+                    <th class="p-3 text-left font-medium" data-sort-type="number">Price</th>
+                    <th class="p-3 text-left font-medium" data-sort-type="number">Free now</th>
+                    <th class="p-3 text-left font-medium">Details</th>
+                    <th class="p-3 text-left font-medium" data-sort-type="number">Qty</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-200 bg-white">
+                  {% for c in categories %}
+                    {% set disabled = c.available_items == 0 or not c.has_standard_price %}
+                    <tr
+                      class="align-top"
+                      data-item-row
+                      data-search-text="{{ (
+                        c.display_name ~ ' ' ~
+                        ('tent ' if c.is_tent else '') ~
+                        ('furnishing ' if c.is_furnishing else '') ~
+                        (c.furnishing_kind or '') ~ ' ' ~
+                        (c.rental_period_label or '') ~ ' ' ~
+                        (c.notes or '')
+                      )|lower }}"
+                    >
+                      <td class="p-3">
+                        <div class="font-medium text-slate-900">{{ c.display_name }}</div>
+                        <div class="mt-1 text-xs text-slate-500">Category #{{ c.id }}</div>
+                      </td>
+                      <td class="p-3">
+                        {% if c.is_tent %}
+                          <span class="inline-flex rounded-full border border-pink-200 bg-pink-50 px-2.5 py-1 text-xs font-medium text-rose-600">Tent</span>
+                        {% elif c.is_furnishing %}
+                          <span class="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">Furnishing</span>
+                        {% endif %}
+                      </td>
+                      <td class="p-3">
+                        {% if c.has_standard_price %}
+                          <div class="font-medium text-slate-900">{{ c.rental_period_label }}</div>
+                          <div class="mt-1 text-xs text-slate-500">{{ c.rental_period_min_days }}-{{ c.rental_period_max_days }} days</div>
+                        {% else %}
+                          <span class="text-amber-700">No standard price</span>
+                        {% endif %}
+                      </td>
+                      <td class="p-3">
+                        {% if c.has_standard_price %}
+                          <div class="font-medium text-slate-900">{{ c.quoted_period_price }} kr</div>
+                        {% else %}
+                          <span class="text-slate-400">Unavailable</span>
+                        {% endif %}
+                      </td>
+                      <td class="p-3">
+                        {% if c.available_items > 0 %}
+                          <span class="font-medium text-slate-900">{{ c.available_items }}</span>
+                        {% else %}
+                          <span class="font-medium text-rose-600">0</span>
+                        {% endif %}
+                      </td>
+                      <td class="p-3 text-xs text-slate-600">
+                        {% if c.is_tent %}
+                          <div>Capacity: {{ c.capacity }}</div>
+                          <div class="mt-1">Season: {{ c.season_rating }}</div>
+                          <div class="mt-1">Setup: {{ c.setup_service_fee }} kr</div>
+                        {% else %}
+                          <div>{{ c.furnishing_kind }}</div>
+                          {% if c.weight_kg %}<div class="mt-1">Weight: {{ c.weight_kg }} kg</div>{% endif %}
+                        {% endif %}
+                      </td>
+                      <td class="p-3">
+                        <input
+                          type="number"
+                          min="0"
+                          max="{{ c.available_items }}"
+                          step="1"
+                          value="0"
+                          name="qty_{{ c.id }}"
+                          inputmode="numeric"
+                          {% if disabled %}disabled{% endif %}
+                          data-booking-qty
+                          data-unit-price="{{ c.quoted_period_price if c.has_standard_price else 0 }}"
+                          data-setup-fee="{{ c.setup_service_fee if c.is_tent else 0 }}"
+                          data-is-tent="{{ 'true' if c.is_tent else 'false' }}"
+                          class="w-24 rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 shadow-sm transition focus:border-pink-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-pink-100"
+                        >
+                      </td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        {% endif %}
+      </div>
+    </section>
+
+    <div class="grid gap-6 xl:grid-cols-[0.95fr_1.05fr_0.8fr] xl:items-start">
+      <section class="rounded-[2rem] border border-slate-200 bg-white shadow-[0_24px_60px_-42px_rgba(15,23,42,0.16)]">
+        <div class="border-b border-slate-200 px-6 py-5">
+          <div class="text-xs font-medium uppercase tracking-[0.2em] text-rose-400">Step 3</div>
+          <h2 class="mt-1 text-xl font-black text-slate-950">Services</h2>
+        </div>
+        <div class="space-y-5 px-6 py-6">
+          <label class="flex items-start gap-3 rounded-2xl border border-pink-100 bg-pink-50/50 px-4 py-4">
+            <input
+              type="checkbox"
+              name="include_delivery"
+              id="include_delivery"
+              class="mt-1 h-4 w-4 rounded border-pink-300 text-pink-500 focus:ring-pink-400"
+            >
+            <span class="text-sm text-slate-700">
+              <span class="block font-medium text-slate-900">Include delivery</span>
+              <span class="mt-1 block">We validate the address and calculate the fee from the route distance.</span>
+            </span>
+          </label>
+
+          <label class="flex items-start gap-3 rounded-2xl border border-pink-100 bg-pink-50/50 px-4 py-4">
+            <input
+              type="checkbox"
+              name="include_setup_service"
+              id="include_setup_service"
+              class="mt-1 h-4 w-4 rounded border-pink-300 text-pink-500 focus:ring-pink-400"
+            >
+            <span class="text-sm text-slate-700">
+              <span class="block font-medium text-slate-900">Include setup service</span>
+              <span class="mt-1 block" id="setup-service-help">Setup fees are added for tents only. Delivery is required.</span>
+            </span>
+          </label>
+
+          <div>
+            <label class="text-sm font-medium text-slate-700" for="booking_note">Booking note</label>
+            <textarea
+              id="booking_note"
+              name="booking_note"
+              rows="4"
+              placeholder="Access details, timing, delivery instructions..."
+              class="mt-1 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 shadow-sm transition focus:border-pink-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-pink-100"
+            ></textarea>
+          </div>
+        </div>
+      </section>
+
+      <section class="rounded-[2rem] border border-slate-200 bg-white shadow-[0_24px_60px_-42px_rgba(15,23,42,0.16)]">
+        <div class="border-b border-slate-200 px-6 py-5">
+          <div class="text-xs font-medium uppercase tracking-[0.2em] text-rose-400">Step 4</div>
+          <h2 class="mt-1 text-xl font-black text-slate-950">
+            {% if role == "customer" and customer_profile %}Your account{% else %}Create account{% endif %}
+          </h2>
+        </div>
+        <div class="space-y-4 px-6 py-6">
+          {% if role == "customer" and customer_profile %}
+            <div class="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm text-emerald-900">
+              Booking as <span class="font-medium">{{ customer_profile.full_name }}</span>{% if customer_profile.email %} ({{ customer_profile.email }}){% endif %}.
+            </div>
+            <div>
+              <label class="text-sm font-medium text-slate-700" for="phone">Phone</label>
+              <input
+                id="phone"
+                name="phone"
+                value="{{ customer_profile.phone or '' }}"
+                autocomplete="tel"
+                class="mt-1 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 shadow-sm transition focus:border-pink-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-pink-100"
+              >
+            </div>
+          {% else %}
+            <div>
+              <label class="text-sm font-medium text-slate-700" for="full_name">Full name</label>
+              <input
+                id="full_name"
+                name="full_name"
+                required
+                autocomplete="name"
+                class="mt-1 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 shadow-sm transition focus:border-pink-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-pink-100"
+              >
+            </div>
+            <div>
+              <label class="text-sm font-medium text-slate-700" for="email">Email</label>
+              <input
+                id="email"
+                name="email"
+                type="email"
+                required
+                autocomplete="email"
+                class="mt-1 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 shadow-sm transition focus:border-pink-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-pink-100"
+              >
+            </div>
+            <div>
+              <label class="text-sm font-medium text-slate-700" for="phone">Phone</label>
+              <input
+                id="phone"
+                name="phone"
+                autocomplete="tel"
+                class="mt-1 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 shadow-sm transition focus:border-pink-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-pink-100"
+              >
+            </div>
+          {% endif %}
+
+          <div>
+            <label class="text-sm font-medium text-slate-700" for="address">Address</label>
+            <input
+              id="address"
+              name="address"
+              type="text"
+              value="{{ customer_profile.address if customer_profile else '' }}"
+              autocomplete="street-address"
+              class="mt-1 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 shadow-sm transition focus:border-pink-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-pink-100"
+            >
+          </div>
+
+          <div>
+            <label class="text-sm font-medium text-slate-700" for="postal_city">Postal city</label>
+            <input
+              id="postal_city"
+              name="postal_city"
+              type="text"
+              value="{{ customer_profile.postal_city if customer_profile and customer_profile.postal_city else '' }}"
+              autocomplete="address-level2"
+              class="mt-1 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 shadow-sm transition focus:border-pink-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-pink-100"
+            >
+          </div>
+
+          {% if not (role == "customer" and customer_profile) %}
+            <div>
+              <label class="text-sm font-medium text-slate-700" for="password">Password</label>
+              <input
+                id="password"
+                name="password"
+                type="password"
+                required
+                autocomplete="new-password"
+                class="mt-1 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 shadow-sm transition focus:border-pink-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-pink-100"
+              >
+            </div>
+          {% endif %}
+        </div>
+      </section>
+
+      <section class="rounded-[2rem] border bg-green-50/50 text-slate-900 shadow-[0_28px_70px_-42px_rgba(15,23,42,0.12)]">
+        <div class="border-b px-6 py-5">
+          <div class="text-xs font-medium uppercase tracking-[0.2em] text-green-400">Step 5</div>
+          <h2 class="mt-1 text-xl font-black text-slate-950">Summary</h2>
+        </div>
+        <div class="space-y-3 px-6 py-6 text-sm">
+          <div class="flex items-center justify-between gap-4">
+            <span class="text-slate-500">Items</span>
+            <span id="summary-items" class="font-semibold text-slate-950">0 selected</span>
+          </div>
+          <div class="flex items-center justify-between gap-4">
+            <span class="text-slate-500">Rental</span>
+            <span id="summary-rental" class="font-semibold text-slate-950">0 kr</span>
+          </div>
+          <div class="flex items-center justify-between gap-4">
+            <span class="text-slate-500">Setup</span>
+            <span id="summary-setup" class="font-semibold text-slate-950">Not included</span>
+          </div>
+          <div class="flex items-center justify-between gap-4">
+            <span class="text-slate-500">Delivery</span>
+            <span id="summary-delivery" class="font-semibold text-slate-950">Not included</span>
+          </div>
+          <div class="border-t border-pink-100 pt-3">
+            <div class="flex items-center justify-between gap-4 text-base font-semibold">
+              <span>Total</span>
+              <span id="summary-total" class="text-rose-600">0 kr</span>
+            </div>
+          </div>
+          <p id="form-error" class="hidden rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700"></p>
+          <button
+            type="submit"
+            class="inline-flex w-full items-center justify-center rounded-2xl bg-pink-500 px-4 py-3 text-sm font-medium text-white transition hover:bg-rose-600 focus:outline-none focus:ring-4 focus:ring-pink-100"
+          >
+            {% if role == "customer" and customer_profile %}Place booking{% else %}Place booking and create account{% endif %}
+          </button>
+          <p class="text-xs text-slate-500">
+            The booking is created as pending. Stock is held temporarily until staff confirms it.
+          </p>
+        </div>
+      </section>
+    </div>
+  </form>
+
+<script>
+  (() => {
+    const form = document.getElementById("guest-booking-form");
+    if (!form) {
+      return;
+    }
+
+    const qtyInputs = Array.from(form.querySelectorAll("[data-booking-qty]"));
+    const includeSetup = document.getElementById("include_setup_service");
+    const includeDelivery = document.getElementById("include_delivery");
+    const setupServiceHelp = document.getElementById("setup-service-help");
+    const addressField = document.getElementById("address");
+    const postalCityField = document.getElementById("postal_city");
+    const deliveryPanel = document.getElementById("delivery-panel");
+    const deliveryError = document.getElementById("delivery-address-error");
+    const formError = document.getElementById("form-error");
+    const summaryItems = document.getElementById("summary-items");
+    const summaryRental = document.getElementById("summary-rental");
+    const summarySetup = document.getElementById("summary-setup");
+    const summaryDelivery = document.getElementById("summary-delivery");
+    const summaryTotal = document.getElementById("summary-total");
+    const itemSearchInput = document.getElementById("item-search-input");
+    const itemSearchCount = document.getElementById("item-search-count");
+    const itemCards = Array.from(form.querySelectorAll("[data-item-card]"));
+    const itemRows = Array.from(form.querySelectorAll("[data-item-row]"));
+    const errorClasses = ["border-rose-400", "bg-rose-50", "focus:ring-rose-100", "focus:border-rose-400"];
+    const loadingClasses = ["border-amber-400", "bg-amber-50", "focus:ring-amber-100", "focus:border-amber-400"];
+    const successClasses = ["border-emerald-400", "bg-emerald-50", "focus:ring-emerald-100", "focus:border-emerald-400"];
+
+    let validatedDelivery = null;
+    let validationInFlight = false;
+    let deliveryValidationTimer = null;
+    let activeValidationPromise = null;
+    let activeValidationAddress = null;
+
+    const parseNumber = (value) => {
+      const parsed = Number(String(value || "0").replace(",", "."));
+      return Number.isFinite(parsed) ? parsed : 0;
+    };
+
+    const formatMoney = (value) => `${value.toFixed(2)} kr`;
+    const normalizeAddress = (value) => value.trim().replace(/\s+/g, " ");
+    const normalizeSearchText = (value) => normalizeAddress((value || "").toLowerCase());
+    const stripPostalCodeFromCity = (value) =>
+      normalizeAddress(String(value || "").replace(/^(?:SE[-\s]?)?\d{3}\s?\d{2}\s*/i, ""));
+
+    const splitFormattedAddress = (formattedAddress) => {
+      const normalized = normalizeAddress(formattedAddress || "");
+      if (!normalized) {
+        return {
+          streetAddress: "",
+          postalCity: "",
+        };
+      }
+
+      const parts = normalized
+        .split(",")
+        .map((part) => normalizeAddress(part))
+        .filter(Boolean);
+
+      if (parts.length === 1) {
+        return {
+          streetAddress: parts[0],
+          postalCity: "",
+        };
+      }
+
+      const countryNames = ["sweden", "sverige"];
+      const withoutCountry = [...parts];
+      const lastPart = withoutCountry[withoutCountry.length - 1]?.toLowerCase();
+
+      if (countryNames.includes(lastPart)) {
+        withoutCountry.pop();
+      }
+
+      if (withoutCountry.length === 1) {
+        return {
+          streetAddress: withoutCountry[0],
+          postalCity: "",
+        };
+      }
+
+      return {
+        streetAddress: withoutCountry.slice(0, -1).join(", "),
+        postalCity: stripPostalCodeFromCity(withoutCountry[withoutCountry.length - 1] || ""),
+      };
+    };
+
+    const getStreetAddress = () => normalizeAddress(addressField?.value || "");
+    const getPostalCity = () => stripPostalCodeFromCity(postalCityField?.value || "");
+
+    const hasCompleteDeliveryAddress = () => {
+      return Boolean(getStreetAddress() && getPostalCity());
+    };
+
+    const getFullAddress = () => {
+      return normalizeAddress([getStreetAddress(), getPostalCity()].filter(Boolean).join(", "));
+    };
+
+    const setFormError = (message) => {
+      formError.textContent = message || "";
+      formError.classList.toggle("hidden", !message);
+    };
+
+    const clearAddressState = () => {
+      [...errorClasses, ...loadingClasses, ...successClasses].forEach((className) => addressField.classList.remove(className));
+      addressField.removeAttribute("aria-invalid");
+    };
+
+    const showAddressLoading = () => {
+      clearAddressState();
+      loadingClasses.forEach((className) => addressField.classList.add(className));
+    };
+
+    const showAddressError = (message) => {
+      validatedDelivery = null;
+      clearAddressState();
+      errorClasses.forEach((className) => addressField.classList.add(className));
+      addressField.setAttribute("aria-invalid", "true");
+      if (deliveryError) {
+        deliveryError.textContent = message;
+        deliveryError.classList.remove("hidden");
+      }
+      renderSummary();
+    };
+
+    const showAddressSuccess = (result) => {
+      clearAddressState();
+      successClasses.forEach((className) => addressField.classList.add(className));
+
+      if (deliveryError) {
+        deliveryError.textContent = "";
+        deliveryError.classList.add("hidden");
+      }
+
+      const splitAddress = splitFormattedAddress(result.formatted_address);
+
+      if (splitAddress.streetAddress) {
+        addressField.value = splitAddress.streetAddress;
+      }
+
+      if (postalCityField) {
+        postalCityField.value = splitAddress.postalCity;
+      }
+
+      validatedDelivery = {
+        originalAddress: getFullAddress(),
+        formattedAddress: result.formatted_address,
+        distanceKm: parseNumber(result.distance_km),
+        deliveryFee: parseNumber(result.delivery_fee),
+      };
+
+      renderSummary();
+    };
+
+    const clearDeliveryValidation = () => {
+      validatedDelivery = null;
+      clearAddressState();
+      if (deliveryError) {
+        deliveryError.classList.add("hidden");
+        deliveryError.textContent = "";
+      }
+      renderSummary();
+    };
+
+    const getState = () => {
+      const selected = qtyInputs
+        .filter((input) => !input.disabled)
+        .map((input) => {
+          const qty = parseInt(input.value || "0", 10);
+          if (!Number.isFinite(qty) || qty <= 0) {
+            return null;
+          }
+
+          return {
+            qty,
+            unitPrice: parseNumber(input.dataset.unitPrice),
+            setupFee: parseNumber(input.dataset.setupFee),
+            isTent: input.dataset.isTent === "true",
+          };
+        })
+        .filter(Boolean);
+
+      const itemCount = selected.reduce((sum, item) => sum + item.qty, 0);
+      const rental = selected.reduce((sum, item) => sum + (item.unitPrice * item.qty), 0);
+      const setup = includeSetup.checked
+        ? selected.reduce((sum, item) => sum + ((item.isTent ? item.setupFee : 0) * item.qty), 0)
+        : 0;
+      const delivery = includeDelivery.checked && validatedDelivery ? validatedDelivery.deliveryFee : 0;
+
+      return {
+        itemCount,
+        rental,
+        setup,
+        delivery,
+        total: rental + setup + delivery,
+      };
+    };
+
+    const renderSummary = () => {
+      const state = getState();
+      summaryItems.textContent = `${state.itemCount} selected`;
+      summaryRental.textContent = formatMoney(state.rental);
+      summarySetup.textContent = includeSetup.checked ? formatMoney(state.setup) : "Not included";
+
+      if (!includeDelivery.checked) {
+        summaryDelivery.textContent = "Not included";
+      } else if (validatedDelivery) {
+        summaryDelivery.textContent = `${formatMoney(validatedDelivery.deliveryFee)} (${validatedDelivery.distanceKm.toFixed(2)} km)`;
+      } else if (validationInFlight) {
+        summaryDelivery.textContent = "Validating...";
+      } else if (!hasCompleteDeliveryAddress()) {
+        summaryDelivery.textContent = "Enter address and postal city";
+      } else {
+        summaryDelivery.textContent = "Ready to validate";
+      }
+
+      summaryTotal.textContent = formatMoney(state.total);
+    };
+
+    const validateDeliveryAddress = async () => {
+      if (!includeDelivery.checked) {
+        return false;
+      }
+
+      if (!hasCompleteDeliveryAddress()) {
+        clearDeliveryValidation();
+        return false;
+      }
+
+      const fullAddress = getFullAddress();
+
+      if (validatedDelivery && validatedDelivery.originalAddress === fullAddress) {
+        return true;
+      }
+
+      if (activeValidationPromise && activeValidationAddress === fullAddress) {
+        return activeValidationPromise;
+      }
+
+      validationInFlight = true;
+      activeValidationAddress = fullAddress;
+      showAddressLoading();
+
+      if (deliveryError) {
+        deliveryError.classList.add("hidden");
+      }
+
+      setFormError("");
+      renderSummary();
+
+      activeValidationPromise = (async () => {
+        try {
+          const response = await fetch(form.dataset.deliveryQuoteUrl, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ address: fullAddress }),
+          });
+          const payload = await response.json();
+
+          if (!response.ok || !payload.ok) {
+            showAddressError(payload.error || "We could not validate that address.");
+            return false;
+          }
+
+          showAddressSuccess(payload);
+          return true;
+        } catch (error) {
+          showAddressError("We could not reach the address service right now.");
+          return false;
+        } finally {
+          validationInFlight = false;
+          activeValidationPromise = null;
+          activeValidationAddress = null;
+          renderSummary();
+        }
+      })();
+
+      return activeValidationPromise;
+    };
+
+    const syncSetupMode = () => {
+      const deliveryEnabled = includeDelivery.checked;
+      includeSetup.disabled = !deliveryEnabled;
+
+      if (!deliveryEnabled && includeSetup.checked) {
+        includeSetup.checked = false;
+      }
+
+      if (setupServiceHelp) {
+        setupServiceHelp.textContent = deliveryEnabled
+          ? "Setup fees are added for tents only."
+          : "Setup requires delivery. Select delivery first.";
+        setupServiceHelp.classList.toggle("text-slate-500", deliveryEnabled);
+        setupServiceHelp.classList.toggle("text-amber-800", !deliveryEnabled);
+        setupServiceHelp.classList.toggle("font-medium", !deliveryEnabled);
+      }
+    };
+
+    const queueDeliveryValidation = () => {
+      if (!includeDelivery.checked) {
+        return;
+      }
+
+      window.clearTimeout(deliveryValidationTimer);
+
+      if (!hasCompleteDeliveryAddress()) {
+        clearDeliveryValidation();
+        return;
+      }
+
+      deliveryValidationTimer = window.setTimeout(() => {
+        const currentAddress = getFullAddress();
+        if (!currentAddress) {
+          clearDeliveryValidation();
+          return;
+        }
+        if (validatedDelivery && validatedDelivery.originalAddress === currentAddress) {
+          return;
+        }
+        validateDeliveryAddress();
+      }, 5000);
+    };
+
+    const updateVisibleItemCount = () => {
+      if (!itemSearchCount) {
+        return;
+      }
+
+      const visibleCards = itemCards.filter((card) => !card.classList.contains("hidden")).length;
+      const visibleRows = itemRows.filter((row) => row.style.display !== "none").length;
+      const visibleCount = visibleCards || visibleRows;
+      itemSearchCount.textContent = `${visibleCount} shown`;
+    };
+
+    const applyItemFilter = () => {
+      if (!itemSearchInput) {
+        return;
+      }
+
+      const query = normalizeSearchText(itemSearchInput.value);
+
+      itemCards.forEach((card) => {
+        const haystack = normalizeSearchText(card.dataset.searchText || "");
+        const matches = !query || haystack.includes(query);
+        card.classList.toggle("hidden", !matches);
+      });
+
+      itemRows.forEach((row) => {
+        const haystack = normalizeSearchText(row.dataset.searchText || "");
+        const matches = !query || haystack.includes(query);
+        row.style.display = matches ? "" : "none";
+      });
+
+      updateVisibleItemCount();
+    };
+
+    includeSetup.addEventListener("change", renderSummary);
+
+    includeDelivery.addEventListener("change", () => {
+      syncSetupMode();
+      if (deliveryPanel) {
+        deliveryPanel.classList.toggle("hidden", !includeDelivery.checked);
+      }
+
+      window.clearTimeout(deliveryValidationTimer);
+
+      if (!includeDelivery.checked) {
+        clearDeliveryValidation();
+      } else if (hasCompleteDeliveryAddress()) {
+        validateDeliveryAddress();
+      } else {
+        clearDeliveryValidation();
+      }
+
+      renderSummary();
+    });
+
+    qtyInputs.forEach((input) => {
+      input.addEventListener("input", renderSummary);
+      input.addEventListener("change", renderSummary);
+    });
+
+    const handleDeliveryFieldInput = () => {
+      if (!includeDelivery.checked) {
+        return;
+      }
+
+      if (validatedDelivery && validatedDelivery.originalAddress !== getFullAddress()) {
+        clearDeliveryValidation();
+      }
+
+      queueDeliveryValidation();
+    };
+
+    const handleDeliveryFieldBlur = () => {
+      if (postalCityField) {
+        postalCityField.value = getPostalCity();
+      }
+
+      if (!includeDelivery.checked) {
+        return;
+      }
+
+      window.clearTimeout(deliveryValidationTimer);
+
+      if (!hasCompleteDeliveryAddress()) {
+        clearDeliveryValidation();
+        return;
+      }
+
+      const currentAddress = getFullAddress();
+      if (validatedDelivery && validatedDelivery.originalAddress === currentAddress) {
+        return;
+      }
+
+      validateDeliveryAddress();
+    };
+
+    const handleDeliveryFieldEnter = (event) => {
+      if (!includeDelivery.checked || event.key !== "Enter") {
+        return;
+      }
+
+      event.preventDefault();
+      window.clearTimeout(deliveryValidationTimer);
+
+      if (!hasCompleteDeliveryAddress()) {
+        clearDeliveryValidation();
+        return;
+      }
+
+      const currentAddress = getFullAddress();
+      if (validatedDelivery && validatedDelivery.originalAddress === currentAddress) {
+        return;
+      }
+
+      validateDeliveryAddress();
+    };
+
+    addressField.addEventListener("input", handleDeliveryFieldInput);
+    postalCityField?.addEventListener("input", handleDeliveryFieldInput);
+
+    addressField.addEventListener("blur", handleDeliveryFieldBlur);
+    postalCityField?.addEventListener("blur", handleDeliveryFieldBlur);
+
+    addressField.addEventListener("keydown", handleDeliveryFieldEnter);
+    postalCityField?.addEventListener("keydown", handleDeliveryFieldEnter);
+
+    itemSearchInput?.addEventListener("input", applyItemFilter);
+
+    form.addEventListener("submit", async (event) => {
+      setFormError("");
+
+      const state = getState();
+      if (!state.itemCount) {
+        event.preventDefault();
+        setFormError("Select at least one item before placing the booking.");
+        return;
+      }
+
+      if (includeDelivery.checked) {
+        if (!hasCompleteDeliveryAddress()) {
+          event.preventDefault();
+          setFormError("Enter both address and postal city before placing the booking.");
+          return;
+        }
+
+        const currentAddress = getFullAddress();
+        if (!validatedDelivery || validatedDelivery.originalAddress !== currentAddress) {
+          event.preventDefault();
+          const valid = await validateDeliveryAddress();
+          if (!valid) {
+            setFormError("Check the highlighted address before placing the booking.");
+          }
+        }
+      }
+    });
+
+    if (deliveryPanel) {
+      deliveryPanel.classList.toggle("hidden", !includeDelivery.checked);
+    }
+
+    syncSetupMode();
+    applyItemFilter();
+    renderSummary();
+  })();
+</script>
+{% endif %}
+{% endblock %}

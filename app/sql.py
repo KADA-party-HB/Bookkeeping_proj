@@ -13,32 +13,32 @@ WHERE email = %s;
 
 # Customers
 SQL_GET_CUSTOMER_BY_EMAIL = """
-SELECT id, full_name, email, phone, address, user_id, created_at
+SELECT id, full_name, email, phone, address, postal_city, user_id, created_at
 FROM customers
 WHERE lower(email) = lower(%s)
 LIMIT 1;
 """
 
 SQL_CREATE_CUSTOMER = """
-INSERT INTO customers (full_name, email, phone, address, user_id)
-VALUES (%s, %s, %s, %s, %s)
+INSERT INTO customers (full_name, email, phone, address, postal_city, user_id)
+VALUES (%s, %s, %s, %s, %s, %s)
 RETURNING id;
 """
 
 SQL_LIST_CUSTOMERS = """
-SELECT id, full_name, email, phone, address, created_at, user_id
+SELECT id, full_name, email, phone, address, postal_city, created_at, user_id
 FROM customers
 ORDER BY created_at DESC;
 """
 
 SQL_GET_CUSTOMER = """
-SELECT id, full_name, email, phone, address, user_id, created_at
+SELECT id, full_name, email, phone, address, postal_city, user_id, created_at
 FROM customers
 WHERE id = %s;
 """
 
 SQL_GET_CUSTOMER_BY_FULL_NAME = """
-SELECT id, full_name, email, phone, address, user_id, created_at
+SELECT id, full_name, email, phone, address, postal_city, user_id, created_at
 FROM customers
 WHERE lower(full_name) = lower(%s)
 ORDER BY id
@@ -46,7 +46,7 @@ LIMIT 1;
 """
 
 SQL_GET_CUSTOMER_BY_USER_ID = """
-SELECT id, full_name, email, phone, address, created_at, user_id
+SELECT id, full_name, email, phone, address, postal_city, created_at, user_id
 FROM customers
 WHERE user_id = %s;
 """
@@ -249,7 +249,7 @@ LIMIT 1;
 
 SQL_CREATE_BOOKING_WITH_ALLOCATIONS = """
 SELECT create_booking_with_allocations(
-  %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+  %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
 ) AS booking_id;
 """
 
@@ -536,13 +536,17 @@ INSERT INTO bookings (
   status,
   include_delivery,
   delivery_fee,
+  address,
+  postal_city,
+  delivery_address,
+  delivery_distance_km,
   include_setup_service,
   custom_total_price,
   custom_price_note,
   booking_note,
   admin_note
 )
-VALUES (%s, %s, %s, 'pending', %s, %s, %s, %s, %s, %s, %s)
+VALUES (%s, %s, %s, 'pending', %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
 RETURNING id;
 """
 
@@ -553,11 +557,15 @@ SELECT
   c.full_name,
   c.email,
   c.phone,
+  b.address,
+  b.postal_city,
   b.start_date,
   b.end_date,
   b.status,
   b.include_delivery,
   b.delivery_fee,
+  b.delivery_address,
+  b.delivery_distance_km,
   b.include_setup_service,
   b.custom_total_price,
   b.custom_price_note,
@@ -576,11 +584,15 @@ SELECT
   c.full_name,
   c.email,
   c.phone,
+  b.address,
+  b.postal_city,
   b.start_date,
   b.end_date,
   b.status,
   b.include_delivery,
   b.delivery_fee,
+  b.delivery_address,
+  b.delivery_distance_km,
   b.include_setup_service,
   b.custom_total_price,
   b.custom_price_note,
@@ -755,6 +767,10 @@ SELECT
   status,
   include_delivery,
   delivery_fee,
+  address,
+  postal_city,
+  delivery_address,
+  delivery_distance_km,
   include_setup_service,
   custom_total_price,
   custom_price_note,
@@ -985,7 +1001,7 @@ WHERE id = %s;
 """
 
 SQL_GET_CUSTOMER_FOR_EDIT = """
-SELECT id, full_name, email, phone, address, user_id, created_at
+SELECT id, full_name, email, phone, address, postal_city, user_id, created_at
 FROM customers
 WHERE id = %s;
 """
@@ -996,7 +1012,8 @@ SET
     full_name = %s,
     email = %s,
     phone = %s,
-    address = %s
+    address = %s,
+    postal_city = %s
 WHERE id = %s
 RETURNING id;
 """

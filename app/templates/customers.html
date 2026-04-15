@@ -43,7 +43,13 @@
             <div class="mt-3 grid gap-2 text-sm text-slate-600">
               <div>{{ c.email or "No email" }}</div>
               <div>{{ c.phone or "No phone" }}</div>
-              <div>{{ c.address or "No address" }}</div>
+              <div>
+                {% if c.address or c.postal_city %}
+                  {{ c.address or "" }}{% if c.address and c.postal_city %}, {% endif %}{{ c.postal_city or "" }}
+                {% else %}
+                  No address
+                {% endif %}
+              </div>
             </div>
           </a>
         {% endfor %}
@@ -73,7 +79,13 @@
                   </td>
                   <td class="p-3 text-slate-700">{{ c.email or "No email" }}</td>
                   <td class="p-3 text-slate-700">{{ c.phone or "No phone" }}</td>
-                  <td class="p-3 text-slate-700">{{ c.address or "No address" }}</td>
+                  <td class="p-3 text-slate-700">
+                    {% if c.address or c.postal_city %}
+                      {{ c.address or "" }}{% if c.address and c.postal_city %}, {% endif %}{{ c.postal_city or "" }}
+                    {% else %}
+                      No address
+                    {% endif %}
+                  </td>
                   <td class="p-3 text-xs text-slate-500">{{ c.created_at }}</td>
                 </tr>
               {% endfor %}
@@ -86,6 +98,10 @@
         <i>No customers yet.</i>
       </div>
     {% endif %}
+
+    {% with page_obj=customers_page %}
+      {% include "_pagination.html" %}
+    {% endwith %}
   </div>
 </section>
 {% endblock %}

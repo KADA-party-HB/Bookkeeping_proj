@@ -2,32 +2,43 @@
 {% block content %}
 <section class="mx-auto max-w-5xl">
   <div class="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
-    <div class="relative overflow-hidden rounded-[2rem] border border-sky-100 bg-gradient-to-br from-white via-sky-50 to-amber-50 shadow-sm">
-      <div class="absolute inset-y-0 right-0 hidden w-1/3 bg-[radial-gradient(circle_at_top,rgba(14,165,233,0.16),transparent_58%)] lg:block"></div>
+    <div class="relative overflow-hidden rounded-[2rem] border border-emerald-200 bg-[linear-gradient(135deg,#ecfdf3_0%,#f6fff8_38%,#ffffff_100%)] shadow-[0_28px_70px_-42px_rgba(34,197,94,0.22)]">
+      <div class="absolute -left-10 top-0 h-36 w-36 rounded-full bg-emerald-300/35 blur-3xl"></div>
+      <div class="absolute right-6 top-6 h-28 w-28 rounded-full bg-emerald-200/30 blur-3xl"></div>
       <div class="relative px-6 py-8 md:px-8">
-        <div class="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-white/80 px-3 py-1 text-xs font-medium uppercase tracking-[0.2em] text-sky-700">
+        <div class="inline-flex items-center gap-2 rounded-full border border-pink-200 bg-white/90 px-3 py-1 text-xs font-medium uppercase tracking-[0.2em] text-rose-500">
           Welcome back
         </div>
-        <h1 class="mt-4 text-3xl font-semibold tracking-tight text-slate-900 md:text-4xl">Log in</h1>
-        <p class="mt-2 max-w-xl text-sm leading-6 text-slate-600">
-          Access bookings, customers, inventory, and pricing tools from the same workspace.
+        <h1 class="mt-5 text-3xl font-black tracking-tight text-slate-950 md:text-5xl">Log in</h1>
+        <p class="mt-3 max-w-xl text-sm leading-6 text-slate-700 md:text-base">
+          Access your bookings, keep delivery details in one place, and place new rental requests in the same flow.
         </p>
+        <div class="mt-5 grid gap-3 sm:grid-cols-2">
+          <div class="rounded-2xl border border-emerald-100 bg-white/85 p-4">
+            <div class="text-xs font-medium uppercase tracking-[0.18em] text-emerald-600">Bookings</div>
+            <div class="mt-2 text-sm font-semibold text-slate-900">See your pending and confirmed reservations in one view.</div>
+          </div>
+          <div class="rounded-2xl border border-pink-100 bg-white/85 p-4">
+            <div class="text-xs font-medium uppercase tracking-[0.18em] text-rose-400">Delivery</div>
+            <div class="mt-2 text-sm font-semibold text-slate-900">Reuse your saved contact and address details faster.</div>
+          </div>
+        </div>
       </div>
     </div>
 
-    <div class="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm md:p-8">
+    <div class="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_24px_60px_-42px_rgba(15,23,42,0.16)] md:p-8">
       <form method="post" class="space-y-4">
         <div>
           <label class="text-sm font-medium text-slate-700" for="email">Email</label>
-          <input id="email" name="email" type="email" required class="mt-1 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 shadow-sm transition focus:border-sky-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-sky-100">
+          <input id="email" name="email" type="email" required class="mt-1 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 shadow-sm transition focus:border-pink-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-pink-100">
         </div>
 
         <div>
           <label class="text-sm font-medium text-slate-700" for="password">Password</label>
-          <input id="password" name="password" type="password" required class="mt-1 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 shadow-sm transition focus:border-sky-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-sky-100">
+          <input id="password" name="password" type="password" required class="mt-1 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 shadow-sm transition focus:border-pink-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-pink-100">
         </div>
 
-        <button class="inline-flex w-full items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white transition hover:bg-sky-700">
+        <button class="inline-flex w-full items-center justify-center rounded-2xl bg-pink-500 px-4 py-3 text-sm font-medium text-white transition hover:bg-rose-600">
           Log in
         </button>
       </form>
