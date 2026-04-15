@@ -249,7 +249,7 @@ LIMIT 1;
 
 SQL_CREATE_BOOKING_WITH_ALLOCATIONS = """
 SELECT create_booking_with_allocations(
-  %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+  %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
 ) AS booking_id;
 """
 
@@ -536,8 +536,6 @@ INSERT INTO bookings (
   status,
   include_delivery,
   delivery_fee,
-  address,
-  postal_city,
   delivery_address,
   delivery_distance_km,
   include_setup_service,
@@ -546,7 +544,7 @@ INSERT INTO bookings (
   booking_note,
   admin_note
 )
-VALUES (%s, %s, %s, 'pending', %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+VALUES (%s, %s, %s, 'pending', %s, %s, %s, %s, %s, %s, %s, %s, %s)
 RETURNING id;
 """
 
@@ -557,8 +555,8 @@ SELECT
   c.full_name,
   c.email,
   c.phone,
-  b.address,
-  b.postal_city,
+  c.address,
+  c.postal_city,
   b.start_date,
   b.end_date,
   b.status,
@@ -584,8 +582,8 @@ SELECT
   c.full_name,
   c.email,
   c.phone,
-  b.address,
-  b.postal_city,
+  c.address,
+  c.postal_city,
   b.start_date,
   b.end_date,
   b.status,
@@ -761,25 +759,26 @@ GROUP BY
 
 SQL_LIST_BOOKINGS_FOR_CUSTOMER = """
 SELECT
-  id,
-  start_date,
-  end_date,
-  status,
-  include_delivery,
-  delivery_fee,
-  address,
-  postal_city,
-  delivery_address,
-  delivery_distance_km,
-  include_setup_service,
-  custom_total_price,
-  custom_price_note,
-  booking_note,
+  b.id,
+  b.start_date,
+  b.end_date,
+  b.status,
+  b.include_delivery,
+  b.delivery_fee,
+  c.address,
+  c.postal_city,
+  b.delivery_address,
+  b.delivery_distance_km,
+  b.include_setup_service,
+  b.custom_total_price,
+  b.custom_price_note,
+  b.booking_note,
   NULL::TEXT AS admin_note,
-  created_at
-FROM bookings
-WHERE customer_id = %s
-ORDER BY created_at DESC;
+  b.created_at
+FROM bookings b
+JOIN customers c ON c.id = b.customer_id
+WHERE b.customer_id = %s
+ORDER BY b.created_at DESC;
 """
 
 SQL_LIST_ALL_BOOKINGS = """
@@ -852,7 +851,8 @@ SELECT
   b.created_at,
   c.id AS customer_id,
   c.full_name,
-  c.email
+  c.email,
+  c.postal_city
 FROM bookings b
 JOIN customers c ON c.id = b.customer_id
 ORDER BY b.created_at DESC;

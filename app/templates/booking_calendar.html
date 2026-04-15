@@ -276,6 +276,7 @@
         "status": {{ b.status|tojson }},
         "customer": {{ (b.full_name or "")|tojson }},
         "email": {{ (b.email or "")|tojson }},
+        "postal_city": {{ (b.postal_city or "")|tojson }},
         "total_cost": {{ b.total_cost|tojson }},
         "booking_start_date": {{ (b.start_date|string)|tojson }},
         "booking_end_date": {{ (b.end_date|string)|tojson }},
@@ -643,7 +644,8 @@
         const tentSuffix = props.tent_summary
           ? (props.tent_summary === "2+" ? " - (1+ tents)" : ` - ${props.tent_summary}`)
           : "";
-        name.textContent = `${props.customer || "Unknown customer"}${suffix}${tentSuffix}`;
+        const postalCitySuffix = props.postal_city ? ` - ${props.postal_city}` : "";
+        name.textContent = `${props.customer || "Unknown customer"}${suffix}${tentSuffix}${postalCitySuffix}`;
         textWrap.appendChild(name);
 
         chip.appendChild(textWrap);

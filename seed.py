@@ -287,6 +287,8 @@ def ensure_sample_booking(
               %s,
               %s,
               %s,
+              %s,
+              %s,
               %s::numeric(10,2)[],
               %s::text[]
             );
@@ -303,6 +305,8 @@ def ensure_sample_booking(
                 None,
                 None,
                 booking_note,
+                None,
+                None,
                 None,
                 None,
             ),

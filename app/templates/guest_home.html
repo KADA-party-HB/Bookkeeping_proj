@@ -23,7 +23,7 @@
           Sök bland våra artiklar och boka direkt.
           </h1>
           <p class="mt-3 max-w-2xl text-sm leading-6 text-slate-700 md:text-base">
-            Den här vyn visar alla artiklar med standardpris och strikt tillgänglighet. Tält kan hyras ut från 3 till 7 dagar, om ni behöver mer kontakta oss på: 
+            Den här vyn visar alla artiklar med standardpris och tillgänglighet. Tält kan hyras ut från 3 till 7 dagar, om ni behöver hyra längre kontakta oss på: 
             <a
               href="mailto:kadaparty@kadaparty.se"
               class="font-bold underline underline-offset-4 text-rose-600"
@@ -369,6 +369,7 @@
             <span class="text-sm text-slate-700">
               <span class="block font-medium text-slate-900">Inkludera leverans</span>
               <span class="mt-1 block">Vi validerar adressen och räknar ut avgiften utifrån körsträckan.</span>
+              <span class="mt-1 block text-xs text-slate-500">Adressvalidering och ruttberäkning använder Geoapify eftersom vi använder deras kostnadsfria version.</span>
             </span>
           </label>
 
@@ -509,11 +510,11 @@
           </div>
           <div class="flex items-center justify-between gap-4">
             <span class="text-slate-500">Montering</span>
-            <span id="summary-setup" class="font-semibold text-slate-950">Ingår inte</span>
+            <span id="summary-setup" class="font-semibold text-slate-950">Inte tillvalt</span>
           </div>
           <div class="flex items-center justify-between gap-4">
             <span class="text-slate-500">Leverans</span>
-            <span id="summary-delivery" class="font-semibold text-slate-950">Ingår inte</span>
+            <span id="summary-delivery" class="font-semibold text-slate-950">Inte tillvalt</span>
           </div>
           <div class="border-t border-pink-100 pt-3">
             <div class="flex items-center justify-between gap-4 text-base font-semibold">
@@ -524,7 +525,7 @@
           <p id="form-error" class="hidden rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700"></p>
           <button
             type="submit"
-            class="inline-flex w-full items-center justify-center rounded-2xl bg-pink-500 px-4 py-3 text-sm font-medium text-white transition hover:bg-rose-600 focus:outline-none focus:ring-4 focus:ring-pink-100"
+            class="inline-flex w-full items-center justify-center rounded-2xl bg-pink-500 px-4 py-3 text-sm font-medium text-white transition hover:bg-rose-600 focus:outline-none focus:ring-4 focus:ring-pink-100 disabled:cursor-not-allowed disabled:bg-pink-300 disabled:hover:bg-pink-300"
           >
             {% if role == "customer" and customer_profile %}Skicka bokning{% else %}Skicka bokning och skapa konto{% endif %}
           </button>
@@ -551,6 +552,7 @@
     const deliveryPanel = document.getElementById("delivery-panel");
     const deliveryError = document.getElementById("delivery-address-error");
     const formError = document.getElementById("form-error");
+    const submitButton = form.querySelector('button[type="submit"]');
     const summaryItems = document.getElementById("summary-items");
     const summaryRental = document.getElementById("summary-rental");
     const summarySetup = document.getElementById("summary-setup");
@@ -570,6 +572,8 @@
     let deliveryValidationTimer = null;
     let activeValidationPromise = null;
     let activeValidationAddress = null;
+    let submitPendingAfterValidation = false;
+    const defaultSubmitLabel = submitButton?.textContent.trim() || "";
 
     const parseNumber = (value) => {
       const parsed = Number(String(value || "0").replace(",", "."));
@@ -638,6 +642,18 @@
     const setFormError = (message) => {
       formError.textContent = message || "";
       formError.classList.toggle("hidden", !message);
+    };
+
+    const syncSubmitButtonState = () => {
+      if (!submitButton) {
+        return;
+      }
+
+      submitButton.disabled = validationInFlight;
+      submitButton.setAttribute("aria-busy", validationInFlight ? "true" : "false");
+      submitButton.textContent = submitPendingAfterValidation && validationInFlight
+        ? "Validerar adress..."
+        : defaultSubmitLabel;
     };
 
     const clearAddressState = () => {
@@ -753,10 +769,10 @@
       const state = getState();
       summaryItems.textContent = `${state.itemCount} valda`;
       summaryRental.textContent = formatMoney(state.rental);
-      summarySetup.textContent = includeSetup.checked ? formatMoney(state.setup) : "Ingår inte";
+      summarySetup.textContent = includeSetup.checked ? formatMoney(state.setup) : "Inte tillvalt";
 
       if (!includeDelivery.checked) {
-        summaryDelivery.textContent = "Ingår inte";
+        summaryDelivery.textContent = "Inte tillvalt";
       } else if (validatedDelivery) {
         summaryDelivery.textContent = `${formatMoney(validatedDelivery.deliveryFee)} (${validatedDelivery.distanceKm.toFixed(2)} km)`;
       } else if (validationInFlight) {
@@ -793,6 +809,7 @@
       validationInFlight = true;
       activeValidationAddress = fullAddress;
       showAddressLoading();
+      syncSubmitButtonState();
 
       if (deliveryError) {
         deliveryError.classList.add("hidden");
@@ -826,6 +843,7 @@
           validationInFlight = false;
           activeValidationPromise = null;
           activeValidationAddress = null;
+          syncSubmitButtonState();
           renderSummary();
         }
       })();
@@ -1023,10 +1041,17 @@
         const currentAddress = getFullAddress();
         if (!validatedDelivery || validatedDelivery.originalAddress !== currentAddress) {
           event.preventDefault();
+          submitPendingAfterValidation = true;
+          syncSubmitButtonState();
           const valid = await validateDeliveryAddress();
+          submitPendingAfterValidation = false;
+          syncSubmitButtonState();
           if (!valid) {
             setFormError("Kontrollera den markerade adressen innan du skickar bokningen.");
+            return;
           }
+
+          form.requestSubmit();
         }
       }
     });
@@ -1037,6 +1062,7 @@
 
     syncSetupMode();
     applyItemFilter();
+    syncSubmitButtonState();
     renderSummary();
   })();
 </script>
