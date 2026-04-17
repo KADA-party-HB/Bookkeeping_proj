@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% import "_components.html" as ui %}
 {% block content %}
 {% if role == "admin" %}
 <section class="relative overflow-hidden rounded-[2rem] border border-sky-100 bg-gradient-to-br from-white via-sky-50 to-slate-50 shadow-sm">
@@ -49,13 +50,7 @@
                 <div class="text-sm font-semibold text-sky-700">Booking #{{ b.id }}</div>
                 <div class="mt-1 text-sm text-slate-600">{{ b.start_date }} - {{ b.end_date }}</div>
               </div>
-              {% if b.status == 'confirmed' %}
-                <span class="inline-flex rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-800">Confirmed</span>
-              {% elif b.status == 'pending' %}
-                <span class="inline-flex rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-800">Pending</span>
-              {% else %}
-                <span class="inline-flex rounded-full bg-rose-100 px-2.5 py-1 text-xs font-medium text-rose-800">Cancelled</span>
-              {% endif %}
+              {{ ui.booking_status_badge(b.status) }}
             </div>
             <div class="mt-3 flex flex-wrap gap-2 text-xs">
               {% if b.include_setup_service %}<span class="inline-flex rounded-full bg-sky-100 px-3 py-1 font-medium text-sky-800">Setup</span>{% endif %}
@@ -94,13 +89,7 @@
                   </td>
                   <td class="p-3" data-sort-value="{{ b.status }}">
                     <a class="block w-full h-full" href="{{ url_for('routes.booking_detail', booking_id=b.id) }}">
-                      {% if b.status == 'confirmed' %}
-                        <span class="inline-flex rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-800">Confirmed</span>
-                      {% elif b.status == 'pending' %}
-                        <span class="inline-flex rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-800">Pending</span>
-                      {% else %}
-                        <span class="inline-flex rounded-full bg-rose-100 px-2.5 py-1 text-xs font-medium text-rose-800">Cancelled</span>
-                      {% endif %}
+                      {{ ui.booking_status_badge(b.status) }}
                     </a>
                   </td>
                   <td class="p-3 text-xs text-slate-600">
@@ -123,7 +112,7 @@
         </div>
       </div>
     {% else %}
-      <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-600"><i>No bookings yet.</i></div>
+      {{ ui.empty_state("No bookings yet.") }}
     {% endif %}
 
     {% with page_obj=bookings_page %}
@@ -201,13 +190,7 @@
                 <div class="text-sm font-bold text-rose-600">Bokning #{{ b.id }}</div>
                 <div class="mt-1 text-sm text-slate-600">{{ b.start_date }} - {{ b.end_date }}</div>
               </div>
-              {% if b.status == 'confirmed' %}
-                <span class="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">Bekräftad</span>
-              {% elif b.status == 'pending' %}
-                <span class="inline-flex rounded-full border border-pink-200 bg-pink-50 px-2.5 py-1 text-xs font-medium text-rose-500">Väntande</span>
-              {% else %}
-                <span class="inline-flex rounded-full border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-medium text-rose-700">Avbokad</span>
-              {% endif %}
+              {{ ui.booking_status_badge(b.status, variant='customer', confirmed_label='Bekräftad', pending_label='Väntande', cancelled_label='Avbokad') }}
             </div>
             <div class="mt-3 flex flex-wrap gap-2 text-xs">
               {% if b.include_setup_service %}<span class="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 font-medium text-emerald-700">Montering</span>{% endif %}
@@ -246,13 +229,7 @@
                   </td>
                   <td class="p-3" data-sort-value="{{ b.status }}">
                     <a class="block w-full h-full" href="{{ url_for('routes.booking_detail', booking_id=b.id) }}">
-                      {% if b.status == 'confirmed' %}
-                        <span class="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">Bekräftad</span>
-                      {% elif b.status == 'pending' %}
-                        <span class="inline-flex rounded-full border border-pink-200 bg-pink-50 px-2.5 py-1 text-xs font-medium text-rose-500">Väntande</span>
-                      {% else %}
-                        <span class="inline-flex rounded-full border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-medium text-rose-700">Avbokad</span>
-                      {% endif %}
+                      {{ ui.booking_status_badge(b.status, variant='customer', confirmed_label='Bekräftad', pending_label='Väntande', cancelled_label='Avbokad') }}
                     </a>
                   </td>
                   <td class="p-3 text-xs text-slate-600">
@@ -275,7 +252,7 @@
         </div>
       </div>
     {% else %}
-      <div class="rounded-2xl border border-emerald-100 bg-emerald-50/40 px-4 py-4 text-sm text-slate-600"><i>Inga bokningar ännu.</i></div>
+      {{ ui.empty_state("Inga bokningar ännu.", theme='customer') }}
     {% endif %}
 
     {% with page_obj=bookings_page %}

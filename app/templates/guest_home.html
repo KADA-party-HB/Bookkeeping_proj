@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% import "_components.html" as ui %}
 {% block extra_head %}
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/airbnb.css">
@@ -189,12 +190,7 @@
                   <div>
                     <div class="font-semibold text-slate-900">{{ c.display_name }}</div>
                     <div class="mt-1 flex flex-wrap gap-2">
-                      {% if c.is_tent %}
-                        <span class="inline-flex rounded-full border border-pink-200 bg-pink-50 px-2.5 py-1 text-xs font-medium text-rose-600">Tält</span>
-                      {% endif %}
-                      {% if c.is_furnishing %}
-                        <span class="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">Inredning</span>
-                      {% endif %}
+                      {{ ui.inventory_type_badges(c.is_tent, c.is_furnishing, variant='customer', tent_label='Tält', furnishing_label='Inredning') }}
                     </div>
                   </div>
                   <span class="inline-flex rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700">
@@ -281,11 +277,7 @@
                         <div class="mt-1 text-xs text-slate-500">Kategori #{{ c.id }}</div>
                       </td>
                       <td class="p-3">
-                        {% if c.is_tent %}
-                          <span class="inline-flex rounded-full border border-pink-200 bg-pink-50 px-2.5 py-1 text-xs font-medium text-rose-600">Tält</span>
-                        {% elif c.is_furnishing %}
-                          <span class="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">Inredning</span>
-                        {% endif %}
+                        {{ ui.inventory_type_badges(c.is_tent, c.is_furnishing, variant='customer', tent_label='Tält', furnishing_label='Inredning') }}
                       </td>
                       <td class="p-3">
                         {% if c.has_standard_price %}

@@ -1,39 +1,23 @@
 {% extends "base.html" %}
+{% import "_components.html" as ui %}
 {% block content %}
-<section class="relative overflow-hidden rounded-[2rem] border border-sky-100 bg-gradient-to-br from-white via-sky-50 to-slate-50 shadow-sm">
-  <div class="absolute inset-y-0 right-0 hidden w-1/3 bg-[radial-gradient(circle_at_top,rgba(14,165,233,0.16),transparent_58%)] lg:block"></div>
-  <div class="relative px-6 py-8 md:px-8">
-    <div class="flex flex-wrap items-start justify-between gap-4">
-      <div>
-        <div class="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-white/80 px-3 py-1 text-xs font-medium uppercase tracking-[0.2em] text-sky-700">
-          Booking Editor
-        </div>
-        <h1 class="mt-4 text-3xl font-semibold tracking-tight text-slate-900 md:text-4xl">
-          Edit booking #{{ booking.id }}
-        </h1>
-        <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-          Update the booking header, service options, notes, and pricing controls. If the dates move, assigned items can be swapped to other free units in the same category, including admin-only same-day turnaround items when the previous booking ends on the new start date.
-        </p>
-      </div>
-
-      <a
-        class="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white transition hover:bg-sky-700 focus:outline-none focus:ring-4 focus:ring-sky-100"
-        href="{{ url_for('routes.booking_detail', booking_id=booking.id) }}"
-      >
-        Back to booking
-      </a>
-    </div>
-  </div>
-</section>
+{% set hero_actions %}
+  <a
+    class="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white transition hover:bg-sky-700 focus:outline-none focus:ring-4 focus:ring-sky-100"
+    href="{{ url_for('routes.booking_detail', booking_id=booking.id) }}"
+  >
+    Back to booking
+  </a>
+{% endset %}
+{{ ui.admin_page_hero(
+  "Booking Editor",
+  "Edit booking #" ~ booking.id,
+  "Update the booking header, service options, notes, and pricing controls. If the dates move, assigned items can be swapped to other free units in the same category, including admin-only same-day turnaround items when the previous booking ends on the new start date.",
+  actions=hero_actions
+) }}
 
 <form method="post" action="{{ url_for('routes.admin_booking_edit_save', booking_id=booking.id) }}" class="mt-6 grid gap-6 xl:grid-cols-[1.15fr_0.85fr]" data-date-range>
-  <section class="rounded-[2rem] border border-slate-200 bg-white shadow-sm">
-    <div class="border-b border-slate-200 px-6 py-5 md:px-8">
-      <h2 class="text-2xl font-semibold text-slate-900">Booking settings</h2>
-      <p class="mt-1 text-sm text-slate-500">Core details for the booking record.</p>
-    </div>
-
-    <div class="grid gap-6 px-6 py-6 md:px-8">
+  {% call ui.content_panel(title="Booking settings", subtitle="Core details for the booking record.", wrapper_class='mt-0', body_class='grid gap-6 px-6 py-6 md:px-8') %}
       <div class="grid gap-4 md:grid-cols-2">
         <div>
           <label class="text-sm font-medium text-slate-700" for="customer_id">Customer</label>
@@ -192,28 +176,11 @@
         </div>
       </div>
 
-      <div class="flex flex-wrap items-center gap-3">
-        <button class="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-5 py-3 text-sm font-medium text-white transition hover:bg-sky-700 focus:outline-none focus:ring-4 focus:ring-sky-100">
-          Save booking
-        </button>
-        <a
-          class="inline-flex items-center justify-center rounded-2xl border border-slate-300 px-5 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-          href="{{ url_for('routes.booking_detail', booking_id=booking.id) }}"
-        >
-          Cancel
-        </a>
-      </div>
-    </div>
-  </section>
+      {{ ui.form_actions("Save booking", url_for('routes.booking_detail', booking_id=booking.id)) }}
+  {% endcall %}
 
   <aside class="space-y-6">
-    <section class="rounded-[2rem] border border-slate-200 bg-white shadow-sm">
-      <div class="border-b border-slate-200 px-6 py-5">
-        <h2 class="text-xl font-semibold text-slate-900">Assigned items</h2>
-        <p class="mt-1 text-sm text-slate-500">Saving date changes may reassign these to other available items in the same category. Admin warnings will call out any same-day turnaround items that are used.</p>
-      </div>
-
-      <div class="px-6 py-6">
+    {% call ui.content_panel(title="Assigned items", subtitle="Saving date changes may reassign these to other available items in the same category. Admin warnings will call out any same-day turnaround items that are used.", wrapper_class='mt-0') %}
         <div class="space-y-3">
           {% for item in items %}
             <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
@@ -221,20 +188,12 @@
               <div class="mt-1 text-xs text-slate-500">{{ item.sku }}</div>
             </div>
           {% else %}
-            <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-600">
-              No items on this booking.
-            </div>
+            {{ ui.empty_state("No items on this booking.", class_name='not-italic') }}
           {% endfor %}
         </div>
-      </div>
-    </section>
+    {% endcall %}
 
-    <section class="rounded-[2rem] border border-slate-200 bg-white shadow-sm">
-      <div class="border-b border-slate-200 px-6 py-5">
-        <h2 class="text-xl font-semibold text-slate-900">Current total</h2>
-      </div>
-
-      <div class="px-6 py-6 text-sm text-slate-700 space-y-2">
+    {% call ui.content_panel(title="Current total", wrapper_class='mt-0', body_class='px-6 py-6 text-sm text-slate-700 space-y-2') %}
         {% if total %}
           <div><b>Days:</b> {{ total.days }}</div>
           <div><b>Rental cost:</b> {{ total.rental_cost }} kr</div>
@@ -247,8 +206,7 @@
         {% else %}
           <div class="text-slate-500">Could not compute total.</div>
         {% endif %}
-      </div>
-    </section>
+    {% endcall %}
   </aside>
 </form>
 

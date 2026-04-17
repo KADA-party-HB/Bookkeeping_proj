@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% import "_components.html" as ui %}
 {% block content %}
   <style>
     @supports (-moz-appearance: none) {
@@ -167,12 +168,7 @@
                         <div>
                           <div class="font-semibold text-slate-900">{{ c.display_name }}</div>
                           <div class="mt-1 flex flex-wrap gap-2">
-                            {% if c.is_tent %}
-                              <span class="inline-flex rounded-full bg-sky-100 px-2.5 py-1 text-xs font-medium text-sky-800">Tent</span>
-                            {% endif %}
-                            {% if c.is_furnishing %}
-                              <span class="inline-flex rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-800">Furnishing</span>
-                            {% endif %}
+                            {{ ui.inventory_type_badges(c.is_tent, c.is_furnishing) }}
                           </div>
                         </div>
                         {% if bookable_available == 0 %}
@@ -304,16 +300,7 @@
 
                           <td class="p-3">
                             <div class="flex flex-wrap gap-2">
-                              {% if c.is_tent %}
-                                <span class="inline-flex rounded-full bg-sky-100 px-2.5 py-1 text-xs font-medium text-sky-800">
-                                  Tent
-                                </span>
-                              {% endif %}
-                              {% if c.is_furnishing %}
-                                <span class="inline-flex rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-800">
-                                  Furnishing
-                                </span>
-                              {% endif %}
+                              {{ ui.inventory_type_badges(c.is_tent, c.is_furnishing) }}
                             </div>
                           </td>
 

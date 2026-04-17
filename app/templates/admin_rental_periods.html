@@ -1,75 +1,62 @@
 {% extends "base.html" %}
+{% import "_components.html" as ui %}
 {% block content %}
-<section class="relative overflow-hidden rounded-[2rem] border border-sky-100 bg-gradient-to-br from-white via-sky-50 to-slate-50 shadow-sm">
-  <div class="absolute inset-y-0 right-0 hidden w-1/3 bg-[radial-gradient(circle_at_top,rgba(14,165,233,0.16),transparent_58%)] lg:block"></div>
-  <div class="relative px-6 py-8 md:px-8">
-    <div class="flex flex-wrap items-start justify-between gap-4">
-      <div>
-        <div class="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-white/80 px-3 py-1 text-xs font-medium uppercase tracking-[0.2em] text-sky-700">
-          Pricing Rules
-        </div>
-        <h1 class="mt-4 text-3xl font-semibold tracking-tight text-slate-900 md:text-4xl">Rental periods</h1>
-        <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-          Reusable duration ranges that category pricing can attach to across the catalog.
-        </p>
-      </div>
-      <a class="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white transition hover:bg-sky-700" href="{{ url_for('routes.admin_rental_period_new_form') }}">
-        New rental period
-      </a>
-    </div>
-  </div>
-</section>
+{% set hero_actions %}
+  <a class="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white transition hover:bg-sky-700" href="{{ url_for('routes.admin_rental_period_new_form') }}">
+    New rental period
+  </a>
+{% endset %}
+{{ ui.admin_page_hero(
+  "Pricing Rules",
+  "Rental periods",
+  "Reusable duration ranges that category pricing can attach to across the catalog.",
+  actions=hero_actions
+) }}
 
-<section class="mt-6 rounded-[2rem] border border-slate-200 bg-white shadow-sm">
-  <div class="px-6 py-6 md:px-8">
-    {% if rental_periods %}
-      <div class="overflow-hidden rounded-[1.5rem] border border-slate-200">
-        <div class="overflow-x-auto">
-          <table class="min-w-full text-sm">
-            <thead class="bg-slate-900 text-slate-100">
-              <tr>
-                <th class="p-3 text-left font-medium" data-sort-type="number">ID</th>
-                <th class="p-3 text-left font-medium">Label</th>
-                <th class="p-3 text-left font-medium" data-sort-type="number">Min days</th>
-                <th class="p-3 text-left font-medium" data-sort-type="number">Max days</th>
-                <th class="p-3 text-left font-medium">Range</th>
-                <th class="p-3 text-left font-medium" data-sort-type="date">Created</th>
-                <th class="p-3 text-left font-medium">Actions</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-200 bg-white">
-              {% for rp in rental_periods %}
-                <tr class="transition hover:bg-sky-50/60">
-                  <td class="p-3 text-slate-500">{{ rp.id }}</td>
-                  <td class="p-3 font-medium text-slate-900">{{ rp.label }}</td>
-                  <td class="p-3 text-slate-700">{{ rp.min_days }}</td>
-                  <td class="p-3 text-slate-700">{{ rp.max_days }}</td>
-                  <td class="p-3 text-slate-700">
-                    {% if rp.min_days == rp.max_days %}
-                      {{ rp.min_days }} day{% if rp.min_days != 1 %}s{% endif %}
-                    {% else %}
-                      {{ rp.min_days }}-{{ rp.max_days }} days
-                    {% endif %}
-                  </td>
-                  <td class="p-3 text-xs text-slate-500">{{ rp.created_at }}</td>
-                  <td class="p-3">
-                    <a class="rounded-full border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50" href="{{ url_for('routes.admin_rental_period_edit_form', rental_period_id=rp.id) }}">
-                      Edit
-                    </a>
-                  </td>
-                </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    {% else %}
-      <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-600"><i>No rental periods yet.</i></div>
-    {% endif %}
+{% call ui.content_panel() %}
+  {% if rental_periods %}
+    {% call ui.table_shell(wrapper_class='overflow-hidden rounded-[1.5rem] border border-slate-200') %}
+      <thead class="bg-slate-900 text-slate-100">
+        <tr>
+          <th class="p-3 text-left font-medium" data-sort-type="number">ID</th>
+          <th class="p-3 text-left font-medium">Label</th>
+          <th class="p-3 text-left font-medium" data-sort-type="number">Min days</th>
+          <th class="p-3 text-left font-medium" data-sort-type="number">Max days</th>
+          <th class="p-3 text-left font-medium">Range</th>
+          <th class="p-3 text-left font-medium" data-sort-type="date">Created</th>
+          <th class="p-3 text-left font-medium">Actions</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-200 bg-white">
+        {% for rp in rental_periods %}
+          <tr class="transition hover:bg-sky-50/60">
+            <td class="p-3 text-slate-500">{{ rp.id }}</td>
+            <td class="p-3 font-medium text-slate-900">{{ rp.label }}</td>
+            <td class="p-3 text-slate-700">{{ rp.min_days }}</td>
+            <td class="p-3 text-slate-700">{{ rp.max_days }}</td>
+            <td class="p-3 text-slate-700">
+              {% if rp.min_days == rp.max_days %}
+                {{ rp.min_days }} day{% if rp.min_days != 1 %}s{% endif %}
+              {% else %}
+                {{ rp.min_days }}-{{ rp.max_days }} days
+              {% endif %}
+            </td>
+            <td class="p-3 text-xs text-slate-500">{{ rp.created_at }}</td>
+            <td class="p-3">
+              <a class="rounded-full border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50" href="{{ url_for('routes.admin_rental_period_edit_form', rental_period_id=rp.id) }}">
+                Edit
+              </a>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    {% endcall %}
+  {% else %}
+    {{ ui.empty_state("No rental periods yet.") }}
+  {% endif %}
 
-    {% with page_obj=rental_periods_page %}
-      {% include "_pagination.html" %}
-    {% endwith %}
-  </div>
-</section>
+  {% with page_obj=rental_periods_page %}
+    {% include "_pagination.html" %}
+  {% endwith %}
+{% endcall %}
 {% endblock %}
