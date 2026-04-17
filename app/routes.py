@@ -633,6 +633,36 @@ def _load_customer_profile_for_user(user_id: int):
         return None
     return query(SQL_GET_CUSTOMER_BY_USER_ID, (user_id,), one=True)
 
+
+def _parse_iso_date_or_none(value: str):
+    value = (value or "").strip()
+    if not value:
+        return None
+
+    try:
+        return date.fromisoformat(value)
+    except ValueError:
+        return None
+
+
+def _normalize_public_date_range(start_value: str, end_value: str):
+    today = date.today()
+    start_date = _parse_iso_date_or_none(start_value)
+    end_date = _parse_iso_date_or_none(end_value)
+
+    if start_date and start_date < today:
+        start_date = today
+
+    minimum_end_date = start_date or today
+    if end_date and end_date < minimum_end_date:
+        end_date = minimum_end_date
+
+    return (
+        start_date.isoformat() if start_date else "",
+        end_date.isoformat() if end_date else "",
+    )
+
+
 def _collect_selected_quantities_from_form():
     """
     Reads duplicate qty_<category_id> fields safely.
@@ -684,6 +714,9 @@ def home():
     uid, role = current_user()
     start = request.args.get("start_date", "")
     end = request.args.get("end_date", "")
+
+    if role != "admin":
+        start, end = _normalize_public_date_range(start, end)
 
     categories = None
     customers = None
@@ -791,12 +824,27 @@ def guest_booking_create():
 
     start = request.form.get("start_date", "").strip()
     end = request.form.get("end_date", "").strip()
+    normalized_start, normalized_end = _normalize_public_date_range(start, end)
     if not start or not end:
         flash("Välj datum först.", "error")
         return redirect(url_for("routes.home"))
-    if end < start:
+    start_date_obj = _parse_iso_date_or_none(start)
+    end_date_obj = _parse_iso_date_or_none(end)
+    if not start_date_obj or not end_date_obj:
+        flash("Välj giltiga datum först.", "error")
+        return redirect(
+            url_for("routes.home", start_date=normalized_start, end_date=normalized_end)
+        )
+    if start_date_obj < date.today():
+        flash("Startdatum kan inte vara tidigare än idag.", "error")
+        return redirect(
+            url_for("routes.home", start_date=normalized_start, end_date=normalized_end)
+        )
+    if end_date_obj < start_date_obj:
         flash("Slutdatum kan inte vara tidigare än startdatum.", "error")
-        return redirect(url_for("routes.home", start_date=start, end_date=end))
+        return redirect(
+            url_for("routes.home", start_date=normalized_start, end_date=normalized_end)
+        )
 
     customer = _load_customer_profile_for_user(uid) if uid else None
     if uid and not customer:
