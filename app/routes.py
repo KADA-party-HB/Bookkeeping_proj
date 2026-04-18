@@ -791,14 +791,14 @@ def _parse_iso_date_or_none(value: str):
 
 
 def _normalize_public_date_range(start_value: str, end_value: str):
-    today = date.today()
+    minimum_start_date = date.today() + timedelta(days=7)
     start_date = _parse_iso_date_or_none(start_value)
     end_date = _parse_iso_date_or_none(end_value)
 
-    if start_date and start_date < today:
-        start_date = today
+    if start_date and start_date < minimum_start_date:
+        start_date = minimum_start_date
 
-    minimum_end_date = start_date or today
+    minimum_end_date = start_date or minimum_start_date
     if end_date and end_date < minimum_end_date:
         end_date = minimum_end_date
 
@@ -886,6 +886,8 @@ def home():
             customers=customers,
             role=role,
         )
+    
+    min_date = (date.today() + timedelta(days=7)).isoformat()
 
     context = {
         "start_date": start,
@@ -893,6 +895,7 @@ def home():
         "categories": categories,
         "customer_profile": customer_profile,
         "role": role,
+        "min_date": min_date,
     }
 
     if _is_ajax_request():
@@ -985,8 +988,10 @@ def guest_booking_create():
         return redirect(
             url_for("routes.home", start_date=normalized_start, end_date=normalized_end)
         )
-    if start_date_obj < date.today():
-        flash("Startdatum kan inte vara tidigare än idag.", "error")
+    minimum_start_date = date.today() + timedelta(days=7)
+
+    if start_date_obj < minimum_start_date:
+        flash("Startdatum måste vara minst 7 dagar fram i tiden.", "error")
         return redirect(
             url_for("routes.home", start_date=normalized_start, end_date=normalized_end)
         )

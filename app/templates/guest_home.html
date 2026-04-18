@@ -70,7 +70,7 @@
       <div class="flex items-center justify-between gap-3">
         <div>
           <h2 class="text-lg font-bold text-slate-950">Välj datum</h2>
-          <p class="mt-1 text-sm text-slate-600">Välj hyresperiod för att ladda tillgängliga artiklar.</p>
+          <p class="mt-1 text-sm text-slate-600">Välj hyresperiod minst 7 dagar framåt för att ladda tillgängliga artiklar.</p>
         </div>
         <div class="rounded-full bg-pink-500 px-3 py-1 text-xs font-medium text-white shadow-sm whitespace-nowrap">Steg 1</div>
       </div>
@@ -83,7 +83,7 @@
         data-date-range
         data-date-range-calendar="themed"
         data-date-range-locale="sv"
-        data-date-range-min="today"
+        data-date-range-min="{{ min_date }}"
       >
         <div>
           <label class="text-sm font-medium text-slate-700" for="start_date">Från datum</label>

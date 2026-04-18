@@ -88,7 +88,10 @@
 
     const shouldUseThemedCalendar = container.dataset.dateRangeCalendar === "themed" && Boolean(window.flatpickr);
     const localeName = container.dataset.dateRangeLocale || "";
-    const minSelectableDate = container.dataset.dateRangeMin === "today" ? getTodayIsoDate() : "";
+    const rawMinDate = (container.dataset.dateRangeMin || "").trim();
+    const minSelectableDate = rawMinDate === "today"
+      ? getTodayIsoDate()
+      : (isIsoDate(rawMinDate) ? rawMinDate : "");
 
     let startPicker = null;
     let endPicker = null;
