@@ -495,4 +495,106 @@
       </section>
     </div>
   </form>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const form = document.getElementById("guest-booking-form");
+      if (!form) return;
+
+      const qtyInputs = Array.from(form.querySelectorAll("[data-booking-qty]"));
+      const deliveryCheckbox = document.getElementById("include_delivery");
+      const setupCheckbox = document.getElementById("include_setup_service");
+
+      const summaryItems = document.getElementById("summary-items");
+      const summaryRental = document.getElementById("summary-rental");
+      const summarySetup = document.getElementById("summary-setup");
+      const summaryDelivery = document.getElementById("summary-delivery");
+      const summaryTotal = document.getElementById("summary-total");
+
+      function safeNumber(value) {
+        const n = Number(value);
+        return Number.isFinite(n) ? n : 0;
+      }
+
+      function formatKr(value) {
+        return `${value} kr`;
+      }
+
+      function updateTotalColor(total) {
+        summaryTotal.classList.remove("text-rose-600", "text-emerald-600");
+        summaryTotal.classList.add(total > 0 ? "text-emerald-600" : "text-rose-600");
+      }
+
+      function updateSummary() {
+        let selectedItems = 0;
+        let rentalTotal = 0;
+        let setupTotal = 0;
+        let tentQty = 0;
+
+        qtyInputs.forEach((input) => {
+          const qty = safeNumber(input.value);
+          const unitPrice = safeNumber(input.dataset.unitPrice);
+          const setupFee = safeNumber(input.dataset.setupFee);
+          const isTent = input.dataset.isTent === "true";
+
+          if (qty > 0) {
+            selectedItems += qty;
+            rentalTotal += qty * unitPrice;
+
+            if (isTent) {
+              tentQty += qty;
+
+              if (setupCheckbox && setupCheckbox.checked) {
+                setupTotal += qty * setupFee;
+              }
+            }
+          }
+        });
+
+        const total = rentalTotal + setupTotal;
+
+        if (summaryItems) {
+          summaryItems.textContent = `${selectedItems} valda`;
+        }
+
+        if (summaryRental) {
+          summaryRental.textContent = formatKr(rentalTotal);
+        }
+
+        if (summarySetup) {
+          if (setupCheckbox && setupCheckbox.checked) {
+            summarySetup.textContent = tentQty > 0 ? formatKr(setupTotal) : "0 kr";
+          } else {
+            summarySetup.textContent = "Inte tillvalt";
+          }
+        }
+
+        if (summaryDelivery) {
+          summaryDelivery.textContent = deliveryCheckbox && deliveryCheckbox.checked
+            ? "Tillvalt"
+            : "Inte tillvalt";
+        }
+
+        if (summaryTotal) {
+          summaryTotal.textContent = formatKr(total);
+          updateTotalColor(total);
+        }
+      }
+
+      qtyInputs.forEach((input) => {
+        input.addEventListener("input", updateSummary);
+        input.addEventListener("change", updateSummary);
+      });
+
+      if (deliveryCheckbox) {
+        deliveryCheckbox.addEventListener("change", updateSummary);
+      }
+
+      if (setupCheckbox) {
+        setupCheckbox.addEventListener("change", updateSummary);
+      }
+
+      updateSummary();
+    });
+  </script>
 {% endif %}
