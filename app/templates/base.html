@@ -57,6 +57,7 @@
       color: inherit;
       font: inherit;
       text-align: left;
+      text-decoration: none;
       cursor: pointer;
     }
 
@@ -480,6 +481,8 @@
       tables.forEach(initTableSorting);
     })();
   </script>
+  <script src="{{ url_for('static', filename='js/client-list-controls.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/async-fragment-controls.js') }}"></script>
   {% block extra_scripts %}{% endblock %}
   <script src="{{ url_for('static', filename='js/date-range-controls.js') }}"></script>
 </body>

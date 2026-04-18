@@ -99,8 +99,79 @@ bp = Blueprint("routes", __name__)
 DELIVERY_BASE_FEE = Decimal("449.00")
 DELIVERY_INCLUDED_DISTANCE_KM = Decimal("10")
 DELIVERY_EXTRA_FEE_PER_KM = Decimal("5.00")
-DEFAULT_PAGE_SIZE = 25
+DEFAULT_PAGE_SIZE = 10
 MAX_PAGE_SIZE = 100
+
+CUSTOMER_LIST_SORTS = {
+    "id": ("id",),
+    "name": ("lower(full_name)", "id"),
+    "email": ("lower(coalesce(email, ''))", "lower(full_name)", "id"),
+    "phone": ("coalesce(phone, '')", "lower(full_name)", "id"),
+    "address": (
+        "lower(coalesce(address, '') || ' ' || coalesce(postal_city, ''))",
+        "lower(full_name)",
+        "id",
+    ),
+    "created": ("created_at", "id"),
+}
+
+CUSTOMER_BOOKING_LIST_SORTS = {
+    "id": ("id",),
+    "dates": ("start_date", "end_date", "id"),
+    "status": (
+        "CASE status WHEN 'pending' THEN 1 WHEN 'confirmed' THEN 2 WHEN 'cancelled' THEN 3 ELSE 4 END",
+        "id",
+    ),
+    "created": ("created_at", "id"),
+}
+
+ADMIN_BOOKING_LIST_SORTS = {
+    "booking": ("id",),
+    "customer": ("lower(full_name)", "id"),
+    "dates": ("start_date", "end_date", "id"),
+    "status": (
+        "CASE status WHEN 'pending' THEN 1 WHEN 'confirmed' THEN 2 WHEN 'cancelled' THEN 3 ELSE 4 END",
+        "id",
+    ),
+    "tent": (
+        "CASE WHEN has_tent THEN 1 ELSE 0 END",
+        "lower(coalesce(tent_summary, ''))",
+        "id",
+    ),
+    "total": ("total_cost", "id"),
+    "created": ("created_at", "id"),
+}
+
+RENTAL_PERIOD_LIST_SORTS = {
+    "id": ("id",),
+    "label": ("lower(label)", "id"),
+    "min_days": ("min_days", "max_days", "id"),
+    "max_days": ("max_days", "min_days", "id"),
+    "created": ("created_at", "id"),
+}
+
+ITEM_LIST_SORTS = {
+    "id": ("id",),
+    "sku": ("lower(sku)", "id"),
+    "active": ("CASE WHEN is_active THEN 1 ELSE 0 END", "id"),
+    "category": ("lower(display_name)", "category_id", "id"),
+    "type": (
+        "CASE WHEN is_tent THEN 1 WHEN is_furnishing THEN 2 ELSE 3 END",
+        "lower(coalesce(furnishing_kind, ''))",
+        "id",
+    ),
+}
+
+CATEGORY_LIST_SORTS = {
+    "id": ("id",),
+    "name": ("lower(display_name)", "id"),
+    "type": (
+        "CASE WHEN is_tent THEN 1 WHEN is_furnishing THEN 2 ELSE 3 END",
+        "lower(display_name)",
+        "id",
+    ),
+    "items": ("active_items", "total_items", "lower(display_name)", "id"),
+}
 
 
 def current_user():
@@ -175,13 +246,66 @@ def _pagination_options(*, default_per_page=DEFAULT_PAGE_SIZE):
     )
 
 
+def _sort_direction(value, *, default="asc"):
+    return value if value in ("asc", "desc") else default
+
+
+def _apply_list_sort(sql, sort_map, *, default_key, default_dir="asc"):
+    requested_key = (request.args.get("sort") or "").strip()
+    sort_key = requested_key if requested_key in sort_map else default_key
+    sort_dir = _sort_direction(
+        (request.args.get("dir") or "").strip().lower(),
+        default=(default_dir if requested_key in sort_map else default_dir),
+    )
+    direction = "DESC" if sort_dir == "desc" else "ASC"
+    order_by = ", ".join(f"{expression} {direction}" for expression in sort_map[sort_key])
+    base_sql = sql.strip().rstrip(";")
+    sorted_sql = f"SELECT * FROM ({base_sql}) AS sorted_source ORDER BY {order_by}"
+    return sorted_sql, sort_key, sort_dir
+
+
+def _fragment_name():
+    return (request.args.get("partial") or "").strip().lower()
+
+
+def _current_query_args():
+    return {
+        key: value
+        for key, value in request.args.to_dict(flat=True).items()
+        if key != "partial"
+    }
+
+
+def _paginate_sorted_list(
+    sql,
+    sort_map,
+    *,
+    default_key,
+    default_dir="asc",
+    params=(),
+    default_per_page=DEFAULT_PAGE_SIZE,
+):
+    sorted_sql, sort_key, sort_dir = _apply_list_sort(
+        sql,
+        sort_map,
+        default_key=default_key,
+        default_dir=default_dir,
+    )
+    page = paginate_query(
+        sorted_sql,
+        params,
+        pagination=_pagination_options(default_per_page=default_per_page),
+    )
+    return page, sort_key, sort_dir
+
+
 @bp.app_context_processor
 def inject_pagination_helpers():
     def pagination_url(*, page=None, per_page=None):
         if not request.endpoint:
             return "#"
 
-        args = request.args.to_dict(flat=True)
+        args = _current_query_args()
         if page is not None:
             args["page"] = page
         if per_page is not None:
@@ -191,7 +315,26 @@ def inject_pagination_helpers():
 
         return url_for(request.endpoint, **(request.view_args or {}), **args)
 
-    return {"pagination_url": pagination_url}
+    def sort_url(sort_key, *, default_dir="asc"):
+        if not request.endpoint:
+            return "#"
+
+        args = _current_query_args()
+        current_sort = (args.get("sort") or "").strip()
+        current_dir = _sort_direction(
+            (args.get("dir") or "").strip().lower(),
+            default=default_dir,
+        )
+
+        args["sort"] = sort_key
+        args["dir"] = (
+            "desc" if current_sort == sort_key and current_dir == "asc" else "asc"
+        ) if current_sort == sort_key else default_dir
+        args["page"] = 1
+
+        return url_for(request.endpoint, **(request.view_args or {}), **args)
+
+    return {"pagination_url": pagination_url, "sort_url": sort_url}
 
 
 def _delivery_validation_error_message(code: str) -> str:
@@ -254,6 +397,8 @@ def _parse_manual_delivery_fee(delivery_fee_value):
 
     return delivery_fee.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
+def _is_ajax_request() -> bool:
+    return request.headers.get("X-Requested-With") == "XMLHttpRequest"
 
 def _build_booking_item_summary(items):
     summary_map = {}
@@ -709,6 +854,7 @@ def _collect_selected_quantities_from_form():
 
 
 # Home (category availability)
+# Home (category availability)
 @bp.get("/")
 def home():
     uid, role = current_user()
@@ -741,14 +887,18 @@ def home():
             role=role,
         )
 
-    return render_template(
-        "guest_home.html",
-        start_date=start,
-        end_date=end,
-        categories=categories,
-        customer_profile=customer_profile,
-        role=role,
-    )
+    context = {
+        "start_date": start,
+        "end_date": end,
+        "categories": categories,
+        "customer_profile": customer_profile,
+        "role": role,
+    }
+
+    if _is_ajax_request():
+        return render_template("partials/_guest_booking_results.html", **context)
+
+    return render_template("guest_home.html", **context)
 
 
 @bp.post("/guest/delivery-quote")
@@ -1286,20 +1436,26 @@ def customers():
         return redirect(url_for("auth.login_form"))
 
     if role == "admin":
-        customers_page = paginate_query(
-            SQL_LIST_CUSTOMERS,
-            pagination=_pagination_options(),
-        )
-        return render_template(
-            "customers.html",
-            customers=customers_page.items,
-            customers_page=customers_page,
-            role=role,
-        )
+        if _fragment_name() == "list":
+            customers_page, sort_key, sort_dir = _paginate_sorted_list(
+                SQL_LIST_CUSTOMERS,
+                CUSTOMER_LIST_SORTS,
+                default_key="created",
+                default_dir="desc",
+            )
+            return render_template(
+                "_customers_list.html",
+                customers=customers_page.items,
+                customers_page=customers_page,
+                current_sort=sort_key,
+                current_sort_dir=sort_dir,
+                role=role,
+            )
+        return render_template("customers.html", role=role)
 
     cust = query(SQL_GET_CUSTOMER_BY_USER_ID, (uid,), one=True)
     if not cust:
-        flash("Det finns ingen kundprofil kopplad till det här kontot.", "error")
+        flash("Det finns ingen kundprofil kopplad till det hÃ¤r kontot.", "error")
         return redirect(url_for("routes.home"))
 
     return redirect(url_for("routes.customer_detail", customer_id=cust["id"]))
@@ -1349,16 +1505,27 @@ def customer_detail(customer_id: int):
         if not self_cust or self_cust["id"] != customer_id:
             abort(403)
 
-    bookings_page = paginate_query(
-        SQL_LIST_BOOKINGS_FOR_CUSTOMER,
-        (customer_id,),
-        pagination=_pagination_options(default_per_page=10),
-    )
+    if _fragment_name() == "bookings":
+        bookings_page, sort_key, sort_dir = _paginate_sorted_list(
+            SQL_LIST_BOOKINGS_FOR_CUSTOMER,
+            CUSTOMER_BOOKING_LIST_SORTS,
+            default_key="created",
+            default_dir="desc",
+            params=(customer_id,),
+        )
+        return render_template(
+            "_customer_detail_bookings_section.html",
+            customer=cust,
+            bookings=bookings_page.items,
+            bookings_page=bookings_page,
+            current_sort=sort_key,
+            current_sort_dir=sort_dir,
+            role=role,
+        )
+
     return render_template(
         "customer_detail.html",
         customer=cust,
-        bookings=bookings_page.items,
-        bookings_page=bookings_page,
         role=role,
     )
 
@@ -1367,14 +1534,32 @@ def customer_detail(customer_id: int):
 @bp.get("/admin/bookings")
 def admin_bookings():
     require_admin()
-    bookings_page = paginate_query(
-        SQL_LIST_ALL_BOOKINGS,
-        pagination=_pagination_options(default_per_page=20),
-    )
+    fragment = _fragment_name()
+    if fragment in {"hero", "list"}:
+        bookings_page, sort_key, sort_dir = _paginate_sorted_list(
+            SQL_LIST_ALL_BOOKINGS,
+            ADMIN_BOOKING_LIST_SORTS,
+            default_key="created",
+            default_dir="desc",
+        )
+        if fragment == "hero":
+            return render_template(
+                "_admin_bookings_hero_extra.html",
+                bookings=bookings_page.items,
+                bookings_page=bookings_page,
+                role="admin",
+            )
+        return render_template(
+            "_admin_bookings_list.html",
+            bookings=bookings_page.items,
+            bookings_page=bookings_page,
+            current_sort=sort_key,
+            current_sort_dir=sort_dir,
+            role="admin",
+        )
+
     return render_template(
         "admin_bookings.html",
-        bookings=bookings_page.items,
-        bookings_page=bookings_page,
         role="admin",
     )
 
@@ -1383,14 +1568,23 @@ def admin_bookings():
 @bp.get("/admin/rental-periods")
 def admin_rental_periods():
     require_admin()
-    rental_periods_page = paginate_query(
-        SQL_LIST_RENTAL_PERIODS,
-        pagination=_pagination_options(),
-    )
+    if _fragment_name() == "list":
+        rental_periods_page, sort_key, sort_dir = _paginate_sorted_list(
+            SQL_LIST_RENTAL_PERIODS,
+            RENTAL_PERIOD_LIST_SORTS,
+            default_key="min_days",
+            default_dir="asc",
+        )
+        return render_template(
+            "_admin_rental_periods_list.html",
+            rental_periods=rental_periods_page.items,
+            rental_periods_page=rental_periods_page,
+            current_sort=sort_key,
+            current_sort_dir=sort_dir,
+            role="admin",
+        )
     return render_template(
         "admin_rental_periods.html",
-        rental_periods=rental_periods_page.items,
-        rental_periods_page=rental_periods_page,
         role="admin",
     )
 
@@ -1493,14 +1687,23 @@ def admin_rental_period_delete(rental_period_id: int):
 @bp.get("/admin/items")
 def admin_items():
     require_admin()
-    items_page = paginate_query(
-        SQL_LIST_ITEMS,
-        pagination=_pagination_options(),
-    )
+    if _fragment_name() == "list":
+        items_page, sort_key, sort_dir = _paginate_sorted_list(
+            SQL_LIST_ITEMS,
+            ITEM_LIST_SORTS,
+            default_key="category",
+            default_dir="asc",
+        )
+        return render_template(
+            "_admin_items_list.html",
+            items=items_page.items,
+            items_page=items_page,
+            current_sort=sort_key,
+            current_sort_dir=sort_dir,
+            role="admin",
+        )
     return render_template(
         "admin_items.html",
-        items=items_page.items,
-        items_page=items_page,
         role="admin",
     )
 
@@ -1596,14 +1799,458 @@ def admin_item_delete(item_id: int):
 @bp.get("/admin/categories")
 def admin_categories():
     require_admin()
-    categories_page = paginate_query(
+    if _fragment_name() == "list":
+        categories_page, sort_key, sort_dir = _paginate_sorted_list(
+            SQL_LIST_CATEGORIES,
+            CATEGORY_LIST_SORTS,
+            default_key="name",
+            default_dir="asc",
+        )
+        return render_template(
+            "_admin_categories_list.html",
+            categories=categories_page.items,
+            categories_page=categories_page,
+            current_sort=sort_key,
+            current_sort_dir=sort_dir,
+            role="admin",
+        )
+    return render_template(
+        "admin_categories.html",
+        role="admin",
+    )
+
+
+@bp.get("/admin/categories/tent/new")
+def admin_category_tent_new_form():
+    require_admin()
+    rental_periods = query(SQL_LIST_RENTAL_PERIODS)
+    return render_template(
+        "admin_category_tent_new.html",
+        role="admin",
+        rental_periods=rental_periods,
+    )
+
+
+@bp.post("/admin/categories/tent/new")
+def admin_category_tent_new():
+    require_admin()
+
+    name = request.form.get("display_name", "").strip()
+    capacity = request.form.get("capacity", "").strip()
+    season_rating = request.form.get("season_rating", "").strip()
+    build_time = request.form.get("estimated_build_time_minutes", "").strip() or "10"
+    setup_service_fee = request.form.get("setup_service_fee", "").strip() or "0"
+    packed_weight = _to_str_or_none(request.form.get("packed_weight_kg"))
+    floor_area = _to_str_or_none(request.form.get("floor_area_m2"))
+    period_rows = _collect_category_period_prices_from_form()
+
+    if not name or not capacity or not season_rating:
+        flash("Missing required fields.", "error")
+        return redirect(url_for("routes.admin_category_tent_new_form"))
+
+    if not period_rows:
+        flash("At least one rental period price is required.", "error")
+        return redirect(url_for("routes.admin_category_tent_new_form"))
+
+    def work(cur):
+        cur.execute(SQL_CREATE_CATEGORY, (name,))
+        cat_id = cur.fetchone()["id"]
+
+        cur.execute(
+            SQL_CREATE_TENT_CATEGORY_ROW,
+            (
+                cat_id,
+                capacity,
+                season_rating,
+                packed_weight,
+                floor_area,
+                build_time,
+                setup_service_fee,
+            ),
+        )
+
+        for row in period_rows:
+            cur.execute(
+                SQL_UPSERT_CATEGORY_RENTAL_PERIOD_PRICE,
+                (
+                    cat_id,
+                    row["rental_period_id"],
+                    row["price"],
+                    row["sort_order"],
+                ),
+            )
+
+        return cat_id
+
+    try:
+        cat_id = tx(work)
+        flash(f"Tent category created (id={cat_id}).", "success")
+        return redirect(url_for("routes.admin_categories"))
+    except Exception as e:
+        flash(f"Failed: {str(e)}", "error")
+        return redirect(url_for("routes.admin_category_tent_new_form"))
+
+"""
+        customers_page = paginate_query(
+            customers_sql,
+            pagination=_pagination_options(),
+        )
+        return render_template(
+            "customers.html",
+            customers=customers_page.items,
+            customers_page=customers_page,
+            current_sort=sort_key,
+            current_sort_dir=sort_dir,
+            role=role,
+        )
+
+    cust = query(SQL_GET_CUSTOMER_BY_USER_ID, (uid,), one=True)
+    if not cust:
+        flash("Det finns ingen kundprofil kopplad till det här kontot.", "error")
+        return redirect(url_for("routes.home"))
+
+    return redirect(url_for("routes.customer_detail", customer_id=cust["id"]))
+
+
+@bp.get("/customers/new")
+def customer_new_form():
+    require_admin()
+    return render_template("customer_new.html", role="admin")
+
+
+@bp.post("/customers/new")
+def customer_new():
+    require_admin()
+
+    full_name = request.form.get("full_name", "").strip()
+    email = request.form.get("email", "").strip().lower() or None
+    phone = request.form.get("phone", "").strip() or None
+    address = request.form.get("address", "").strip() or None
+    postal_city = _sanitize_postal_city(request.form.get("postal_city"))
+
+    if not full_name:
+        flash("Full name is required.", "error")
+        return redirect(url_for("routes.customer_new_form"))
+
+    try:
+        row = query(SQL_CREATE_CUSTOMER, (full_name, email, phone, address, postal_city, None), one=True, commit=True)
+        flash(f"Customer created (id={row['id']}).", "success")
+    except Exception as e:
+        flash(f"Could not create customer: {str(e)}", "error")
+
+    return redirect(url_for("routes.customers"))
+
+
+@bp.get("/customers/<int:customer_id>")
+def customer_detail(customer_id: int):
+    uid, role = require_login()
+    if not uid:
+        return redirect(url_for("auth.login_form"))
+
+    cust = query(SQL_GET_CUSTOMER, (customer_id,), one=True)
+    if not cust:
+        abort(404)
+
+    if role != "admin":
+        self_cust = query(SQL_GET_CUSTOMER_BY_USER_ID, (uid,), one=True)
+        if not self_cust or self_cust["id"] != customer_id:
+            abort(403)
+
+    bookings_sql, sort_key, sort_dir = _apply_list_sort(
+        SQL_LIST_BOOKINGS_FOR_CUSTOMER,
+        CUSTOMER_BOOKING_LIST_SORTS,
+        default_key="created",
+        default_dir="desc",
+    )
+    bookings_page = paginate_query(
+        bookings_sql,
+        (customer_id,),
+        pagination=_pagination_options(default_per_page=10),
+    )
+    return render_template(
+        "customer_detail.html",
+        customer=cust,
+        bookings=bookings_page.items,
+        bookings_page=bookings_page,
+        current_sort=sort_key,
+        current_sort_dir=sort_dir,
+        role=role,
+    )
+
+
+# Admin: Bookings list
+@bp.get("/admin/bookings")
+def admin_bookings():
+    require_admin()
+    bookings_sql, sort_key, sort_dir = _apply_list_sort(
+        SQL_LIST_ALL_BOOKINGS,
+        ADMIN_BOOKING_LIST_SORTS,
+        default_key="created",
+        default_dir="desc",
+    )
+    bookings_page = paginate_query(
+        bookings_sql,
+        pagination=_pagination_options(default_per_page=20),
+    )
+    return render_template(
+        "admin_bookings.html",
+        bookings=bookings_page.items,
+        bookings_page=bookings_page,
+        current_sort=sort_key,
+        current_sort_dir=sort_dir,
+        role="admin",
+    )
+
+
+# Admin: Rental periods
+@bp.get("/admin/rental-periods")
+def admin_rental_periods():
+    require_admin()
+    rental_periods_sql, sort_key, sort_dir = _apply_list_sort(
+        SQL_LIST_RENTAL_PERIODS,
+        RENTAL_PERIOD_LIST_SORTS,
+        default_key="min_days",
+        default_dir="asc",
+    )
+    rental_periods_page = paginate_query(
+        rental_periods_sql,
+        pagination=_pagination_options(),
+    )
+    return render_template(
+        "admin_rental_periods.html",
+        rental_periods=rental_periods_page.items,
+        rental_periods_page=rental_periods_page,
+        current_sort=sort_key,
+        current_sort_dir=sort_dir,
+        role="admin",
+    )
+
+
+@bp.get("/admin/rental-periods/new")
+def admin_rental_period_new_form():
+    require_admin()
+    return render_template("admin_rental_period_new.html", role="admin")
+
+
+@bp.post("/admin/rental-periods/new")
+def admin_rental_period_new():
+    require_admin()
+
+    label = request.form.get("label", "").strip()
+    min_days = request.form.get("min_days", "").strip()
+    max_days = request.form.get("max_days", "").strip()
+
+    if not label or not min_days or not max_days:
+        flash("Label, minimum days and maximum days are required.", "error")
+        return redirect(url_for("routes.admin_rental_period_new_form"))
+
+    try:
+        row = query(
+            SQL_CREATE_RENTAL_PERIOD,
+            (label, min_days, max_days),
+            one=True,
+            commit=True,
+        )
+        flash(f"Rental period created (id={row['id']}).", "success")
+        return redirect(url_for("routes.admin_rental_periods"))
+    except Exception as e:
+        flash(f"Failed: {str(e)}", "error")
+        return redirect(url_for("routes.admin_rental_period_new_form"))
+
+
+@bp.get("/admin/rental-periods/<int:rental_period_id>/edit")
+def admin_rental_period_edit_form(rental_period_id: int):
+    require_admin()
+
+    rental_period = query(SQL_GET_RENTAL_PERIOD, (rental_period_id,), one=True)
+    if not rental_period:
+        flash("Rental period not found.", "error")
+        return redirect(url_for("routes.admin_rental_periods"))
+
+    usage = query(SQL_RENTAL_PERIOD_USAGE_COUNT, (rental_period_id,), one=True)
+    usage_count = usage["usage_count"] if usage else 0
+
+    return render_template(
+        "admin_rental_period_edit.html",
+        rental_period=rental_period,
+        pricing_usage_count=usage_count,
+        allow_delete=(usage_count == 0),
+        role="admin",
+    )
+
+
+@bp.post("/admin/rental-periods/<int:rental_period_id>/edit")
+def admin_rental_period_edit_save(rental_period_id: int):
+    require_admin()
+
+    label = request.form.get("label", "").strip()
+    min_days = request.form.get("min_days", "").strip()
+    max_days = request.form.get("max_days", "").strip()
+
+    if not label or not min_days or not max_days:
+        flash("Label, minimum days and maximum days are required.", "error")
+        return redirect(url_for("routes.admin_rental_period_edit_form", rental_period_id=rental_period_id))
+
+    try:
+        execute(SQL_UPDATE_RENTAL_PERIOD, (label, min_days, max_days, rental_period_id))
+        flash("Rental period updated.", "success")
+        return redirect(url_for("routes.admin_rental_periods"))
+    except Exception as e:
+        flash(f"Update failed: {str(e)}", "error")
+        return redirect(url_for("routes.admin_rental_period_edit_form", rental_period_id=rental_period_id))
+
+
+@bp.post("/admin/rental-periods/<int:rental_period_id>/delete")
+def admin_rental_period_delete(rental_period_id: int):
+    require_admin()
+
+    usage = query(SQL_RENTAL_PERIOD_USAGE_COUNT, (rental_period_id,), one=True)
+    usage_count = usage["usage_count"] if usage else 0
+
+    if usage_count > 0:
+        flash("Cannot delete rental period because it is used by category pricing.", "error")
+        return redirect(url_for("routes.admin_rental_period_edit_form", rental_period_id=rental_period_id))
+
+    try:
+        execute(SQL_DELETE_RENTAL_PERIOD, (rental_period_id,))
+        flash("Rental period deleted.", "success")
+    except Exception as e:
+        flash(f"Delete failed: {str(e)}", "error")
+
+    return redirect(url_for("routes.admin_rental_periods"))
+
+
+# Admin: Items
+@bp.get("/admin/items")
+def admin_items():
+    require_admin()
+    items_sql, sort_key, sort_dir = _apply_list_sort(
+        SQL_LIST_ITEMS,
+        ITEM_LIST_SORTS,
+        default_key="category",
+        default_dir="asc",
+    )
+    items_page = paginate_query(
+        items_sql,
+        pagination=_pagination_options(),
+    )
+    return render_template(
+        "admin_items.html",
+        items=items_page.items,
+        items_page=items_page,
+        current_sort=sort_key,
+        current_sort_dir=sort_dir,
+        role="admin",
+    )
+
+
+@bp.get("/admin/items/new")
+def admin_item_new_form():
+    require_admin()
+    categories = query(SQL_LIST_CATEGORIES_FOR_DROPDOWN)
+    return render_template("admin_item_new.html", categories=categories, role="admin")
+
+
+@bp.post("/admin/items/new")
+def admin_item_new():
+    require_admin()
+
+    category_id = request.form.get("category_id", "").strip()
+    sku = request.form.get("sku", "").strip()
+    is_active = _to_bool(request.form.get("is_active"))
+
+    if not category_id or not sku:
+        flash("Category and SKU are required.", "error")
+        return redirect(url_for("routes.admin_item_new_form"))
+
+    try:
+        cat_id_int = int(category_id)
+        row = query(SQL_CREATE_ITEM, (cat_id_int, sku, is_active), one=True, commit=True)
+        flash(f"Item created (item_id={row['new_item_id']}).", "success")
+        return redirect(url_for("routes.admin_items"))
+    except Exception as e:
+        flash(f"Failed: {str(e)}", "error")
+        return redirect(url_for("routes.admin_item_new_form"))
+
+
+@bp.get("/admin/items/<int:item_id>/edit")
+def admin_item_edit_form(item_id: int):
+    require_admin()
+
+    item = query(SQL_GET_ITEM_FOR_EDIT, (item_id,), one=True)
+    if not item:
+        flash("Item not found.", "error")
+        return redirect(url_for("routes.admin_items"))
+
+    categories = query(SQL_LIST_CATEGORIES_FOR_DROPDOWN)
+    return render_template("admin_item_edit.html", item=item, categories=categories, role="admin")
+
+
+@bp.post("/admin/items/<int:item_id>/edit")
+def admin_item_edit_save(item_id: int):
+    require_admin()
+
+    category_id = request.form.get("category_id", "").strip()
+    sku = request.form.get("sku", "").strip()
+    is_active = _to_bool(request.form.get("is_active"))
+
+    if not category_id or not sku:
+        flash("Category and SKU are required.", "error")
+        return redirect(url_for("routes.admin_item_edit_form", item_id=item_id))
+
+    try:
+        cat_id_int = int(category_id)
+        query(SQL_UPDATE_ITEM, (cat_id_int, sku, is_active, item_id), commit=True)
+        flash("Item updated.", "success")
+        return redirect(url_for("routes.admin_items"))
+    except Exception as e:
+        flash(f"Update failed: {str(e)}", "error")
+        return redirect(url_for("routes.admin_item_edit_form", item_id=item_id))
+
+
+@bp.post("/admin/items/<int:item_id>/delete")
+def admin_item_delete(item_id: int):
+    require_admin()
+
+    blocked = query(SQL_ITEM_HAS_ACTIVE_OR_FUTURE_BOOKING, (item_id,), one=True)
+    if blocked:
+        flash("Cannot delete item: it is booked now or in the future.", "error")
+        return redirect(url_for("routes.admin_items"))
+
+    def work(cur):
+        cur.execute(SQL_DELETE_BOOKING_ITEMS_FOR_ITEM, (item_id,))
+        cur.execute(SQL_DELETE_ITEM, (item_id,))
+        return True
+
+    try:
+        tx(work)
+        flash("Item deleted.", "success")
+    except Exception as e:
+        flash(f"Delete failed: {str(e)}", "error")
+
+    return redirect(url_for("routes.admin_items"))
+
+
+# Admin: Categories
+@bp.get("/admin/categories")
+def admin_categories():
+    require_admin()
+    categories_sql, sort_key, sort_dir = _apply_list_sort(
         SQL_LIST_CATEGORIES,
+        CATEGORY_LIST_SORTS,
+        default_key="name",
+        default_dir="asc",
+    )
+    categories_page = paginate_query(
+        categories_sql,
         pagination=_pagination_options(),
     )
     return render_template(
         "admin_categories.html",
         categories=categories_page.items,
         categories_page=categories_page,
+        current_sort=sort_key,
+        current_sort_dir=sort_dir,
         role="admin",
     )
 
@@ -1679,6 +2326,7 @@ def admin_category_tent_new():
         return redirect(url_for("routes.admin_category_tent_new_form"))
 
 
+"""
 @bp.get("/admin/categories/furnishing/new")
 def admin_category_furn_new_form():
     require_admin()

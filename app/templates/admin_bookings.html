@@ -1,9 +1,6 @@
 {% extends "base.html" %}
-{% import "_components.html" as ui %}
+{% import "_components.html" as ui with context %}
 {% block content %}
-{% set revenue_bookings = bookings|rejectattr('status', 'equalto', 'pending')|list %}
-{% set total_income = revenue_bookings|sum(attribute='total_cost') %}
-{% set average_booking = (total_income / (revenue_bookings|length)) if revenue_bookings else 0 %}
 {% set hero_actions %}
   <a
     class="inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition hover:border-sky-300 hover:text-sky-700 focus:outline-none focus:ring-4 focus:ring-sky-100"
@@ -19,38 +16,12 @@
   </a>
 {% endset %}
 {% set hero_extra %}
-  <div class="grid gap-3 lg:grid-cols-[1.15fr_1fr_1fr]">
-    <div class="rounded-2xl border border-white/80 bg-white/80 p-4 shadow-sm backdrop-blur">
-      <div class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">Booking revenue</div>
-      <div class="mt-2 text-2xl font-semibold text-slate-900">{{ total_income }} kr</div>
-      <div class="mt-2 text-sm text-slate-500">Across {{ revenue_bookings|length }} non-pending bookings shown on this page.</div>
-    </div>
-    <div class="rounded-2xl border border-white/80 bg-white/80 p-4 shadow-sm backdrop-blur">
-      <div class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">Average booking</div>
-      <div class="mt-2 text-2xl font-semibold text-sky-700">{{ "%.2f"|format(average_booking) }} kr</div>
-      <div class="mt-2 text-sm text-slate-500">Pending bookings shown on this page are excluded from this average.</div>
-    </div>
-    <div class="rounded-2xl border border-white/80 bg-white/80 p-4 shadow-sm backdrop-blur">
-      <div class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">At a glance</div>
-      <div class="mt-2 flex flex-wrap gap-2">
-        <span class="inline-flex rounded-full bg-slate-900 px-3 py-1 text-xs font-medium text-white">
-          {{ bookings_page.total_items if bookings_page else bookings|length }} total
-        </span>
-        <span class="inline-flex rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-800">
-          {{ bookings|selectattr('status', 'equalto', 'confirmed')|list|length }} confirmed
-        </span>
-        <span class="inline-flex rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-800">
-          {{ bookings|selectattr('status', 'equalto', 'pending')|list|length }} pending
-        </span>
-        <span class="inline-flex rounded-full bg-sky-100 px-3 py-1 text-xs font-medium text-sky-800">
-          {{ bookings|selectattr('has_tent')|list|length }} with tents
-        </span>
-      </div>
-    </div>
-    <div class="mt-3 text-xs text-slate-500">
-      This page shows {{ bookings|length }} booking{{ '' if bookings|length == 1 else 's' }}.
-    </div>
-  </div>
+  {{ ui.async_fragment_host(
+    'hero',
+    message='Loading booking metrics...',
+    loading_class='rounded-2xl border border-white/80 bg-white/80 p-4 text-sm text-slate-500 shadow-sm backdrop-blur',
+    min_height='7rem'
+  ) }}
 {% endset %}
 {{ ui.admin_page_hero(
   "Admin Overview",
@@ -59,170 +30,10 @@
   actions=hero_actions,
   extra=hero_extra
 ) }}
-
-{% call ui.content_panel(title="Live booking register", eyebrow="Booking list", trailing="Click any row to open details") %}
-  {% if bookings %}
-    <div class="grid gap-4 md:hidden">
-      {% for b in bookings %}
-        <a href="{{ url_for('routes.booking_detail', booking_id=b.id) }}" class="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4 shadow-sm transition hover:border-sky-200 hover:bg-sky-50/40">
-          <div class="flex items-start justify-between gap-3">
-            <div>
-              <div class="text-sm font-semibold text-sky-700">Booking #{{ b.id }}</div>
-              <div class="mt-1 text-sm font-medium text-slate-900">{{ b.full_name }}</div>
-              <div class="mt-1 text-xs text-slate-500">{{ b.start_date }} - {{ b.end_date }}</div>
-            </div>
-            <div class="text-right">
-              <div class="text-sm font-semibold text-slate-900">{{ b.total_cost }} kr</div>
-              {{ ui.booking_status_badge(b.status, class_name='mt-2') }}
-            </div>
-          </div>
-          <div class="mt-3 flex flex-wrap gap-2">
-            <span class="inline-flex rounded-full bg-slate-900 px-3 py-1 text-xs font-medium text-white">
-              {{ b.tent_summary if b.has_tent else "No tent" }}{% if b.has_tent and b.postal_city %} - {{ b.postal_city }}{% endif %}
-            </span>
-            {% if b.include_setup_service %}
-              <span class="inline-flex rounded-full bg-sky-100 px-3 py-1 text-xs font-medium text-sky-800">Setup</span>
-            {% endif %}
-            {% if b.include_delivery %}
-              <span class="inline-flex rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-800">Delivery</span>
-            {% endif %}
-            {% if b.booking_note %}
-              <span class="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">Booking note</span>
-            {% endif %}
-          </div>
-        </a>
-      {% endfor %}
-    </div>
-
-    {% call ui.table_shell() %}
-      <thead class="bg-slate-900 text-slate-100">
-        <tr>
-          <th class="p-3 text-left font-medium" data-sort-type="number">Booking</th>
-          <th class="p-3 text-left font-medium">Customer</th>
-          <th class="p-3 text-left font-medium" data-sort-type="date">Dates</th>
-          <th class="p-3 text-left font-medium">Status</th>
-          <th class="p-3 text-left font-medium">Tent</th>
-          <th class="p-3 text-left font-medium" data-sort-type="number">Total</th>
-          <th class="p-3 text-left font-medium">Options</th>
-          <th class="p-3 text-left font-medium" data-sort-type="date">Created</th>
-        </tr>
-      </thead>
-      <tbody class="divide-y divide-slate-200 bg-white">
-        {% for b in bookings %}
-          <tr class="align-top transition hover:bg-sky-50/60">
-            <td class="p-3" data-sort-value="{{ b.id }}">
-              <a
-                class="block h-full w-full"
-                href="{{ url_for('routes.booking_detail', booking_id=b.id) }}"
-              >
-                <div class="font-semibold text-sky-700">#{{ b.id }}</div>
-                {% if b.custom_total_price is not none %}
-                  <div class="mt-1 text-xs text-amber-700">Booking override active</div>
-                {% endif %}
-              </a>
-            </td>
-
-            <td class="p-3" data-sort-value="{{ b.full_name }}">
-              <a
-                class="block h-full w-full"
-                href="{{ url_for('routes.booking_detail', booking_id=b.id) }}"
-              >
-                <div class="font-medium text-slate-900">{{ b.full_name }}</div>
-                <div class="mt-1 text-xs text-slate-500">{{ b.email or "No email" }}</div>
-              </a>
-            </td>
-
-            <td class="p-3" data-sort-value="{{ b.start_date }}">
-              <a
-                class="block h-full w-full"
-                href="{{ url_for('routes.booking_detail', booking_id=b.id) }}"
-              >
-                <div class="font-medium text-slate-900">{{ b.start_date }} - {{ b.end_date }}</div>
-              </a>
-            </td>
-
-            <td class="p-3" data-sort-value="{{ b.status }}">
-              <a
-                class="block h-full w-full"
-                href="{{ url_for('routes.booking_detail', booking_id=b.id) }}"
-              >
-                {{ ui.booking_status_badge(b.status) }}
-              </a>
-            </td>
-
-            <td class="p-3" data-sort-value="{{ (b.tent_summary if b.has_tent else 'No tent') ~ (' - ' ~ b.postal_city if b.has_tent and b.postal_city else '') }}">
-              <a
-                class="block h-full w-full"
-                href="{{ url_for('routes.booking_detail', booking_id=b.id) }}"
-              >
-                {% if b.has_tent %}
-                  <span class="inline-flex rounded-full bg-sky-100 px-2.5 py-1 text-xs font-medium text-sky-800">
-                    {{ b.tent_summary }}{% if b.postal_city %} - {{ b.postal_city }}{% endif %}
-                  </span>
-                {% else %}
-                  <span class="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">
-                    No tent
-                  </span>
-                {% endif %}
-              </a>
-            </td>
-
-            <td class="p-3" data-sort-value="{{ b.total_cost }}">
-              <a
-                class="block h-full w-full"
-                href="{{ url_for('routes.booking_detail', booking_id=b.id) }}"
-              >
-                <div class="font-medium text-slate-900">{{ b.total_cost }} kr</div>
-              </a>
-            </td>
-
-            <td class="p-3 text-xs text-slate-600">
-              <a
-                class="block h-full w-full space-y-1"
-                href="{{ url_for('routes.booking_detail', booking_id=b.id) }}"
-              >
-                {% if b.include_setup_service %}
-                  <div>Setup included</div>
-                {% endif %}
-
-                {% if b.include_delivery %}
-                  <div>
-                    Delivery included{% if b.delivery_fee is not none %} ({{ b.delivery_fee }} kr){% endif %}
-                  </div>
-                {% endif %}
-
-                {% if b.admin_note %}
-                  <div class="text-slate-500">Has admin note</div>
-                {% endif %}
-
-                {% if b.booking_note %}
-                  <div class="text-slate-500">Has booking note</div>
-                {% endif %}
-
-                {% if not b.include_setup_service and not b.include_delivery and not b.admin_note and not b.booking_note %}
-                  <span class="text-slate-400">No extras</span>
-                {% endif %}
-              </a>
-            </td>
-
-            <td class="p-3 text-xs text-slate-500" data-sort-value="{{ b.created_at }}">
-              <a
-                class="block h-full w-full"
-                href="{{ url_for('routes.booking_detail', booking_id=b.id) }}"
-              >
-                {{ b.created_at }}
-              </a>
-            </td>
-          </tr>
-        {% endfor %}
-      </tbody>
-    {% endcall %}
-  {% else %}
-    {{ ui.empty_state("No bookings yet.") }}
-  {% endif %}
-
-  {% with page_obj=bookings_page %}
-    {% include "_pagination.html" %}
-  {% endwith %}
-{% endcall %}
+{{ ui.async_fragment_host(
+  'list',
+  message='Loading booking register...',
+  class_name='mt-6',
+  min_height='18rem'
+) }}
 {% endblock %}

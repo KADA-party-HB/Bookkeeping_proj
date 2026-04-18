@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% import "_components.html" as ui %}
+{% import "_components.html" as ui with context %}
 {% block content %}
 {% set hero_actions %}
   {% if role == "admin" %}
@@ -14,74 +14,10 @@
   "Browse customer profiles, contact details, and booking history entry points from one place.",
   actions=hero_actions
 ) }}
-
-{% call ui.content_panel(title="Customer register") %}
-  {% if customers %}
-    <div class="grid gap-4 md:hidden">
-      {% for c in customers %}
-        <a href="{{ url_for('routes.customer_detail', customer_id=c.id) }}" class="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4 shadow-sm transition hover:border-sky-200 hover:bg-sky-50/40">
-          <div class="flex items-start justify-between gap-3">
-            <div>
-              <div class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">Customer #{{ c.id }}</div>
-              <div class="mt-1 text-lg font-semibold text-slate-900">{{ c.full_name }}</div>
-            </div>
-            <div class="text-xs text-slate-500">{{ c.created_at }}</div>
-          </div>
-          <div class="mt-3 grid gap-2 text-sm text-slate-600">
-            <div>{{ c.email or "No email" }}</div>
-            <div>{{ c.phone or "No phone" }}</div>
-            <div>
-              {% if c.address or c.postal_city %}
-                {{ c.address or "" }}{% if c.address and c.postal_city %}, {% endif %}{{ c.postal_city or "" }}
-              {% else %}
-                No address
-              {% endif %}
-            </div>
-          </div>
-        </a>
-      {% endfor %}
-    </div>
-
-    {% call ui.table_shell() %}
-      <thead class="bg-slate-900 text-slate-100">
-        <tr>
-          <th class="p-3 text-left font-medium" data-sort-type="number">ID</th>
-          <th class="p-3 text-left font-medium">Name</th>
-          <th class="p-3 text-left font-medium">Email</th>
-          <th class="p-3 text-left font-medium">Phone</th>
-          <th class="p-3 text-left font-medium">Address</th>
-          <th class="p-3 text-left font-medium" data-sort-type="date">Created</th>
-        </tr>
-      </thead>
-      <tbody class="divide-y divide-slate-200 bg-white">
-        {% for c in customers %}
-          <tr class="transition hover:bg-sky-50/60">
-            <td class="p-3 text-slate-500">{{ c.id }}</td>
-            <td class="p-3">
-              <a class="font-medium text-sky-700 hover:underline" href="{{ url_for('routes.customer_detail', customer_id=c.id) }}">
-                {{ c.full_name }}
-              </a>
-            </td>
-            <td class="p-3 text-slate-700">{{ c.email or "No email" }}</td>
-            <td class="p-3 text-slate-700">{{ c.phone or "No phone" }}</td>
-            <td class="p-3 text-slate-700">
-              {% if c.address or c.postal_city %}
-                {{ c.address or "" }}{% if c.address and c.postal_city %}, {% endif %}{{ c.postal_city or "" }}
-              {% else %}
-                No address
-              {% endif %}
-            </td>
-            <td class="p-3 text-xs text-slate-500">{{ c.created_at }}</td>
-          </tr>
-        {% endfor %}
-      </tbody>
-    {% endcall %}
-  {% else %}
-    {{ ui.empty_state("No customers yet.") }}
-  {% endif %}
-
-  {% with page_obj=customers_page %}
-    {% include "_pagination.html" %}
-  {% endwith %}
-{% endcall %}
+{{ ui.async_fragment_host(
+  'list',
+  message='Loading customer register...',
+  class_name='mt-6',
+  min_height='16rem'
+) }}
 {% endblock %}

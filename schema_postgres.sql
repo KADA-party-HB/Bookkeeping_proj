@@ -25,13 +25,20 @@ CREATE TABLE users (
 CREATE TABLE customers (
   id SERIAL PRIMARY KEY,
   full_name VARCHAR(200) NOT NULL,
-  email VARCHAR(255) UNIQUE,
+  email VARCHAR(255),
   phone VARCHAR(50),
   address TEXT,
   postal_city TEXT,
   user_id INT UNIQUE REFERENCES users(id) ON DELETE SET NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE UNIQUE INDEX customers_email_lower_uniq
+  ON customers ((lower(email)))
+  WHERE email IS NOT NULL;
+
+CREATE INDEX customers_full_name_lower_idx
+  ON customers ((lower(full_name)));
 
 -- CATEGORIES (product/model)
 -- Pricing removed from here. Pricing now depends on category + rental period.
@@ -264,7 +271,7 @@ CREATE TABLE booking_items (
   CONSTRAINT chk_line_custom_total CHECK (custom_total_price IS NULL OR custom_total_price >= 0)
 );
 
-CREATE INDEX idx_booking_items_item_id ON booking_items(item_id);
+CREATE INDEX idx_booking_items_item_booking ON booking_items(item_id, booking_id);
 
 -- overlap prevention (per physical item)
 CREATE OR REPLACE FUNCTION trg_prevent_overlapping_item_booking()

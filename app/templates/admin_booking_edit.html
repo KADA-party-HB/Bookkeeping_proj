@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% import "_components.html" as ui %}
+{% import "_components.html" as ui with context %}
 {% block content %}
 {% set hero_actions %}
   <a
@@ -181,15 +181,18 @@
 
   <aside class="space-y-6">
     {% call ui.content_panel(title="Assigned items", subtitle="Saving date changes may reassign these to other available items in the same category. Admin warnings will call out any same-day turnaround items that are used.", wrapper_class='mt-0') %}
+        <div data-client-list>
         <div class="space-y-3">
           {% for item in items %}
-            <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+            <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3" data-client-list-item>
               <div class="font-medium text-slate-900">{{ item.display_name }}</div>
               <div class="mt-1 text-xs text-slate-500">{{ item.sku }}</div>
             </div>
           {% else %}
             {{ ui.empty_state("No items on this booking.", class_name='not-italic') }}
           {% endfor %}
+        </div>
+        {{ ui.client_pager(class_name='mt-4', default_per_page=10) }}
         </div>
     {% endcall %}
 

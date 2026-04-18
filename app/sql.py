@@ -124,45 +124,37 @@ WITH request_window AS (
       %s::date AS requested_end
   ) base
 ),
-strict_available_items AS (
-  SELECT i.id, i.category_id
-  FROM items i
-  CROSS JOIN request_window rw
-  WHERE i.is_active = TRUE
-    AND NOT EXISTS (
-      SELECT 1
-      FROM booking_items bi
-      JOIN bookings b ON b.id = bi.booking_id
-      WHERE bi.item_id = i.id
-        AND b.status <> 'cancelled'
-        AND rw.requested_start <= b.end_date
-        AND rw.requested_end >= b.start_date
-    )
-),
-turnaround_available_items AS (
-  SELECT i.id, i.category_id
-  FROM items i
-  CROSS JOIN request_window rw
-  WHERE i.is_active = TRUE
-    AND EXISTS (
-      SELECT 1
-      FROM booking_items bi
-      JOIN bookings b ON b.id = bi.booking_id
-      WHERE bi.item_id = i.id
-        AND b.status <> 'cancelled'
-        AND rw.requested_start <= b.end_date
-        AND rw.requested_end >= b.start_date
-    )
-    AND NOT EXISTS (
-      SELECT 1
-      FROM booking_items bi
-      JOIN bookings b ON b.id = bi.booking_id
-      WHERE bi.item_id = i.id
-        AND b.status <> 'cancelled'
-        AND rw.requested_start <= b.end_date
-        AND rw.requested_end >= b.start_date
+item_overlap AS (
+  SELECT
+    i.id,
+    i.category_id,
+    COUNT(b.id) AS overlap_count,
+    COUNT(*) FILTER (
+      WHERE b.id IS NOT NULL
         AND b.end_date <> rw.requested_start
-    )
+    ) AS blocking_overlap_count
+  FROM items i
+  CROSS JOIN request_window rw
+  LEFT JOIN booking_items bi
+    ON bi.item_id = i.id
+  LEFT JOIN bookings b
+    ON b.id = bi.booking_id
+   AND b.status <> 'cancelled'
+   AND rw.requested_start <= b.end_date
+   AND rw.requested_end >= b.start_date
+  WHERE i.is_active = TRUE
+  GROUP BY i.id, i.category_id
+),
+availability AS (
+  SELECT
+    category_id,
+    COUNT(*) FILTER (WHERE overlap_count = 0) AS available_items,
+    COUNT(*) FILTER (
+      WHERE overlap_count > 0
+        AND blocking_overlap_count = 0
+    ) AS same_day_turnaround_items
+  FROM item_overlap
+  GROUP BY category_id
 ),
 matching_period AS (
   SELECT
@@ -206,29 +198,18 @@ SELECT
   fc.weight_kg,
   fc.notes,
 
-  COUNT(DISTINCT sai.id) AS available_items,
-  COUNT(DISTINCT tai.id) AS same_day_turnaround_items,
-  COUNT(DISTINCT sai.id) + COUNT(DISTINCT tai.id) AS admin_available_items
+  COALESCE(a.available_items, 0) AS available_items,
+  COALESCE(a.same_day_turnaround_items, 0) AS same_day_turnaround_items,
+  COALESCE(a.available_items, 0) + COALESCE(a.same_day_turnaround_items, 0) AS admin_available_items
 FROM categories c
-LEFT JOIN strict_available_items sai
-  ON sai.category_id = c.id
-LEFT JOIN turnaround_available_items tai
-  ON tai.category_id = c.id
-LEFT JOIN tent_categories tc
-  ON tc.category_id = c.id
-LEFT JOIN furnishing_categories fc
-  ON fc.category_id = c.id
+LEFT JOIN availability a ON a.category_id = c.id
+LEFT JOIN tent_categories tc ON tc.category_id = c.id
+LEFT JOIN furnishing_categories fc ON fc.category_id = c.id
 LEFT JOIN matching_period mp
   ON mp.category_id = c.id
  AND mp.rn = 1
-GROUP BY
-  c.id, c.display_name,
-  mp.rental_period_id, mp.rental_period_label, mp.min_days, mp.max_days, mp.price,
-  tc.category_id, tc.capacity, tc.season_rating, tc.estimated_build_time_minutes,
-  tc.setup_service_fee, tc.packed_weight_kg, tc.floor_area_m2,
-  fc.category_id, fc.furnishing_kind, fc.weight_kg, fc.notes
 ORDER BY
-  (COUNT(DISTINCT sai.id) = 0),
+  (COALESCE(a.available_items, 0) = 0),
   (mp.rental_period_id IS NULL),
   (tc.category_id IS NOT NULL) DESC,
   c.display_name;
@@ -782,64 +763,37 @@ ORDER BY b.created_at DESC;
 """
 
 SQL_LIST_ALL_BOOKINGS = """
+WITH booking_rollup AS (
+  SELECT
+    bi.booking_id,
+    BOOL_OR(tc.category_id IS NOT NULL) AS has_tent,
+    COUNT(DISTINCT c.id) FILTER (WHERE tc.category_id IS NOT NULL) AS tent_category_count,
+    MIN(c.display_name) FILTER (WHERE tc.category_id IS NOT NULL) AS single_tent_name,
+    COALESCE(SUM(COALESCE(bi.custom_total_price, bi.quoted_period_price)), 0) AS rental_sum,
+    COALESCE(SUM(COALESCE(bi.setup_service_fee, 0)), 0) AS setup_sum
+  FROM booking_items bi
+  JOIN items i ON i.id = bi.item_id
+  JOIN categories c ON c.id = i.category_id
+  LEFT JOIN tent_categories tc ON tc.category_id = c.id
+  GROUP BY bi.booking_id
+)
 SELECT
   b.id,
   b.start_date,
   b.end_date,
   b.status,
-  EXISTS (
-    SELECT 1
-    FROM booking_items bi2
-    JOIN items i2 ON i2.id = bi2.item_id
-    JOIN tent_categories tc2 ON tc2.category_id = i2.category_id
-    WHERE bi2.booking_id = b.id
-  ) AS has_tent,
+  COALESCE(br.has_tent, FALSE) AS has_tent,
   CASE
-    WHEN (
-      SELECT COUNT(DISTINCT c2.id)
-      FROM booking_items bi3
-      JOIN items i3 ON i3.id = bi3.item_id
-      JOIN categories c2 ON c2.id = i3.category_id
-      JOIN tent_categories tc3 ON tc3.category_id = c2.id
-      WHERE bi3.booking_id = b.id
-    ) = 1 THEN (
-      SELECT MIN(c3.display_name)
-      FROM booking_items bi4
-      JOIN items i4 ON i4.id = bi4.item_id
-      JOIN categories c3 ON c3.id = i4.category_id
-      JOIN tent_categories tc4 ON tc4.category_id = c3.id
-      WHERE bi4.booking_id = b.id
-    )
-    WHEN (
-      SELECT COUNT(DISTINCT c4.id)
-      FROM booking_items bi5
-      JOIN items i5 ON i5.id = bi5.item_id
-      JOIN categories c4 ON c4.id = i5.category_id
-      JOIN tent_categories tc5 ON tc5.category_id = c4.id
-      WHERE bi5.booking_id = b.id
-    ) >= 2 THEN '2+'
+    WHEN br.tent_category_count = 1 THEN br.single_tent_name
+    WHEN br.tent_category_count >= 2 THEN '2+'
     ELSE NULL
   END AS tent_summary,
   CASE
     WHEN b.custom_total_price IS NOT NULL THEN b.custom_total_price
     ELSE
-      COALESCE((
-        SELECT SUM(COALESCE(bi6.custom_total_price, bi6.quoted_period_price))
-        FROM booking_items bi6
-        WHERE bi6.booking_id = b.id
-      ), 0)
-      + CASE
-          WHEN b.include_setup_service THEN COALESCE((
-            SELECT SUM(COALESCE(bi7.setup_service_fee, 0))
-            FROM booking_items bi7
-            WHERE bi7.booking_id = b.id
-          ), 0)
-          ELSE 0
-        END
-      + CASE
-          WHEN b.include_delivery THEN COALESCE(b.delivery_fee, 0)
-          ELSE 0
-        END
+      COALESCE(br.rental_sum, 0)
+      + CASE WHEN b.include_setup_service THEN COALESCE(br.setup_sum, 0) ELSE 0 END
+      + CASE WHEN b.include_delivery THEN COALESCE(b.delivery_fee, 0) ELSE 0 END
   END AS total_cost,
   b.include_delivery,
   b.delivery_fee,
@@ -855,6 +809,7 @@ SELECT
   c.postal_city
 FROM bookings b
 JOIN customers c ON c.id = b.customer_id
+LEFT JOIN booking_rollup br ON br.booking_id = b.id
 ORDER BY b.created_at DESC;
 """
 
@@ -888,18 +843,21 @@ WITH request_window AS (
 SELECT
   i.id AS item_id,
   i.sku,
-  EXISTS (
-    SELECT 1
-    FROM booking_items bi
-    JOIN bookings b ON b.id = bi.booking_id
-    WHERE bi.item_id = i.id
-      AND (rw.current_booking_id IS NULL OR bi.booking_id <> rw.current_booking_id)
-      AND b.status <> 'cancelled'
-      AND rw.requested_start <= b.end_date
-      AND rw.requested_end >= b.start_date
-  ) AS is_turnaround
+  COALESCE(ov.has_overlap, FALSE) AS is_turnaround
 FROM items i
 CROSS JOIN request_window rw
+LEFT JOIN LATERAL (
+  SELECT
+    COUNT(*) > 0 AS has_overlap,
+    COALESCE(BOOL_OR(b.end_date <> rw.requested_start), FALSE) AS has_blocking_overlap
+  FROM booking_items bi
+  JOIN bookings b ON b.id = bi.booking_id
+  WHERE bi.item_id = i.id
+    AND (rw.current_booking_id IS NULL OR bi.booking_id <> rw.current_booking_id)
+    AND b.status <> 'cancelled'
+    AND rw.requested_start <= b.end_date
+    AND rw.requested_end >= b.start_date
+) ov ON TRUE
 WHERE i.category_id = %s
   AND (
     i.is_active = TRUE
@@ -910,18 +868,8 @@ WHERE i.category_id = %s
         AND current_bi.item_id = i.id
     )
   )
-  AND NOT EXISTS (
-    SELECT 1
-    FROM booking_items bi
-    JOIN bookings b ON b.id = bi.booking_id
-    WHERE bi.item_id = i.id
-      AND (rw.current_booking_id IS NULL OR bi.booking_id <> rw.current_booking_id)
-      AND b.status <> 'cancelled'
-      AND rw.requested_start <= b.end_date
-      AND rw.requested_end >= b.start_date
-      AND b.end_date <> rw.requested_start
-  )
-ORDER BY is_turnaround, i.id
+  AND COALESCE(ov.has_blocking_overlap, FALSE) = FALSE
+ORDER BY COALESCE(ov.has_overlap, FALSE), i.id
 FOR UPDATE OF i SKIP LOCKED;
 """
 

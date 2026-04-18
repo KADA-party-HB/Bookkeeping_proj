@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% import "_components.html" as ui %}
+{% import "_components.html" as ui with context %}
 {% block content %}
 {% set hero_actions %}
   <a class="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white transition hover:bg-sky-700" href="{{ url_for('routes.admin_bookings') }}">

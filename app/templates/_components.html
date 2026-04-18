@@ -80,6 +80,67 @@
 <div class="{{ base_class }}{% if class_name %} {{ class_name }}{% endif %}"><i>{{ message }}</i></div>
 {%- endmacro %}
 
+{% macro async_fragment_host(partial, message='Loading...', class_name='', loading_class='rounded-[2rem] border border-slate-200 bg-white px-6 py-8 text-sm text-slate-500 shadow-sm', min_height=None) -%}
+<div{% if class_name %} class="{{ class_name }}"{% endif %} data-async-fragment="{{ partial }}" aria-live="polite">
+  <div class="{{ loading_class }}"{% if min_height %} style="min-height: {{ min_height }};"{% endif %}>
+    {{ message }}
+  </div>
+</div>
+{%- endmacro %}
+
+{% macro client_pager(variant='admin', rows_label='Rows', previous_label='Previous', next_label='Next', showing_label='Showing', of_label='of', class_name='mt-6', per_page_options=(10, 25, 50, 100), default_per_page=10) -%}
+<div class="{{ class_name }} flex flex-col gap-4 rounded-[1.5rem] px-4 py-4 md:flex-row md:items-center md:justify-between{% if variant == 'admin' %} border border-slate-200 bg-slate-50{% else %} border border-slate-200 bg-white shadow-[0_18px_40px_-32px_rgba(15,23,42,0.1)]{% endif %}" data-client-list-pager data-client-list-variant="{{ variant }}">
+  <div class="text-sm text-slate-600">
+    {{ showing_label }}
+    <span class="font-medium text-slate-900" data-client-list-start>0</span>-<span class="font-medium text-slate-900" data-client-list-end>0</span>
+    {{ of_label }}
+    <span class="font-medium text-slate-900" data-client-list-total>0</span>
+  </div>
+
+  <div class="flex flex-col gap-3 md:flex-row md:items-center">
+    <div class="flex items-center gap-2 text-sm text-slate-600">
+      <span class="font-medium text-slate-700">{{ rows_label }}</span>
+      <select
+        data-client-list-per-page
+        class="rounded-xl border px-3 py-2 text-sm text-slate-900 shadow-sm transition focus:outline-none focus:ring-4 {% if variant == 'admin' %}border-slate-300 bg-white focus:border-sky-400 focus:ring-sky-100{% else %}border-slate-300 bg-slate-50 focus:border-pink-400 focus:bg-white focus:ring-pink-100{% endif %}"
+      >
+        {% for option in per_page_options %}
+          <option value="{{ option }}" {% if option == default_per_page %}selected{% endif %}>{{ option }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <nav class="flex flex-wrap items-center gap-2" data-client-list-nav aria-label="{% if variant == 'admin' %}Pagination{% else %}Sidnumrering{% endif %}">
+      <button
+        type="button"
+        data-client-list-prev
+        class="inline-flex items-center justify-center rounded-xl border bg-white px-3 py-2 text-sm font-medium text-slate-700 transition disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 {% if variant == 'admin' %}border-slate-300 hover:border-sky-300 hover:text-sky-700{% else %}border-slate-300 hover:border-pink-300 hover:text-rose-600{% endif %}"
+      >
+        {{ previous_label }}
+      </button>
+      <div class="flex flex-wrap items-center gap-2" data-client-list-pages></div>
+      <button
+        type="button"
+        data-client-list-next
+        class="inline-flex items-center justify-center rounded-xl border bg-white px-3 py-2 text-sm font-medium text-slate-700 transition disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 {% if variant == 'admin' %}border-slate-300 hover:border-sky-300 hover:text-sky-700{% else %}border-slate-300 hover:border-pink-300 hover:text-rose-600{% endif %}"
+      >
+        {{ next_label }}
+      </button>
+    </nav>
+  </div>
+</div>
+{%- endmacro %}
+
+{% macro sortable_header(label, sort_key, current_sort, current_sort_dir, default_dir='asc', class_name='p-3 text-left font-medium') -%}
+{% set active = current_sort == sort_key %}
+<th class="{{ class_name }}" aria-sort="{% if active %}{{ 'ascending' if current_sort_dir == 'asc' else 'descending' }}{% else %}none{% endif %}">
+  <a class="sortable-header-button" href="{{ sort_url(sort_key, default_dir=default_dir) }}" data-async-nav>
+    <span>{{ label }}</span>
+    <span class="sortable-header-indicator">{% if active %}{{ '↑' if current_sort_dir == 'asc' else '↓' }}{% else %}↕{% endif %}</span>
+  </a>
+</th>
+{%- endmacro %}
+
 {% macro form_actions(submit_label, cancel_href, cancel_label='Cancel', submit_type='submit', submit_class='', cancel_class='') -%}
 <div class="flex flex-wrap items-center gap-3">
   <button type="{{ submit_type }}" class="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-5 py-3 text-sm font-medium text-white transition hover:bg-sky-700 focus:outline-none focus:ring-4 focus:ring-sky-100{% if submit_class %} {{ submit_class }}{% endif %}">
