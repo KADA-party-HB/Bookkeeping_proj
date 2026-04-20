@@ -1,0 +1,600 @@
+{% import "_components.html" as ui with context %}
+
+{% if categories is not none %}
+  <form
+    method="post"
+    action="{{ url_for('routes.guest_booking_create') }}"
+    class="mt-6 space-y-6"
+    id="guest-booking-form"
+    data-delivery-quote-url="{{ url_for('routes.guest_delivery_quote') }}"
+  >
+    <input type="hidden" name="start_date" value="{{ start_date }}">
+    <input type="hidden" name="end_date" value="{{ end_date }}">
+
+    <section class="rounded-[2rem] border border-slate-200 bg-white shadow-[0_24px_60px_-42px_rgba(15,23,42,0.16)]" data-client-list>
+      <div class="border-b border-pink-100 bg-[linear-gradient(180deg,rgba(253,242,248,0.55),rgba(255,255,255,0.96))] px-6 py-5 md:px-8">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <div class="text-xs font-medium uppercase tracking-[0.2em] text-rose-400">Steg 2</div>
+            <h2 class="mt-1 text-2xl font-black text-slate-950">Välj artiklar</h2>
+          </div>
+
+          <div class="rounded-full border border-pink-200 bg-white px-4 py-2 text-sm font-medium text-slate-700">
+            {{ categories|length }} kategorier hittades
+          </div>
+        </div>
+
+        {% if categories|length > 0 %}
+          <div class="mt-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div class="max-w-xl">
+              <label class="text-sm font-medium text-slate-700" for="item-search-input">Sök artiklar</label>
+              <p class="mt-1 text-xs text-slate-500">Filtrera på namn, typ, hyresperiod eller detaljer.</p>
+            </div>
+
+            <div class="flex w-full flex-col gap-3 sm:flex-row lg:max-w-2xl lg:items-center">
+              <input
+                id="item-search-input"
+                type="search"
+                data-client-list-search
+                placeholder="Sök tält, inredning, priser..."
+                class="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-900 shadow-sm transition focus:border-pink-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-pink-100"
+              >
+              <div
+                class="inline-flex items-center justify-center whitespace-nowrap rounded-full border border-pink-200 bg-pink-50 px-3 py-2 text-xs font-medium text-rose-500 shadow-sm"
+                id="item-search-count"
+                data-client-list-count
+                data-client-list-count-suffix="visas"
+              >
+                {{ categories|length }} visas
+              </div>
+            </div>
+          </div>
+        {% endif %}
+      </div>
+
+      <div class="px-6 py-6 md:px-8">
+        {% if categories|length == 0 %}
+          <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-600">
+            <i>Inga kategorier är tillgängliga för de datumen.</i>
+          </div>
+        {% else %}
+          <div class="grid gap-4 md:hidden">
+            {% for c in categories %}
+              {% set disabled = c.available_items == 0 or not c.has_standard_price %}
+              <div
+                class="rounded-[1.4rem] border border-slate-200 bg-[linear-gradient(180deg,#fffdfd_0%,#ffffff_100%)] p-4 shadow-[0_18px_45px_-36px_rgba(15,23,42,0.12)]"
+                data-item-card
+                data-client-list-item
+                data-client-list-group="cards"
+                data-search-text="{{ (
+                  c.display_name ~ ' ' ~
+                  ('tent ' if c.is_tent else '') ~
+                  ('furnishing ' if c.is_furnishing else '') ~
+                  (c.furnishing_kind or '') ~ ' ' ~
+                  (c.rental_period_label or '') ~ ' ' ~
+                  (c.notes or '')
+                )|lower }}"
+              >
+                <div class="flex items-start justify-between gap-3">
+                  <div>
+                    <div class="font-semibold text-slate-900">{{ c.display_name }}</div>
+                    <div class="mt-1 flex flex-wrap gap-2">
+                      {{ ui.inventory_type_badges(c.is_tent, c.is_furnishing, variant='customer', tent_label='Tält', furnishing_label='Inredning') }}
+                    </div>
+                  </div>
+
+                  <span class="inline-flex rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700">
+                    {{ c.available_items }} lediga
+                  </span>
+                </div>
+
+                <div class="mt-4 grid gap-3 text-sm text-slate-600">
+                  <div>
+                    {% if c.has_standard_price %}
+                      <div class="font-medium text-slate-900">{{ c.quoted_period_price }} kr</div>
+                      <div class="text-xs text-slate-500">{{ c.rental_period_label }}</div>
+                    {% else %}
+                      <div class="font-medium text-amber-700">Kan inte bokas för de här datumen</div>
+                    {% endif %}
+                  </div>
+
+                  <div class="space-y-1">
+                    {% if c.is_tent %}
+                      <div>Kapacitet: {{ c.capacity }}</div>
+                      <div>Säsong: {{ c.season_rating }}</div>
+                      <div>Montering: {{ c.setup_service_fee }} kr</div>
+                    {% else %}
+                      <div>{{ c.furnishing_kind }}</div>
+                      {% if c.weight_kg %}<div>Vikt: {{ c.weight_kg }} kg</div>{% endif %}
+                    {% endif %}
+                  </div>
+
+                  <div>
+                    <label class="text-sm font-medium text-slate-700" for="qty_mobile_{{ c.id }}">Antal</label>
+                    <input
+                      id="qty_mobile_{{ c.id }}"
+                      type="number"
+                      min="0"
+                      max="{{ c.available_items }}"
+                      step="1"
+                      value="0"
+                      name="qty_{{ c.id }}"
+                      inputmode="numeric"
+                      {% if disabled %}disabled{% endif %}
+                      data-booking-qty
+                      data-unit-price="{{ c.quoted_period_price if c.has_standard_price else 0 }}"
+                      data-setup-fee="{{ c.setup_service_fee if c.is_tent else 0 }}"
+                      data-is-tent="{{ 'true' if c.is_tent else 'false' }}"
+                      class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 shadow-sm transition focus:border-pink-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-pink-100"
+                    >
+                  </div>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+
+          <div class="hidden overflow-hidden rounded-[1.5rem] border border-slate-200 md:block">
+            <div class="overflow-x-auto">
+              <table class="min-w-full text-sm">
+                <thead class="bg-[linear-gradient(90deg,#ec4899_0%,#f472b6_72%,#22c55e_140%)] text-white">
+                  <tr>
+                    <th class="p-3 text-left font-medium">Kategori</th>
+                    <th class="p-3 text-left font-medium">Typ</th>
+                    <th class="p-3 text-left font-medium">Period</th>
+                    <th class="p-3 text-left font-medium" data-sort-type="number">Pris</th>
+                    <th class="p-3 text-left font-medium" data-sort-type="number">Lediga nu</th>
+                    <th class="p-3 text-left font-medium">Detaljer</th>
+                    <th class="p-3 text-left font-medium" data-sort-type="number">Antal</th>
+                  </tr>
+                </thead>
+
+                <tbody class="divide-y divide-slate-200 bg-white">
+                  {% for c in categories %}
+                    {% set disabled = c.available_items == 0 or not c.has_standard_price %}
+                    <tr
+                      class="align-top"
+                      data-item-row
+                      data-client-list-item
+                      data-client-list-group="rows"
+                      data-search-text="{{ (
+                        c.display_name ~ ' ' ~
+                        ('tent ' if c.is_tent else '') ~
+                        ('furnishing ' if c.is_furnishing else '') ~
+                        (c.furnishing_kind or '') ~ ' ' ~
+                        (c.rental_period_label or '') ~ ' ' ~
+                        (c.notes or '')
+                      )|lower }}"
+                    >
+                      <td class="p-3">
+                        <div class="font-medium text-slate-900">{{ c.display_name }}</div>
+                        <div class="mt-1 text-xs text-slate-500">Kategori #{{ c.id }}</div>
+                      </td>
+
+                      <td class="p-3">
+                        {{ ui.inventory_type_badges(c.is_tent, c.is_furnishing, variant='customer', tent_label='Tält', furnishing_label='Inredning') }}
+                      </td>
+
+                      <td class="p-3">
+                        {% if c.has_standard_price %}
+                          <div class="font-medium text-slate-900">{{ c.rental_period_label }}</div>
+                          <div class="mt-1 text-xs text-slate-500">
+                            {% if c.rental_period_min_days == 1 and c.rental_period_max_days == 1 %}
+                              1 dag
+                            {% else %}
+                              {{ c.rental_period_min_days }}-{{ c.rental_period_max_days }} dagar
+                            {% endif %}
+                          </div>
+                        {% else %}
+                          <span class="text-amber-700">Inget standardpris för vald period</span>
+                        {% endif %}
+                      </td>
+
+                      <td class="p-3">
+                        {% if c.has_standard_price %}
+                          <div class="font-medium text-slate-900">{{ c.quoted_period_price }} kr</div>
+                        {% else %}
+                          <span class="text-slate-400">Ej tillgänglig</span>
+                        {% endif %}
+                      </td>
+
+                      <td class="p-3">
+                        {% if c.available_items > 0 %}
+                          <span class="font-medium text-slate-900">{{ c.available_items }}</span>
+                        {% else %}
+                          <span class="font-medium text-rose-600">0</span>
+                        {% endif %}
+                      </td>
+
+                      <td class="p-3 text-xs text-slate-600">
+                        {% if c.is_tent %}
+                          <div>Kapacitet: {{ c.capacity }}</div>
+                          <div class="mt-1">Säsong: {{ c.season_rating }}</div>
+                          <div class="mt-1">Montering: {{ c.setup_service_fee }} kr</div>
+                        {% else %}
+                          <div>{{ c.furnishing_kind }}</div>
+                          {% if c.weight_kg %}<div class="mt-1">Vikt: {{ c.weight_kg }} kg</div>{% endif %}
+                        {% endif %}
+                      </td>
+
+                      <td class="p-3">
+                        <input
+                          type="number"
+                          min="0"
+                          max="{{ c.available_items }}"
+                          step="1"
+                          value="0"
+                          name="qty_{{ c.id }}"
+                          inputmode="numeric"
+                          {% if disabled %}disabled{% endif %}
+                          data-booking-qty
+                          data-unit-price="{{ c.quoted_period_price if c.has_standard_price else 0 }}"
+                          data-setup-fee="{{ c.setup_service_fee if c.is_tent else 0 }}"
+                          data-is-tent="{{ 'true' if c.is_tent else 'false' }}"
+                          class="w-24 rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 shadow-sm transition focus:border-pink-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-pink-100"
+                        >
+                      </td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        {% endif %}
+
+        <div
+          class="mt-6 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 sm:flex-row sm:items-center sm:justify-between"
+          data-local-pager
+        >
+          <div class="text-sm text-slate-600">
+            <span data-pager-status>Visar 0 av 0</span>
+          </div>
+
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div class="flex items-center gap-2">
+              <label class="text-sm font-medium text-slate-700" for="items-per-page">Rader</label>
+              <select
+                id="items-per-page"
+                data-pager-per-page
+                class="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-pink-400 focus:outline-none focus:ring-4 focus:ring-pink-100"
+              >
+                <option value="5">5</option>
+                <option value="10" selected>10</option>
+                <option value="20">20</option>
+                <option value="50">50</option>
+              </select>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <button
+                type="button"
+                data-pager-prev
+                class="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:border-pink-300 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Föregående
+              </button>
+
+              <span
+                data-pager-page
+                class="min-w-[90px] text-center text-sm font-medium text-slate-700"
+              >
+                Sida 1 av 1
+              </span>
+
+              <button
+                type="button"
+                data-pager-next
+                class="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:border-pink-300 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Nästa
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="grid gap-6 xl:grid-cols-[0.95fr_1.05fr_0.8fr] xl:items-start">
+      <section class="rounded-[2rem] border border-slate-200 bg-white shadow-[0_24px_60px_-42px_rgba(15,23,42,0.16)]">
+        <div class="border-b border-slate-200 px-6 py-5">
+          <div class="text-xs font-medium uppercase tracking-[0.2em] text-rose-400">Steg 3</div>
+          <h2 class="mt-1 text-xl font-black text-slate-950">Tjänster</h2>
+        </div>
+
+        <div class="space-y-5 px-6 py-6">
+          <label class="flex items-start gap-3 rounded-2xl border border-pink-100 bg-pink-50/50 px-4 py-4">
+            <input
+              type="checkbox"
+              name="include_delivery"
+              id="include_delivery"
+              class="mt-1 h-4 w-4 rounded border-pink-300 text-pink-500 focus:ring-pink-400"
+            >
+            <span class="text-sm text-slate-700">
+              <span class="block font-medium text-slate-900">Inkludera leverans</span>
+              <span class="mt-1 block">Vi validerar adressen och räknar ut avgiften utifrån körsträckan.</span>
+              <span class="mt-1 block text-xs text-slate-500">Adressvalidering och ruttberäkning använder Geoapify.</span>
+            </span>
+          </label>
+
+          <label class="flex items-start gap-3 rounded-2xl border border-pink-100 bg-pink-50/50 px-4 py-4">
+            <input
+              type="checkbox"
+              name="include_setup_service"
+              id="include_setup_service"
+              class="mt-1 h-4 w-4 rounded border-pink-300 text-pink-500 focus:ring-pink-400"
+            >
+            <span class="text-sm text-slate-700">
+              <span class="block font-medium text-slate-900">Inkludera montering</span>
+              <span class="mt-1 block" id="setup-service-help">Monteringsavgift läggs bara till för tält. Leverans krävs.</span>
+            </span>
+          </label>
+
+          <div>
+            <label class="text-sm font-medium text-slate-700" for="booking_note">Bokningsanteckning</label>
+            <textarea
+              id="booking_note"
+              name="booking_note"
+              rows="4"
+              placeholder="Åtkomstinfo, tider, leveransinstruktioner..."
+              class="mt-1 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 shadow-sm transition focus:border-pink-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-pink-100"
+            ></textarea>
+          </div>
+        </div>
+      </section>
+
+      <section class="rounded-[2rem] border border-slate-200 bg-white shadow-[0_24px_60px_-42px_rgba(15,23,42,0.16)]">
+        <div class="border-b border-slate-200 px-6 py-5">
+          <div class="text-xs font-medium uppercase tracking-[0.2em] text-rose-400">Steg 4</div>
+          <h2 class="mt-1 text-xl font-black text-slate-950">
+            {% if role == "customer" and customer_profile %}Ditt konto{% else %}Skapa konto{% endif %}
+          </h2>
+        </div>
+
+        <div class="space-y-4 px-6 py-6">
+          {% if role == "customer" and customer_profile %}
+            <div class="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm text-emerald-900">
+              Bokar som <span class="font-medium">{{ customer_profile.full_name }}</span>{% if customer_profile.email %} ({{ customer_profile.email }}){% endif %}.
+            </div>
+
+            <div>
+              <label class="text-sm font-medium text-slate-700" for="phone">Telefon</label>
+              <input
+                id="phone"
+                name="phone"
+                value="{{ customer_profile.phone or '' }}"
+                autocomplete="tel"
+                class="mt-1 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 shadow-sm transition focus:border-pink-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-pink-100"
+              >
+            </div>
+          {% else %}
+            <div>
+              <label class="text-sm font-medium text-slate-700" for="full_name">Fullständigt namn</label>
+              <input
+                id="full_name"
+                name="full_name"
+                required
+                autocomplete="name"
+                class="mt-1 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 shadow-sm transition focus:border-pink-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-pink-100"
+              >
+            </div>
+
+            <div>
+              <label class="text-sm font-medium text-slate-700" for="email">E-post</label>
+              <input
+                id="email"
+                name="email"
+                type="email"
+                required
+                autocomplete="email"
+                class="mt-1 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 shadow-sm transition focus:border-pink-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-pink-100"
+              >
+            </div>
+
+            <div>
+              <label class="text-sm font-medium text-slate-700" for="phone">Telefon</label>
+              <input
+                id="phone"
+                name="phone"
+                autocomplete="tel"
+                class="mt-1 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 shadow-sm transition focus:border-pink-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-pink-100"
+              >
+            </div>
+          {% endif %}
+
+          <div>
+            <label class="text-sm font-medium text-slate-700" for="address">Adress</label>
+            <input
+              id="address"
+              name="address"
+              type="text"
+              value="{{ customer_profile.address if customer_profile else '' }}"
+              autocomplete="street-address"
+              class="mt-1 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 shadow-sm transition focus:border-pink-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-pink-100"
+            >
+          </div>
+
+          <div>
+            <label class="text-sm font-medium text-slate-700" for="postal_city">Postort</label>
+            <input
+              id="postal_city"
+              name="postal_city"
+              type="text"
+              value="{{ customer_profile.postal_city if customer_profile and customer_profile.postal_city else '' }}"
+              autocomplete="address-level2"
+              class="mt-1 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 shadow-sm transition focus:border-pink-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-pink-100"
+            >
+          </div>
+
+          <p
+            id="delivery-address-error"
+            class="hidden rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700"
+          ></p>
+
+          {% if not (role == "customer" and customer_profile) %}
+            <div>
+              <label class="text-sm font-medium text-slate-700" for="password">Lösenord</label>
+              <input
+                id="password"
+                name="password"
+                type="password"
+                required
+                autocomplete="new-password"
+                class="mt-1 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 shadow-sm transition focus:border-pink-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-pink-100"
+              >
+            </div>
+          {% endif %}
+        </div>
+      </section>
+
+      <section class="rounded-[2rem] border bg-green-50/50 text-slate-900 shadow-[0_28px_70px_-42px_rgba(15,23,42,0.12)]">
+        <div class="border-b px-6 py-5">
+          <div class="text-xs font-medium uppercase tracking-[0.2em] text-green-400">Steg 5</div>
+          <h2 class="mt-1 text-xl font-black text-slate-950">Sammanfattning</h2>
+        </div>
+
+        <div class="space-y-3 px-6 py-6 text-sm">
+          <div class="flex items-center justify-between gap-4">
+            <span class="text-slate-500">Artiklar</span>
+            <span id="summary-items" class="font-semibold text-slate-950">0 valda</span>
+          </div>
+
+          <div class="flex items-center justify-between gap-4">
+            <span class="text-slate-500">Hyra</span>
+            <span id="summary-rental" class="font-semibold text-slate-950">0 kr</span>
+          </div>
+
+          <div class="flex items-center justify-between gap-4">
+            <span class="text-slate-500">Montering</span>
+            <span id="summary-setup" class="font-semibold text-slate-950">Inte tillvalt</span>
+          </div>
+
+          <div class="flex items-center justify-between gap-4">
+            <span class="text-slate-500">Leverans</span>
+            <span id="summary-delivery" class="font-semibold text-slate-950">Inte tillvalt</span>
+          </div>
+
+          <div class="border-t border-pink-100 pt-3">
+            <div class="flex items-center justify-between gap-4 text-base font-semibold">
+              <span>Total</span>
+              <span id="summary-total" class="text-rose-600">0 kr</span>
+            </div>
+          </div>
+
+          <p id="form-error" class="hidden rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700"></p>
+
+          <button
+            type="submit"
+            class="inline-flex w-full items-center justify-center rounded-2xl bg-pink-500 px-4 py-3 text-sm font-medium text-white transition hover:bg-rose-600 focus:outline-none focus:ring-4 focus:ring-pink-100 disabled:cursor-not-allowed disabled:bg-pink-300 disabled:hover:bg-pink-300"
+          >
+            {% if role == "customer" and customer_profile %}Skicka bokning{% else %}Skicka bokning och skapa konto{% endif %}
+          </button>
+
+          <p class="text-xs text-slate-500">
+            Bokningen skapas som väntande. Lagret reserveras tillfälligt tills personalen bekräftar den.
+          </p>
+        </div>
+      </section>
+    </div>
+  </form>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const form = document.getElementById("guest-booking-form");
+      if (!form) return;
+
+      const qtyInputs = Array.from(form.querySelectorAll("[data-booking-qty]"));
+      const deliveryCheckbox = document.getElementById("include_delivery");
+      const setupCheckbox = document.getElementById("include_setup_service");
+
+      const summaryItems = document.getElementById("summary-items");
+      const summaryRental = document.getElementById("summary-rental");
+      const summarySetup = document.getElementById("summary-setup");
+      const summaryDelivery = document.getElementById("summary-delivery");
+      const summaryTotal = document.getElementById("summary-total");
+
+      function safeNumber(value) {
+        const n = Number(value);
+        return Number.isFinite(n) ? n : 0;
+      }
+
+      function formatKr(value) {
+        return `${value} kr`;
+      }
+
+      function updateTotalColor(total) {
+        summaryTotal.classList.remove("text-rose-600", "text-emerald-600");
+        summaryTotal.classList.add(total > 0 ? "text-emerald-600" : "text-rose-600");
+      }
+
+      function updateSummary() {
+        let selectedItems = 0;
+        let rentalTotal = 0;
+        let setupTotal = 0;
+        let tentQty = 0;
+
+        qtyInputs.forEach((input) => {
+          const qty = safeNumber(input.value);
+          const unitPrice = safeNumber(input.dataset.unitPrice);
+          const setupFee = safeNumber(input.dataset.setupFee);
+          const isTent = input.dataset.isTent === "true";
+
+          if (qty > 0) {
+            selectedItems += qty;
+            rentalTotal += qty * unitPrice;
+
+            if (isTent) {
+              tentQty += qty;
+
+              if (setupCheckbox && setupCheckbox.checked) {
+                setupTotal += qty * setupFee;
+              }
+            }
+          }
+        });
+
+        const total = rentalTotal + setupTotal;
+
+        if (summaryItems) {
+          summaryItems.textContent = `${selectedItems} valda`;
+        }
+
+        if (summaryRental) {
+          summaryRental.textContent = formatKr(rentalTotal);
+        }
+
+        if (summarySetup) {
+          if (setupCheckbox && setupCheckbox.checked) {
+            summarySetup.textContent = tentQty > 0 ? formatKr(setupTotal) : "0 kr";
+          } else {
+            summarySetup.textContent = "Inte tillvalt";
+          }
+        }
+
+        if (summaryDelivery) {
+          summaryDelivery.textContent = deliveryCheckbox && deliveryCheckbox.checked
+            ? "Tillvalt"
+            : "Inte tillvalt";
+        }
+
+        if (summaryTotal) {
+          summaryTotal.textContent = formatKr(total);
+          updateTotalColor(total);
+        }
+      }
+
+      qtyInputs.forEach((input) => {
+        input.addEventListener("input", updateSummary);
+        input.addEventListener("change", updateSummary);
+      });
+
+      if (deliveryCheckbox) {
+        deliveryCheckbox.addEventListener("change", updateSummary);
+      }
+
+      if (setupCheckbox) {
+        setupCheckbox.addEventListener("change", updateSummary);
+      }
+
+      updateSummary();
+    });
+  </script>
+{% endif %}

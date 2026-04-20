@@ -1,0 +1,290 @@
+{% macro admin_page_hero(eyebrow, title, description=None, actions=None, extra=None, title_tag='h1', title_class='mt-4 text-3xl font-semibold tracking-tight text-slate-900 md:text-4xl') -%}
+<section class="relative overflow-hidden rounded-[2rem] border border-sky-100 bg-gradient-to-br from-white via-sky-50 to-slate-50 shadow-sm">
+  <div class="absolute inset-y-0 right-0 hidden w-1/3 bg-[radial-gradient(circle_at_top,rgba(14,165,233,0.16),transparent_58%)] lg:block"></div>
+  <div class="relative px-6 py-8 md:px-8">
+    <div class="flex flex-wrap items-start justify-between gap-4">
+      <div>
+        <div class="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-white/80 px-3 py-1 text-xs font-medium uppercase tracking-[0.2em] text-sky-700">
+          {{ eyebrow }}
+        </div>
+        <{{ title_tag }} class="{{ title_class }}">{{ title }}</{{ title_tag }}>
+        {% if description %}
+          <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-600">{{ description }}</p>
+        {% endif %}
+      </div>
+      {% if actions %}
+        <div class="flex flex-wrap items-center gap-3">{{ actions|safe }}</div>
+      {% endif %}
+    </div>
+    {% if extra %}
+      <div class="mt-6">{{ extra|safe }}</div>
+    {% endif %}
+  </div>
+</section>
+{%- endmacro %}
+
+{% macro content_panel(title=None, eyebrow=None, subtitle=None, trailing=None, wrapper_class='mt-6', panel_class='', body_class='px-6 py-6 md:px-8', header_class='', title_class='text-2xl font-semibold text-slate-900', trailing_class='rounded-full bg-slate-100 px-4 py-2 text-sm font-medium text-slate-600') -%}
+<section class="{{ wrapper_class }} rounded-[2rem] border border-slate-200 bg-white shadow-sm{% if panel_class %} {{ panel_class }}{% endif %}">
+  {% if eyebrow or title or subtitle or trailing %}
+    <div class="border-b border-slate-200 px-6 py-5 md:px-8{% if header_class %} {{ header_class }}{% endif %}">
+      {% if trailing %}
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            {% if eyebrow %}
+              <div class="text-xs font-medium uppercase tracking-[0.2em] text-slate-400">{{ eyebrow }}</div>
+            {% endif %}
+            {% if title %}
+              <h2 class="{% if eyebrow %}mt-1 {% endif %}{{ title_class }}">{{ title }}</h2>
+            {% endif %}
+            {% if subtitle %}
+              <p class="{% if eyebrow or title %}mt-1 {% endif %}text-sm text-slate-500">{{ subtitle }}</p>
+            {% endif %}
+          </div>
+          <div class="{{ trailing_class }}">{{ trailing|safe }}</div>
+        </div>
+      {% else %}
+        {% if eyebrow %}
+          <div class="text-xs font-medium uppercase tracking-[0.2em] text-slate-400">{{ eyebrow }}</div>
+        {% endif %}
+        {% if title %}
+          <h2 class="{% if eyebrow %}mt-1 {% endif %}{{ title_class }}">{{ title }}</h2>
+        {% endif %}
+        {% if subtitle %}
+          <p class="{% if eyebrow or title %}mt-1 {% endif %}text-sm text-slate-500">{{ subtitle }}</p>
+        {% endif %}
+      {% endif %}
+    </div>
+  {% endif %}
+  <div class="{{ body_class }}">
+    {{ caller() }}
+  </div>
+</section>
+{%- endmacro %}
+
+{% macro table_shell(wrapper_class='hidden overflow-hidden rounded-[1.5rem] border border-slate-200 md:block', table_class='min-w-full text-sm') -%}
+<div class="{{ wrapper_class }}">
+  <div class="overflow-x-auto">
+    <table class="{{ table_class }}">
+      {{ caller() }}
+    </table>
+  </div>
+</div>
+{%- endmacro %}
+
+{% macro empty_state(message, theme='admin', class_name='') -%}
+{% if theme == 'customer' %}
+  {% set base_class = 'rounded-2xl border border-emerald-100 bg-emerald-50/40 px-4 py-4 text-sm text-slate-600' %}
+{% else %}
+  {% set base_class = 'rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-600' %}
+{% endif %}
+<div class="{{ base_class }}{% if class_name %} {{ class_name }}{% endif %}"><i>{{ message }}</i></div>
+{%- endmacro %}
+
+{% macro async_fragment_host(partial, message='Loading...', class_name='', loading_class='rounded-[2rem] border border-slate-200 bg-white px-6 py-8 text-sm text-slate-500 shadow-sm', min_height=None) -%}
+<div{% if class_name %} class="{{ class_name }}"{% endif %} data-async-fragment="{{ partial }}" aria-live="polite">
+  <div class="{{ loading_class }}"{% if min_height %} style="min-height: {{ min_height }};"{% endif %}>
+    {{ message }}
+  </div>
+</div>
+{%- endmacro %}
+
+{% macro client_pager(variant='admin', rows_label='Rows', previous_label='Previous', next_label='Next', showing_label='Showing', of_label='of', class_name='mt-6', per_page_options=(10, 25, 50, 100), default_per_page=10) -%}
+<div class="{{ class_name }} flex flex-col gap-4 rounded-[1.5rem] px-4 py-4 md:flex-row md:items-center md:justify-between{% if variant == 'admin' %} border border-slate-200 bg-slate-50{% else %} border border-slate-200 bg-white shadow-[0_18px_40px_-32px_rgba(15,23,42,0.1)]{% endif %}" data-client-list-pager data-client-list-variant="{{ variant }}">
+  <div class="text-sm text-slate-600">
+    {{ showing_label }}
+    <span class="font-medium text-slate-900" data-client-list-start>0</span>-<span class="font-medium text-slate-900" data-client-list-end>0</span>
+    {{ of_label }}
+    <span class="font-medium text-slate-900" data-client-list-total>0</span>
+  </div>
+
+  <div class="flex flex-col gap-3 md:flex-row md:items-center">
+    <div class="flex items-center gap-2 text-sm text-slate-600">
+      <span class="font-medium text-slate-700">{{ rows_label }}</span>
+      <select
+        data-client-list-per-page
+        class="rounded-xl border px-3 py-2 text-sm text-slate-900 shadow-sm transition focus:outline-none focus:ring-4 {% if variant == 'admin' %}border-slate-300 bg-white focus:border-sky-400 focus:ring-sky-100{% else %}border-slate-300 bg-slate-50 focus:border-pink-400 focus:bg-white focus:ring-pink-100{% endif %}"
+      >
+        {% for option in per_page_options %}
+          <option value="{{ option }}" {% if option == default_per_page %}selected{% endif %}>{{ option }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <nav class="flex flex-wrap items-center gap-2" data-client-list-nav aria-label="{% if variant == 'admin' %}Pagination{% else %}Sidnumrering{% endif %}">
+      <button
+        type="button"
+        data-client-list-prev
+        class="inline-flex items-center justify-center rounded-xl border bg-white px-3 py-2 text-sm font-medium text-slate-700 transition disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 {% if variant == 'admin' %}border-slate-300 hover:border-sky-300 hover:text-sky-700{% else %}border-slate-300 hover:border-pink-300 hover:text-rose-600{% endif %}"
+      >
+        {{ previous_label }}
+      </button>
+      <div class="flex flex-wrap items-center gap-2" data-client-list-pages></div>
+      <button
+        type="button"
+        data-client-list-next
+        class="inline-flex items-center justify-center rounded-xl border bg-white px-3 py-2 text-sm font-medium text-slate-700 transition disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 {% if variant == 'admin' %}border-slate-300 hover:border-sky-300 hover:text-sky-700{% else %}border-slate-300 hover:border-pink-300 hover:text-rose-600{% endif %}"
+      >
+        {{ next_label }}
+      </button>
+    </nav>
+  </div>
+</div>
+{%- endmacro %}
+
+{% macro sortable_header(label, sort_key, current_sort, current_sort_dir, default_dir='asc', class_name='p-3 text-left font-medium') -%}
+{% set active = current_sort == sort_key %}
+<th class="{{ class_name }}" aria-sort="{% if active %}{{ 'ascending' if current_sort_dir == 'asc' else 'descending' }}{% else %}none{% endif %}">
+  <a class="sortable-header-button" href="{{ sort_url(sort_key, default_dir=default_dir) }}" data-async-nav>
+    <span>{{ label }}</span>
+    <span class="sortable-header-indicator">{% if active %}{{ '↑' if current_sort_dir == 'asc' else '↓' }}{% else %}↕{% endif %}</span>
+  </a>
+</th>
+{%- endmacro %}
+
+{% macro form_actions(submit_label, cancel_href, cancel_label='Cancel', submit_type='submit', submit_class='', cancel_class='') -%}
+<div class="flex flex-wrap items-center gap-3">
+  <button type="{{ submit_type }}" class="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-5 py-3 text-sm font-medium text-white transition hover:bg-sky-700 focus:outline-none focus:ring-4 focus:ring-sky-100{% if submit_class %} {{ submit_class }}{% endif %}">
+    {{ submit_label }}
+  </button>
+  <a class="inline-flex items-center justify-center rounded-2xl border border-slate-300 px-5 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50{% if cancel_class %} {{ cancel_class }}{% endif %}" href="{{ cancel_href }}">
+    {{ cancel_label }}
+  </a>
+</div>
+{%- endmacro %}
+
+{% macro booking_status_badge(status, variant='admin', size='xs', confirmed_label='Confirmed', pending_label='Pending', cancelled_label='Cancelled', class_name='') -%}
+{% if size == 'sm' %}
+  {% set size_class = 'px-3 py-1 text-sm font-medium' %}
+{% else %}
+  {% set size_class = 'px-2.5 py-1 text-xs font-medium' %}
+{% endif %}
+{% if variant == 'customer' %}
+  {% set confirmed_class = 'border border-emerald-200 bg-emerald-50 text-emerald-700' %}
+  {% set pending_class = 'border border-pink-200 bg-pink-50 text-rose-500' %}
+  {% set cancelled_class = 'border border-rose-200 bg-rose-50 text-rose-700' %}
+{% else %}
+  {% set confirmed_class = 'bg-emerald-100 text-emerald-800' %}
+  {% set pending_class = 'bg-amber-100 text-amber-800' %}
+  {% set cancelled_class = 'bg-rose-100 text-rose-800' %}
+{% endif %}
+{% if status == 'confirmed' %}
+  {% set label = confirmed_label %}
+  {% set status_class = confirmed_class %}
+{% elif status == 'pending' %}
+  {% set label = pending_label %}
+  {% set status_class = pending_class %}
+{% else %}
+  {% set label = cancelled_label %}
+  {% set status_class = cancelled_class %}
+{% endif %}
+<span class="inline-flex rounded-full {{ size_class }} {{ status_class }}{% if class_name %} {{ class_name }}{% endif %}">{{ label }}</span>
+{%- endmacro %}
+
+{% macro inventory_type_badges(is_tent=False, is_furnishing=False, variant='admin', tent_label='Tent', furnishing_label='Furnishing') -%}
+{% if variant == 'customer' %}
+  {% set tent_class = 'border border-pink-200 bg-pink-50 text-rose-600' %}
+  {% set furnishing_class = 'border border-emerald-200 bg-emerald-50 text-emerald-700' %}
+{% else %}
+  {% set tent_class = 'bg-sky-100 text-sky-800' %}
+  {% set furnishing_class = 'bg-emerald-100 text-emerald-800' %}
+{% endif %}
+{% if is_tent %}
+  <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-medium {{ tent_class }}">{{ tent_label }}</span>
+{% endif %}
+{% if is_furnishing %}
+  <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-medium {{ furnishing_class }}">{{ furnishing_label }}</span>
+{% endif %}
+{%- endmacro %}
+
+{% macro category_pricing_matrix(rental_periods, pricing_map=None, title='Rental period pricing', description='Choose which rental periods this category uses and set a price for each one.', note='At least one rental period price must be entered.') -%}
+{% set pricing_rows = pricing_map or {} %}
+<div class="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-5">
+  <div>
+    <h3 class="font-medium text-slate-900">{{ title }}</h3>
+    <p class="mt-1 text-sm text-slate-500">{{ description }}</p>
+  </div>
+
+  <div class="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-white">
+    <div class="overflow-x-auto">
+      <table class="min-w-full text-sm">
+        <thead class="bg-slate-900 text-slate-100">
+          <tr>
+            <th class="p-3 text-left font-medium">Use</th>
+            <th class="p-3 text-left font-medium">Period</th>
+            <th class="p-3 text-left font-medium">Days</th>
+            <th class="p-3 text-left font-medium">Price</th>
+            <th class="p-3 text-left font-medium">Sort order</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-200 bg-white">
+          {% for rp in rental_periods %}
+            {% set existing = pricing_rows.get(rp.id) %}
+            {% set checked = existing is not none %}
+            <tr class="align-top">
+              <td class="p-3">
+                <input
+                  type="checkbox"
+                  id="use_period_{{ rp.id }}"
+                  class="h-4 w-4"
+                  {% if checked %}checked{% endif %}
+                  onchange="
+                    const price = document.getElementById('period_price_{{ rp.id }}');
+                    const sort = document.getElementById('period_sort_{{ rp.id }}');
+                    price.disabled = !this.checked;
+                    sort.disabled = !this.checked;
+                    if (!this.checked) { price.value = ''; sort.value = '{{ loop.index0 }}'; }
+                  "
+                >
+              </td>
+              <td class="p-3">
+                <label for="use_period_{{ rp.id }}" class="cursor-pointer font-medium text-slate-900">
+                  {{ rp.label }}
+                </label>
+              </td>
+              <td class="p-3 text-slate-600">
+                {% if rp.min_days == rp.max_days %}
+                  {{ rp.min_days }} day{% if rp.min_days != 1 %}s{% endif %}
+                {% else %}
+                  {{ rp.min_days }}-{{ rp.max_days }} days
+                {% endif %}
+              </td>
+              <td class="p-3">
+                <input
+                  id="period_price_{{ rp.id }}"
+                  name="period_price_{{ rp.id }}"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value="{{ existing.price if existing else '' }}"
+                  {% if not checked %}disabled{% endif %}
+                  class="w-32 rounded-xl border border-slate-300 bg-white px-3 py-2 shadow-sm transition focus:border-sky-400 focus:outline-none focus:ring-4 focus:ring-sky-100"
+                  placeholder="Price"
+                >
+              </td>
+              <td class="p-3">
+                <input
+                  id="period_sort_{{ rp.id }}"
+                  name="period_sort_{{ rp.id }}"
+                  type="number"
+                  min="0"
+                  value="{{ existing.sort_order if existing else loop.index0 }}"
+                  {% if not checked %}disabled{% endif %}
+                  class="w-24 rounded-xl border border-slate-300 bg-white px-3 py-2 shadow-sm transition focus:border-sky-400 focus:outline-none focus:ring-4 focus:ring-sky-100"
+                >
+              </td>
+            </tr>
+          {% else %}
+            <tr>
+              <td class="p-3 text-slate-600" colspan="5">
+                <i>No rental periods available yet. Create rental periods first.</i>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <p class="mt-3 text-xs text-slate-500">{{ note }}</p>
+</div>
+{%- endmacro %}

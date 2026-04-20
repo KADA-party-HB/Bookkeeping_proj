@@ -1,12 +1,16 @@
 {% extends "base.html" %}
+{% import "_components.html" as ui with context %}
+
 {% block extra_head %}
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/airbnb.css">
 {% endblock %}
+
 {% block extra_scripts %}
   <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/sv.js"></script>
 {% endblock %}
+
 {% block content %}
 <section class="mx-auto max-w-6xl">
   <div class="flex flex-col gap-4 lg:flex-row">
@@ -14,31 +18,32 @@
       <div class="absolute -left-12 top-0 h-36 w-36 rounded-full bg-emerald-200/30 blur-3xl"></div>
       <div class="absolute right-8 top-8 h-28 w-28 rounded-full bg-pink-200/25 blur-3xl"></div>
       <div class="absolute bottom-0 right-0 h-40 w-40 translate-x-1/4 translate-y-1/4 rounded-full bg-pink-100/55"></div>
+
       <div class="relative px-4 py-8 md:px-5">
         <div>
           <div class="inline-flex items-center gap-2 rounded-full border border-pink-200 bg-white/90 px-3 py-1 text-xs font-medium uppercase tracking-[0.2em] text-rose-500">
             Kada Party-bokning
           </div>
+
           <h1 class="mt-3 max-w-2xl text-3xl font-black tracking-tight text-slate-950 md:text-5xl">
-          Sök bland våra artiklar och boka direkt.
+            Sök bland våra artiklar och boka direkt.
           </h1>
+
           <p class="mt-3 max-w-2xl text-sm leading-6 text-slate-700 md:text-base">
-            Här visas alla artiklar med standardpris och tillgänglighet. Tält kan hyras ut från 3 till 7 dagar, om ni behöver hyra längre kontakta oss på: 
+            Här visas alla artiklar med standardpris och tillgänglighet. Tält kan hyras ut från 3 till 7 dagar, om ni behöver hyra längre kontakta oss på:
             <a
               href="mailto:kadaparty@kadaparty.se"
               class="font-bold underline underline-offset-4 text-rose-600"
             >
               kadaparty@kadaparty.se
             </a>
-
             eller via telefon:
-
-            <p
+            <a
               href="tel:0730813710"
-              class="text-rose-600 font-bold underline-offset-4"
+              class="font-bold underline underline-offset-4 text-rose-600"
             >
               0730813710
-            </p>
+            </a>
           </p>
         </div>
 
@@ -47,10 +52,12 @@
             <div class="text-xs font-medium uppercase tracking-[0.18em] text-emerald-600">Tillgänglighet</div>
             <div class="mt-2 text-sm font-semibold text-slate-900">Boka nu och få det levererat och monterat till festen</div>
           </div>
+
           <div class="rounded-2xl border border-pink-100 bg-white/90 p-4 shadow-sm backdrop-blur">
             <div class="text-xs font-medium uppercase tracking-[0.18em] text-rose-400">Priser</div>
-            <div class="mt-2 text-sm font-semibold text-slate-900">Dem bästa priserna i Blekinge</div>
+            <div class="mt-2 text-sm font-semibold text-slate-900">De bästa priserna i Blekinge</div>
           </div>
+
           <div class="rounded-2xl border border-emerald-100 bg-white/90 p-4 shadow-sm backdrop-blur">
             <div class="text-xs font-medium uppercase tracking-[0.18em] text-emerald-600">Leverans</div>
             <div class="mt-2 text-sm font-semibold text-slate-900">Vi erbjuder också leverans ända fram! Bara lägg till leverans i kundvagnen så räknar vi priset åt dig!</div>
@@ -63,12 +70,21 @@
       <div class="flex items-center justify-between gap-3">
         <div>
           <h2 class="text-lg font-bold text-slate-950">Välj datum</h2>
-          <p class="mt-1 text-sm text-slate-600">Välj hyresperiod för att ladda tillgängliga artiklar.</p>
+          <p class="mt-1 text-sm text-slate-600">Välj hyresperiod minst 7 dagar framåt för att ladda tillgängliga artiklar.</p>
         </div>
         <div class="rounded-full bg-pink-500 px-3 py-1 text-xs font-medium text-white shadow-sm whitespace-nowrap">Steg 1</div>
       </div>
 
-      <form method="get" class="mt-5 grid gap-4" data-date-range data-date-range-calendar="themed" data-date-range-locale="sv">
+      <form
+        id="availability-search-form"
+        method="get"
+        action="{{ url_for('routes.home') }}"
+        class="mt-5 grid gap-4"
+        data-date-range
+        data-date-range-calendar="themed"
+        data-date-range-locale="sv"
+        data-date-range-min="{{ min_date }}"
+      >
         <div>
           <label class="text-sm font-medium text-slate-700" for="start_date">Från datum</label>
           <input
@@ -105,9 +121,17 @@
           >
         </div>
 
-        <button class="inline-flex items-center justify-center rounded-2xl bg-pink-500 px-4 py-3 text-sm font-medium text-white transition hover:bg-rose-600 focus:outline-none focus:ring-4 focus:ring-pink-100">
+        <button
+          type="submit"
+          class="inline-flex items-center justify-center rounded-2xl bg-pink-500 px-4 py-3 text-sm font-medium text-white transition hover:bg-rose-600 focus:outline-none focus:ring-4 focus:ring-pink-100"
+        >
           Sök tillgänglighet
         </button>
+
+        <p
+          id="availability-search-error"
+          class="hidden rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700"
+        ></p>
       </form>
 
       {% if role == "customer" and customer_profile %}
@@ -120,447 +144,43 @@
   </div>
 </section>
 
-{% if categories is not none %}
-  <form
-    method="post"
-    action="{{ url_for('routes.guest_booking_create') }}"
-    class="mt-6 space-y-6"
-    id="guest-booking-form"
-    data-delivery-quote-url="{{ url_for('routes.guest_delivery_quote') }}"
-  >
-    <input type="hidden" name="start_date" value="{{ start_date }}">
-    <input type="hidden" name="end_date" value="{{ end_date }}">
-
-    <section class="rounded-[2rem] border border-slate-200 bg-white shadow-[0_24px_60px_-42px_rgba(15,23,42,0.16)]">
-      <div class="border-b border-pink-100 bg-[linear-gradient(180deg,rgba(253,242,248,0.55),rgba(255,255,255,0.96))] px-6 py-5 md:px-8">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div class="text-xs font-medium uppercase tracking-[0.2em] text-rose-400">Steg 2</div>
-            <h2 class="mt-1 text-2xl font-black text-slate-950">Välj artiklar</h2>
-          </div>
-          <div class="rounded-full border border-pink-200 bg-white px-4 py-2 text-sm font-medium text-slate-700">
-            {{ categories|length }} kategorier hittades
-          </div>
-        </div>
-
-        {% if categories|length > 0 %}
-          <div class="mt-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div class="max-w-xl">
-              <label class="text-sm font-medium text-slate-700" for="item-search-input">Sök artiklar</label>
-              <p class="mt-1 text-xs text-slate-500">Filtrera på namn, typ, hyresperiod eller detaljer.</p>
-            </div>
-            <div class="flex w-full flex-col gap-3 sm:flex-row lg:max-w-2xl lg:items-center">
-              <input
-                id="item-search-input"
-                type="search"
-                placeholder="Sök tält, inredning, priser..."
-                class="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-900 shadow-sm transition focus:border-pink-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-pink-100"
-              >
-              <div class="inline-flex items-center justify-center whitespace-nowrap rounded-full border border-pink-200 bg-pink-50 px-3 py-2 text-xs font-medium text-rose-500 shadow-sm" id="item-search-count">
-                {{ categories|length }} visas
-              </div>
-            </div>
-          </div>
-        {% endif %}
-      </div>
-
-      <div class="px-6 py-6 md:px-8">
-        {% if categories|length == 0 %}
-          <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-600">
-            <i>Inga kategorier är tillgängliga för de datumen.</i>
-          </div>
-        {% else %}
-          <div class="grid gap-4 md:hidden">
-            {% for c in categories %}
-              {% set disabled = c.available_items == 0 or not c.has_standard_price %}
-              <div
-                class="rounded-[1.4rem] border border-slate-200 bg-[linear-gradient(180deg,#fffdfd_0%,#ffffff_100%)] p-4 shadow-[0_18px_45px_-36px_rgba(15,23,42,0.12)]"
-                data-item-card
-                data-search-text="{{ (
-                  c.display_name ~ ' ' ~
-                  ('tent ' if c.is_tent else '') ~
-                  ('furnishing ' if c.is_furnishing else '') ~
-                  (c.furnishing_kind or '') ~ ' ' ~
-                  (c.rental_period_label or '') ~ ' ' ~
-                  (c.notes or '')
-                )|lower }}"
-              >
-                <div class="flex items-start justify-between gap-3">
-                  <div>
-                    <div class="font-semibold text-slate-900">{{ c.display_name }}</div>
-                    <div class="mt-1 flex flex-wrap gap-2">
-                      {% if c.is_tent %}
-                        <span class="inline-flex rounded-full border border-pink-200 bg-pink-50 px-2.5 py-1 text-xs font-medium text-rose-600">Tält</span>
-                      {% endif %}
-                      {% if c.is_furnishing %}
-                        <span class="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">Inredning</span>
-                      {% endif %}
-                    </div>
-                  </div>
-                  <span class="inline-flex rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700">
-                    {{ c.available_items }} lediga
-                  </span>
-                </div>
-
-                <div class="mt-4 grid gap-3 text-sm text-slate-600">
-                  <div>
-                    {% if c.has_standard_price %}
-                      <div class="font-medium text-slate-900">{{ c.quoted_period_price }} kr</div>
-                      <div class="text-xs text-slate-500">{{ c.rental_period_label }}</div>
-                    {% else %}
-                      <div class="font-medium text-amber-700">Kan inte bokas för de här datumen</div>
-                    {% endif %}
-                  </div>
-
-                  <div class="space-y-1">
-                    {% if c.is_tent %}
-                      <div>Kapacitet: {{ c.capacity }}</div>
-                      <div>Säsong: {{ c.season_rating }}</div>
-                      <div>Montering: {{ c.setup_service_fee }} kr</div>
-                    {% else %}
-                      <div>{{ c.furnishing_kind }}</div>
-                      {% if c.weight_kg %}<div>Vikt: {{ c.weight_kg }} kg</div>{% endif %}
-                    {% endif %}
-                  </div>
-
-                  <div>
-                    <label class="text-sm font-medium text-slate-700" for="qty_mobile_{{ c.id }}">Antal</label>
-                    <input
-                      id="qty_mobile_{{ c.id }}"
-                      type="number"
-                      min="0"
-                      max="{{ c.available_items }}"
-                      step="1"
-                      value="0"
-                      name="qty_{{ c.id }}"
-                      inputmode="numeric"
-                      {% if disabled %}disabled{% endif %}
-                      data-booking-qty
-                      data-unit-price="{{ c.quoted_period_price if c.has_standard_price else 0 }}"
-                      data-setup-fee="{{ c.setup_service_fee if c.is_tent else 0 }}"
-                      data-is-tent="{{ 'true' if c.is_tent else 'false' }}"
-                      class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 shadow-sm transition focus:border-pink-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-pink-100"
-                    >
-                  </div>
-                </div>
-              </div>
-            {% endfor %}
-          </div>
-
-          <div class="hidden overflow-hidden rounded-[1.5rem] border border-slate-200 md:block">
-            <div class="overflow-x-auto">
-              <table class="min-w-full text-sm">
-                <thead class="bg-[linear-gradient(90deg,#ec4899_0%,#f472b6_72%,#22c55e_140%)] text-white">
-                  <tr>
-                    <th class="p-3 text-left font-medium">Kategori</th>
-                    <th class="p-3 text-left font-medium">Typ</th>
-                    <th class="p-3 text-left font-medium">Period</th>
-                    <th class="p-3 text-left font-medium" data-sort-type="number">Pris</th>
-                    <th class="p-3 text-left font-medium" data-sort-type="number">Lediga nu</th>
-                    <th class="p-3 text-left font-medium">Detaljer</th>
-                    <th class="p-3 text-left font-medium" data-sort-type="number">Antal</th>
-                  </tr>
-                </thead>
-                <tbody class="divide-y divide-slate-200 bg-white">
-                  {% for c in categories %}
-                    {% set disabled = c.available_items == 0 or not c.has_standard_price %}
-                    <tr
-                      class="align-top"
-                      data-item-row
-                      data-search-text="{{ (
-                        c.display_name ~ ' ' ~
-                        ('tent ' if c.is_tent else '') ~
-                        ('furnishing ' if c.is_furnishing else '') ~
-                        (c.furnishing_kind or '') ~ ' ' ~
-                        (c.rental_period_label or '') ~ ' ' ~
-                        (c.notes or '')
-                      )|lower }}"
-                    >
-                      <td class="p-3">
-                        <div class="font-medium text-slate-900">{{ c.display_name }}</div>
-                        <div class="mt-1 text-xs text-slate-500">Kategori #{{ c.id }}</div>
-                      </td>
-                      <td class="p-3">
-                        {% if c.is_tent %}
-                          <span class="inline-flex rounded-full border border-pink-200 bg-pink-50 px-2.5 py-1 text-xs font-medium text-rose-600">Tält</span>
-                        {% elif c.is_furnishing %}
-                          <span class="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">Inredning</span>
-                        {% endif %}
-                      </td>
-                      <td class="p-3">
-                        {% if c.has_standard_price %}
-                          <div class="font-medium text-slate-900">{{ c.rental_period_label }}</div>
-                          <div class="mt-1 text-xs text-slate-500">
-                            {% if c.rental_period_min_days == 1 and c.rental_period_max_days == 1 %}
-                              1 dag
-                            {% else %}
-                              {{ c.rental_period_min_days }}-{{ c.rental_period_max_days }} dagar
-                            {% endif %}
-                          </div>
-                        {% else %}
-                          <span class="text-amber-700">Inget standardpris för vald period</span>
-                        {% endif %}
-                      </td>
-                      <td class="p-3">
-                        {% if c.has_standard_price %}
-                          <div class="font-medium text-slate-900">{{ c.quoted_period_price }} kr</div>
-                        {% else %}
-                          <span class="text-slate-400">Ej tillgänglig</span>
-                        {% endif %}
-                      </td>
-                      <td class="p-3">
-                        {% if c.available_items > 0 %}
-                          <span class="font-medium text-slate-900">{{ c.available_items }}</span>
-                        {% else %}
-                          <span class="font-medium text-rose-600">0</span>
-                        {% endif %}
-                      </td>
-                      <td class="p-3 text-xs text-slate-600">
-                        {% if c.is_tent %}
-                          <div>Kapacitet: {{ c.capacity }}</div>
-                          <div class="mt-1">Säsong: {{ c.season_rating }}</div>
-                          <div class="mt-1">Montering: {{ c.setup_service_fee }} kr</div>
-                        {% else %}
-                          <div>{{ c.furnishing_kind }}</div>
-                          {% if c.weight_kg %}<div class="mt-1">Vikt: {{ c.weight_kg }} kg</div>{% endif %}
-                        {% endif %}
-                      </td>
-                      <td class="p-3">
-                        <input
-                          type="number"
-                          min="0"
-                          max="{{ c.available_items }}"
-                          step="1"
-                          value="0"
-                          name="qty_{{ c.id }}"
-                          inputmode="numeric"
-                          {% if disabled %}disabled{% endif %}
-                          data-booking-qty
-                          data-unit-price="{{ c.quoted_period_price if c.has_standard_price else 0 }}"
-                          data-setup-fee="{{ c.setup_service_fee if c.is_tent else 0 }}"
-                          data-is-tent="{{ 'true' if c.is_tent else 'false' }}"
-                          class="w-24 rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 shadow-sm transition focus:border-pink-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-pink-100"
-                        >
-                      </td>
-                    </tr>
-                  {% endfor %}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        {% endif %}
-      </div>
-    </section>
-
-    <div class="grid gap-6 xl:grid-cols-[0.95fr_1.05fr_0.8fr] xl:items-start">
-      <section class="rounded-[2rem] border border-slate-200 bg-white shadow-[0_24px_60px_-42px_rgba(15,23,42,0.16)]">
-        <div class="border-b border-slate-200 px-6 py-5">
-          <div class="text-xs font-medium uppercase tracking-[0.2em] text-rose-400">Steg 3</div>
-          <h2 class="mt-1 text-xl font-black text-slate-950">Tjänster</h2>
-        </div>
-        <div class="space-y-5 px-6 py-6">
-          <label class="flex items-start gap-3 rounded-2xl border border-pink-100 bg-pink-50/50 px-4 py-4">
-            <input
-              type="checkbox"
-              name="include_delivery"
-              id="include_delivery"
-              class="mt-1 h-4 w-4 rounded border-pink-300 text-pink-500 focus:ring-pink-400"
-            >
-            <span class="text-sm text-slate-700">
-              <span class="block font-medium text-slate-900">Inkludera leverans</span>
-              <span class="mt-1 block">Vi validerar adressen och räknar ut avgiften utifrån körsträckan.</span>
-              <span class="mt-1 block text-xs text-slate-500">Adressvalidering och ruttberäkning använder Geoapify.</span>
-            </span>
-          </label>
-
-          <label class="flex items-start gap-3 rounded-2xl border border-pink-100 bg-pink-50/50 px-4 py-4">
-            <input
-              type="checkbox"
-              name="include_setup_service"
-              id="include_setup_service"
-              class="mt-1 h-4 w-4 rounded border-pink-300 text-pink-500 focus:ring-pink-400"
-            >
-            <span class="text-sm text-slate-700">
-              <span class="block font-medium text-slate-900">Inkludera montering</span>
-              <span class="mt-1 block" id="setup-service-help">Monteringsavgift läggs bara till för tält. Leverans krävs.</span>
-            </span>
-          </label>
-
-          <div>
-            <label class="text-sm font-medium text-slate-700" for="booking_note">Bokningsanteckning</label>
-            <textarea
-              id="booking_note"
-              name="booking_note"
-              rows="4"
-              placeholder="Åtkomstinfo, tider, leveransinstruktioner..."
-              class="mt-1 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 shadow-sm transition focus:border-pink-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-pink-100"
-            ></textarea>
-          </div>
-        </div>
-      </section>
-
-      <section class="rounded-[2rem] border border-slate-200 bg-white shadow-[0_24px_60px_-42px_rgba(15,23,42,0.16)]">
-        <div class="border-b border-slate-200 px-6 py-5">
-          <div class="text-xs font-medium uppercase tracking-[0.2em] text-rose-400">Steg 4</div>
-          <h2 class="mt-1 text-xl font-black text-slate-950">
-            {% if role == "customer" and customer_profile %}Ditt konto{% else %}Skapa konto{% endif %}
-          </h2>
-        </div>
-        <div class="space-y-4 px-6 py-6">
-          {% if role == "customer" and customer_profile %}
-            <div class="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm text-emerald-900">
-              Bokar som <span class="font-medium">{{ customer_profile.full_name }}</span>{% if customer_profile.email %} ({{ customer_profile.email }}){% endif %}.
-            </div>
-            <div>
-              <label class="text-sm font-medium text-slate-700" for="phone">Telefon</label>
-              <input
-                id="phone"
-                name="phone"
-                value="{{ customer_profile.phone or '' }}"
-                autocomplete="tel"
-                class="mt-1 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 shadow-sm transition focus:border-pink-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-pink-100"
-              >
-            </div>
-          {% else %}
-            <div>
-              <label class="text-sm font-medium text-slate-700" for="full_name">Fullständigt namn</label>
-              <input
-                id="full_name"
-                name="full_name"
-                required
-                autocomplete="name"
-                class="mt-1 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 shadow-sm transition focus:border-pink-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-pink-100"
-              >
-            </div>
-            <div>
-              <label class="text-sm font-medium text-slate-700" for="email">E-post</label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                required
-                autocomplete="email"
-                class="mt-1 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 shadow-sm transition focus:border-pink-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-pink-100"
-              >
-            </div>
-            <div>
-              <label class="text-sm font-medium text-slate-700" for="phone">Telefon</label>
-              <input
-                id="phone"
-                name="phone"
-                autocomplete="tel"
-                class="mt-1 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 shadow-sm transition focus:border-pink-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-pink-100"
-              >
-            </div>
-          {% endif %}
-
-          <div>
-            <label class="text-sm font-medium text-slate-700" for="address">Adress</label>
-            <input
-              id="address"
-              name="address"
-              type="text"
-              value="{{ customer_profile.address if customer_profile else '' }}"
-              autocomplete="street-address"
-              class="mt-1 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 shadow-sm transition focus:border-pink-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-pink-100"
-            >
-          </div>
-
-          <div>
-            <label class="text-sm font-medium text-slate-700" for="postal_city">Postort</label>
-            <input
-              id="postal_city"
-              name="postal_city"
-              type="text"
-              value="{{ customer_profile.postal_city if customer_profile and customer_profile.postal_city else '' }}"
-              autocomplete="address-level2"
-              class="mt-1 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 shadow-sm transition focus:border-pink-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-pink-100"
-            >
-          </div>
-
-          {% if not (role == "customer" and customer_profile) %}
-            <div>
-              <label class="text-sm font-medium text-slate-700" for="password">Lösenord</label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                required
-                autocomplete="new-password"
-                class="mt-1 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 shadow-sm transition focus:border-pink-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-pink-100"
-              >
-            </div>
-          {% endif %}
-        </div>
-      </section>
-
-      <section class="rounded-[2rem] border bg-green-50/50 text-slate-900 shadow-[0_28px_70px_-42px_rgba(15,23,42,0.12)]">
-        <div class="border-b px-6 py-5">
-          <div class="text-xs font-medium uppercase tracking-[0.2em] text-green-400">Steg 5</div>
-          <h2 class="mt-1 text-xl font-black text-slate-950">Sammanfattning</h2>
-        </div>
-        <div class="space-y-3 px-6 py-6 text-sm">
-          <div class="flex items-center justify-between gap-4">
-            <span class="text-slate-500">Artiklar</span>
-            <span id="summary-items" class="font-semibold text-slate-950">0 valda</span>
-          </div>
-          <div class="flex items-center justify-between gap-4">
-            <span class="text-slate-500">Hyra</span>
-            <span id="summary-rental" class="font-semibold text-slate-950">0 kr</span>
-          </div>
-          <div class="flex items-center justify-between gap-4">
-            <span class="text-slate-500">Montering</span>
-            <span id="summary-setup" class="font-semibold text-slate-950">Inte tillvalt</span>
-          </div>
-          <div class="flex items-center justify-between gap-4">
-            <span class="text-slate-500">Leverans</span>
-            <span id="summary-delivery" class="font-semibold text-slate-950">Inte tillvalt</span>
-          </div>
-          <div class="border-t border-pink-100 pt-3">
-            <div class="flex items-center justify-between gap-4 text-base font-semibold">
-              <span>Total</span>
-              <span id="summary-total" class="text-rose-600">0 kr</span>
-            </div>
-          </div>
-          <p id="form-error" class="hidden rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700"></p>
-          <button
-            type="submit"
-            class="inline-flex w-full items-center justify-center rounded-2xl bg-pink-500 px-4 py-3 text-sm font-medium text-white transition hover:bg-rose-600 focus:outline-none focus:ring-4 focus:ring-pink-100 disabled:cursor-not-allowed disabled:bg-pink-300 disabled:hover:bg-pink-300"
-          >
-            {% if role == "customer" and customer_profile %}Skicka bokning{% else %}Skicka bokning och skapa konto{% endif %}
-          </button>
-          <p class="text-xs text-slate-500">
-            Bokningen skapas som väntande. Lagret reserveras tillfälligt tills personalen bekräftar den.
-          </p>
-        </div>
-      </section>
-    </div>
-  </form>
+<div id="availability-results">
+  {% include "partials/_guest_booking_results.html" %}
+</div>
 
 <script>
-  (() => {
-    const form = document.getElementById("guest-booking-form");
-    if (!form) {
+  function initGuestBookingForm(root = document) {
+    const form = root.querySelector("#guest-booking-form");
+    if (!form || form.dataset.initialized === "true") {
       return;
     }
+
+    form.dataset.initialized = "true";
+
     const qtyInputs = Array.from(form.querySelectorAll("[data-booking-qty]"));
-    const includeSetup = document.getElementById("include_setup_service");
-    const includeDelivery = document.getElementById("include_delivery");
-    const setupServiceHelp = document.getElementById("setup-service-help");
-    const addressField = document.getElementById("address");
-    const postalCityField = document.getElementById("postal_city");
-    const deliveryPanel = document.getElementById("delivery-panel");
-    const deliveryError = document.getElementById("delivery-address-error");
-    const formError = document.getElementById("form-error");
+    const includeSetup = form.querySelector("#include_setup_service");
+    const includeDelivery = form.querySelector("#include_delivery");
+    const setupServiceHelp = form.querySelector("#setup-service-help");
+    const addressField = form.querySelector("#address");
+    const postalCityField = form.querySelector("#postal_city");
+    const deliveryPanel = form.querySelector("#delivery-panel");
+    const deliveryError = form.querySelector("#delivery-address-error");
+    const formError = form.querySelector("#form-error");
     const submitButton = form.querySelector('button[type="submit"]');
-    const summaryItems = document.getElementById("summary-items");
-    const summaryRental = document.getElementById("summary-rental");
-    const summarySetup = document.getElementById("summary-setup");
-    const summaryDelivery = document.getElementById("summary-delivery");
-    const summaryTotal = document.getElementById("summary-total");
-    const itemSearchInput = document.getElementById("item-search-input");
-    const itemSearchCount = document.getElementById("item-search-count");
+    const summaryItems = form.querySelector("#summary-items");
+    const summaryRental = form.querySelector("#summary-rental");
+    const summarySetup = form.querySelector("#summary-setup");
+    const summaryDelivery = form.querySelector("#summary-delivery");
+    const summaryTotal = form.querySelector("#summary-total");
+    const itemSearchInput = form.querySelector("#item-search-input");
+    const itemSearchCount = form.querySelector("#item-search-count");
     const itemCards = Array.from(form.querySelectorAll("[data-item-card]"));
+    const pagerRoot = form.querySelector("[data-local-pager]");
+    const pagerStatus = form.querySelector("[data-pager-status]");
+    const pagerPerPage = form.querySelector("[data-pager-per-page]");
+    const pagerPrev = form.querySelector("[data-pager-prev]");
+    const pagerNext = form.querySelector("[data-pager-next]");
+    const pagerPage = form.querySelector("[data-pager-page]");
     const itemRows = Array.from(form.querySelectorAll("[data-item-row]"));
     const errorClasses = ["border-rose-400", "bg-rose-50", "focus:ring-rose-100", "focus:border-rose-400"];
     const loadingClasses = ["border-amber-400", "bg-amber-50", "focus:ring-amber-100", "focus:border-amber-400"];
@@ -573,6 +193,8 @@
     let activeValidationPromise = null;
     let activeValidationAddress = null;
     let submitPendingAfterValidation = false;
+    let currentPage = 1;
+    let perPage = Number(pagerPerPage?.value || 10);
     const defaultSubmitLabel = submitButton?.textContent.trim() || "";
 
     const parseNumber = (value) => {
@@ -581,7 +203,7 @@
     };
 
     const formatMoney = (value) => `${value.toFixed(2)} kr`;
-    const normalizeAddress = (value) => value.trim().replace(/\s+/g, " ");
+    const normalizeAddress = (value) => String(value || "").trim().replace(/\s+/g, " ");
     const normalizeSearchText = (value) => normalizeAddress((value || "").toLowerCase());
     const stripPostalCodeFromCity = (value) =>
       normalizeAddress(String(value || "").replace(/^(?:SE[-\s]?)?\d{3}\s?\d{2}\s*/i, ""));
@@ -589,10 +211,7 @@
     const splitFormattedAddress = (formattedAddress) => {
       const normalized = normalizeAddress(formattedAddress || "");
       if (!normalized) {
-        return {
-          streetAddress: "",
-          postalCity: "",
-        };
+        return { streetAddress: "", postalCity: "" };
       }
 
       const parts = normalized
@@ -601,10 +220,7 @@
         .filter(Boolean);
 
       if (parts.length === 1) {
-        return {
-          streetAddress: parts[0],
-          postalCity: "",
-        };
+        return { streetAddress: parts[0], postalCity: "" };
       }
 
       const countryNames = ["sweden", "sverige"];
@@ -616,10 +232,7 @@
       }
 
       if (withoutCountry.length === 1) {
-        return {
-          streetAddress: withoutCountry[0],
-          postalCity: "",
-        };
+        return { streetAddress: withoutCountry[0], postalCity: "" };
       }
 
       return {
@@ -630,25 +243,17 @@
 
     const getStreetAddress = () => normalizeAddress(addressField?.value || "");
     const getPostalCity = () => stripPostalCodeFromCity(postalCityField?.value || "");
-
-    const hasCompleteDeliveryAddress = () => {
-      return Boolean(getStreetAddress() && getPostalCity());
-    };
-
-    const getFullAddress = () => {
-      return normalizeAddress([getStreetAddress(), getPostalCity()].filter(Boolean).join(", "));
-    };
+    const hasCompleteDeliveryAddress = () => Boolean(getStreetAddress() && getPostalCity());
+    const getFullAddress = () => normalizeAddress([getStreetAddress(), getPostalCity()].filter(Boolean).join(", "));
 
     const setFormError = (message) => {
+      if (!formError) return;
       formError.textContent = message || "";
       formError.classList.toggle("hidden", !message);
     };
 
     const syncSubmitButtonState = () => {
-      if (!submitButton) {
-        return;
-      }
-
+      if (!submitButton) return;
       submitButton.disabled = validationInFlight;
       submitButton.setAttribute("aria-busy", validationInFlight ? "true" : "false");
       submitButton.textContent = submitPendingAfterValidation && validationInFlight
@@ -658,9 +263,9 @@
 
     const clearAddressState = () => {
       addressFields.forEach((field) => {
-        [...errorClasses, ...loadingClasses, ...successClasses].forEach((className) =>
-          field.classList.remove(className)
-        );
+        [...errorClasses, ...loadingClasses, ...successClasses].forEach((className) => {
+          field.classList.remove(className);
+        });
         field.removeAttribute("aria-invalid");
       });
     };
@@ -703,7 +308,7 @@
 
       const splitAddress = splitFormattedAddress(result.formatted_address);
 
-      if (splitAddress.streetAddress) {
+      if (splitAddress.streetAddress && addressField) {
         addressField.value = splitAddress.streetAddress;
       }
 
@@ -724,10 +329,12 @@
     const clearDeliveryValidation = () => {
       validatedDelivery = null;
       clearAddressState();
+
       if (deliveryError) {
         deliveryError.classList.add("hidden");
         deliveryError.textContent = "";
       }
+
       renderSummary();
     };
 
@@ -751,10 +358,10 @@
 
       const itemCount = selected.reduce((sum, item) => sum + item.qty, 0);
       const rental = selected.reduce((sum, item) => sum + (item.unitPrice * item.qty), 0);
-      const setup = includeSetup.checked
+      const setup = includeSetup?.checked
         ? selected.reduce((sum, item) => sum + ((item.isTent ? item.setupFee : 0) * item.qty), 0)
         : 0;
-      const delivery = includeDelivery.checked && validatedDelivery ? validatedDelivery.deliveryFee : 0;
+      const delivery = includeDelivery?.checked && validatedDelivery ? validatedDelivery.deliveryFee : 0;
 
       return {
         itemCount,
@@ -767,29 +374,30 @@
 
     const renderSummary = () => {
       const state = getState();
-      summaryItems.textContent = `${state.itemCount} valda`;
-      summaryRental.textContent = formatMoney(state.rental);
-      summarySetup.textContent = includeSetup.checked ? formatMoney(state.setup) : "Inte tillvalt";
 
-      if (!includeDelivery.checked) {
-        summaryDelivery.textContent = "Inte tillvalt";
-      } else if (validatedDelivery) {
-        summaryDelivery.textContent = `${formatMoney(validatedDelivery.deliveryFee)} (${validatedDelivery.distanceKm.toFixed(2)} km)`;
-      } else if (validationInFlight) {
-        summaryDelivery.textContent = "Validerar...";
-      } else if (!hasCompleteDeliveryAddress()) {
-        summaryDelivery.textContent = "Ange adress och postort";
-      } else {
-        summaryDelivery.textContent = "Klar för validering";
+      if (summaryItems) summaryItems.textContent = `${state.itemCount} valda`;
+      if (summaryRental) summaryRental.textContent = formatMoney(state.rental);
+      if (summarySetup) summarySetup.textContent = includeSetup?.checked ? formatMoney(state.setup) : "Inte tillvalt";
+
+      if (summaryDelivery) {
+        if (!includeDelivery?.checked) {
+          summaryDelivery.textContent = "Inte tillvalt";
+        } else if (validatedDelivery) {
+          summaryDelivery.textContent = `${formatMoney(validatedDelivery.deliveryFee)} (${validatedDelivery.distanceKm.toFixed(2)} km)`;
+        } else if (validationInFlight) {
+          summaryDelivery.textContent = "Validerar...";
+        } else if (!hasCompleteDeliveryAddress()) {
+          summaryDelivery.textContent = "Ange adress och postort";
+        } else {
+          summaryDelivery.textContent = "Klar för validering";
+        }
       }
 
-      summaryTotal.textContent = formatMoney(state.total);
+      if (summaryTotal) summaryTotal.textContent = formatMoney(state.total);
     };
 
     const validateDeliveryAddress = async () => {
-      if (!includeDelivery.checked) {
-        return false;
-      }
+      if (!includeDelivery?.checked) return false;
 
       if (!hasCompleteDeliveryAddress()) {
         clearDeliveryValidation();
@@ -810,11 +418,6 @@
       activeValidationAddress = fullAddress;
       showAddressLoading();
       syncSubmitButtonState();
-
-      if (deliveryError) {
-        deliveryError.classList.add("hidden");
-      }
-
       setFormError("");
       renderSummary();
 
@@ -822,11 +425,10 @@
         try {
           const response = await fetch(form.dataset.deliveryQuoteUrl, {
             method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ address: fullAddress }),
           });
+
           const payload = await response.json();
 
           if (!response.ok || !payload.ok) {
@@ -852,6 +454,8 @@
     };
 
     const syncSetupMode = () => {
+      if (!includeSetup || !includeDelivery) return;
+
       const deliveryEnabled = includeDelivery.checked;
       includeSetup.disabled = !deliveryEnabled;
 
@@ -859,20 +463,99 @@
         includeSetup.checked = false;
       }
 
+      if (deliveryPanel) {
+        deliveryPanel.classList.toggle("hidden", !deliveryEnabled);
+      }
+
       if (setupServiceHelp) {
         setupServiceHelp.textContent = deliveryEnabled
-          ? "Monteringsavgift"
+          ? "Monteringsavgift läggs bara till för tält. Leverans krävs."
           : "Montering kräver leverans. Välj leverans först.";
-        setupServiceHelp.classList.toggle("text-slate-500", deliveryEnabled);
-        setupServiceHelp.classList.toggle("text-amber-800", !deliveryEnabled);
-        setupServiceHelp.classList.toggle("font-medium", !deliveryEnabled);
       }
     };
 
-    const queueDeliveryValidation = () => {
-      if (!includeDelivery.checked) {
-        return;
+    const itemPairs = Array.from(
+      { length: Math.max(itemCards.length, itemRows.length) },
+      (_, index) => ({
+        card: itemCards[index] || null,
+        row: itemRows[index] || null,
+        searchText: normalizeSearchText(
+          itemCards[index]?.dataset.searchText ||
+          itemRows[index]?.dataset.searchText ||
+          ""
+        ),
+      })
+    );
+
+    const setPairVisible = (pair, isVisible) => {
+      if (pair.card) {
+        pair.card.classList.toggle("hidden", !isVisible);
       }
+
+      if (pair.row) {
+        pair.row.style.display = isVisible ? "" : "none";
+      }
+    };
+
+    const renderPager = (visibleCount, totalPages) => {
+      if (itemSearchCount) {
+        itemSearchCount.textContent = `${visibleCount} visas`;
+      }
+
+      if (pagerStatus) {
+        pagerStatus.textContent = visibleCount > 0
+          ? `Visar ${Math.min((currentPage - 1) * perPage + 1, visibleCount)}-${Math.min(currentPage * perPage, visibleCount)} av ${visibleCount}`
+          : "Visar 0 av 0";
+      }
+
+      if (pagerPage) {
+        pagerPage.textContent = `Sida ${visibleCount === 0 ? 0 : currentPage} av ${totalPages}`;
+      }
+
+      if (pagerPrev) {
+        pagerPrev.disabled = currentPage <= 1 || visibleCount === 0;
+      }
+
+      if (pagerNext) {
+        pagerNext.disabled = currentPage >= totalPages || visibleCount === 0;
+      }
+    };
+
+    const applyItemFilter = () => {
+      const query = normalizeSearchText(itemSearchInput?.value || "");
+
+      const filteredPairs = itemPairs.filter((pair) => {
+        return !query || pair.searchText.includes(query);
+      });
+
+      const visibleCount = filteredPairs.length;
+      const safePerPage = Math.max(1, Number(pagerPerPage?.value || perPage || 10));
+      perPage = safePerPage;
+
+      const totalPages = Math.max(1, Math.ceil(visibleCount / perPage));
+
+      if (currentPage > totalPages) {
+        currentPage = totalPages;
+      }
+      if (currentPage < 1) {
+        currentPage = 1;
+      }
+
+      const startIndex = (currentPage - 1) * perPage;
+      const endIndex = startIndex + perPage;
+      const visibleOnPage = new Set(filteredPairs.slice(startIndex, endIndex));
+
+      itemPairs.forEach((pair) => {
+        const matchesQuery = !query || pair.searchText.includes(query);
+        const isVisible = matchesQuery && visibleOnPage.has(pair);
+        setPairVisible(pair, isVisible);
+      });
+
+      renderPager(visibleCount, totalPages);
+    };
+
+    const queueDeliveryValidation = () => {
+      if (!includeDelivery?.checked) return;
 
       window.clearTimeout(deliveryValidationTimer);
 
@@ -883,58 +566,45 @@
 
       deliveryValidationTimer = window.setTimeout(() => {
         const currentAddress = getFullAddress();
+
         if (!currentAddress) {
           clearDeliveryValidation();
           return;
         }
+
         if (validatedDelivery && validatedDelivery.originalAddress === currentAddress) {
           return;
         }
+
         validateDeliveryAddress();
-      }, 5000);
+      }, 800);
     };
 
-    const updateVisibleItemCount = () => {
-      if (!itemSearchCount) {
-        return;
-      }
+    itemSearchInput?.addEventListener("input", () => {
+      currentPage = 1;
+      applyItemFilter();
+    });
 
-      const visibleCards = itemCards.filter((card) => !card.classList.contains("hidden")).length;
-      const visibleRows = itemRows.filter((row) => row.style.display !== "none").length;
-      const visibleCount = visibleCards || visibleRows;
-      itemSearchCount.textContent = `${visibleCount} visas`;
-    };
+    pagerPerPage?.addEventListener("change", () => {
+      currentPage = 1;
+      perPage = Number(pagerPerPage.value || 10);
+      applyItemFilter();
+    });
 
-    const applyItemFilter = () => {
-      if (!itemSearchInput) {
-        return;
-      }
+    pagerPrev?.addEventListener("click", () => {
+      currentPage -= 1;
+      applyItemFilter();
+    });
 
-      const query = normalizeSearchText(itemSearchInput.value);
+    pagerNext?.addEventListener("click", () => {
+      currentPage += 1;
+      applyItemFilter();
+    });
 
-      itemCards.forEach((card) => {
-        const haystack = normalizeSearchText(card.dataset.searchText || "");
-        const matches = !query || haystack.includes(query);
-        card.classList.toggle("hidden", !matches);
-      });
+    includeSetup?.addEventListener("change", renderSummary);
 
-      itemRows.forEach((row) => {
-        const haystack = normalizeSearchText(row.dataset.searchText || "");
-        const matches = !query || haystack.includes(query);
-        row.style.display = matches ? "" : "none";
-      });
-
-      updateVisibleItemCount();
-    };
-
-    includeSetup.addEventListener("change", renderSummary);
-
-    includeDelivery.addEventListener("change", () => {
+    includeDelivery?.addEventListener("change", () => {
       syncSetupMode();
-      if (deliveryPanel) {
-        deliveryPanel.classList.toggle("hidden", !includeDelivery.checked);
-      }
-
       window.clearTimeout(deliveryValidationTimer);
 
       if (!includeDelivery.checked) {
@@ -954,9 +624,7 @@
     });
 
     const handleDeliveryFieldInput = () => {
-      if (!includeDelivery.checked) {
-        return;
-      }
+      if (!includeDelivery?.checked) return;
 
       if (validatedDelivery && validatedDelivery.originalAddress !== getFullAddress()) {
         clearDeliveryValidation();
@@ -970,9 +638,7 @@
         postalCityField.value = getPostalCity();
       }
 
-      if (!includeDelivery.checked) {
-        return;
-      }
+      if (!includeDelivery?.checked) return;
 
       window.clearTimeout(deliveryValidationTimer);
 
@@ -990,9 +656,7 @@
     };
 
     const handleDeliveryFieldEnter = (event) => {
-      if (!includeDelivery.checked || event.key !== "Enter") {
-        return;
-      }
+      if (!includeDelivery?.checked || event.key !== "Enter") return;
 
       event.preventDefault();
       window.clearTimeout(deliveryValidationTimer);
@@ -1010,16 +674,12 @@
       validateDeliveryAddress();
     };
 
-    addressField.addEventListener("input", handleDeliveryFieldInput);
+    addressField?.addEventListener("input", handleDeliveryFieldInput);
     postalCityField?.addEventListener("input", handleDeliveryFieldInput);
-
-    addressField.addEventListener("blur", handleDeliveryFieldBlur);
+    addressField?.addEventListener("blur", handleDeliveryFieldBlur);
     postalCityField?.addEventListener("blur", handleDeliveryFieldBlur);
-
-    addressField.addEventListener("keydown", handleDeliveryFieldEnter);
+    addressField?.addEventListener("keydown", handleDeliveryFieldEnter);
     postalCityField?.addEventListener("keydown", handleDeliveryFieldEnter);
-
-    itemSearchInput?.addEventListener("input", applyItemFilter);
 
     form.addEventListener("submit", async (event) => {
       setFormError("");
@@ -1031,7 +691,7 @@
         return;
       }
 
-      if (includeDelivery.checked) {
+      if (includeDelivery?.checked) {
         if (!hasCompleteDeliveryAddress()) {
           event.preventDefault();
           setFormError("Ange både adress och postort innan du skickar bokningen.");
@@ -1039,13 +699,17 @@
         }
 
         const currentAddress = getFullAddress();
+
         if (!validatedDelivery || validatedDelivery.originalAddress !== currentAddress) {
           event.preventDefault();
           submitPendingAfterValidation = true;
           syncSubmitButtonState();
+
           const valid = await validateDeliveryAddress();
+
           submitPendingAfterValidation = false;
           syncSubmitButtonState();
+
           if (!valid) {
             setFormError("Kontrollera den markerade adressen innan du skickar bokningen.");
             return;
@@ -1056,15 +720,86 @@
       }
     });
 
-    if (deliveryPanel) {
-      deliveryPanel.classList.toggle("hidden", !includeDelivery.checked);
-    }
-
     syncSetupMode();
     applyItemFilter();
     syncSubmitButtonState();
     renderSummary();
-  })();
+  }
+
+  async function fetchAvailability(event) {
+    event.preventDefault();
+
+    const form = event.currentTarget;
+    const results = document.getElementById("availability-results");
+    const errorBox = document.getElementById("availability-search-error");
+    const submitButton = form.querySelector('button[type="submit"]');
+
+    if (!results) {
+      form.submit();
+      return;
+    }
+
+    if (errorBox) {
+      errorBox.textContent = "";
+      errorBox.classList.add("hidden");
+    }
+
+    const params = new URLSearchParams(new FormData(form));
+    const url = `${form.action}?${params.toString()}`;
+    const originalButtonText = submitButton?.textContent || "";
+
+    try {
+      if (submitButton) {
+        submitButton.disabled = true;
+        submitButton.textContent = "Söker...";
+      }
+
+      results.classList.add("opacity-60", "pointer-events-none");
+
+      const response = await fetch(url, {
+        method: "GET",
+        headers: {
+          "X-Requested-With": "XMLHttpRequest",
+          "Accept": "text/html"
+        },
+        credentials: "same-origin"
+      });
+
+      if (!response.ok) {
+        throw new Error("Kunde inte ladda tillgänglighet.");
+      }
+
+      const html = await response.text();
+      results.innerHTML = html;
+      initGuestBookingForm(results);
+      window.history.replaceState({}, "", url);
+    } catch (error) {
+      if (errorBox) {
+        errorBox.textContent = "Kunde inte ladda tillgänglighet just nu. Försök igen.";
+        errorBox.classList.remove("hidden");
+      }
+    } finally {
+      results.classList.remove("opacity-60", "pointer-events-none");
+
+      if (submitButton) {
+        submitButton.disabled = false;
+        submitButton.textContent = originalButtonText;
+      }
+    }
+  }
+
+  function bootGuestBookingPage() {
+    document
+      .getElementById("availability-search-form")
+      ?.addEventListener("submit", fetchAvailability);
+
+    initGuestBookingForm(document);
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", bootGuestBookingPage);
+  } else {
+    bootGuestBookingPage();
+  }
 </script>
-{% endif %}
 {% endblock %}

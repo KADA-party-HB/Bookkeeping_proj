@@ -11,9 +11,9 @@
     </div>
 
     <div class="flex flex-col gap-3 md:flex-row md:items-center">
-      <form method="get" class="flex items-center gap-2 text-sm text-slate-600">
+      <form method="get" class="flex items-center gap-2 text-sm text-slate-600" data-async-nav>
         {% for key, value in request.args.items() %}
-          {% if key not in ("page", "per_page") %}
+          {% if key not in ("page", "per_page", "partial") %}
             <input type="hidden" name="{{ key }}" value="{{ value }}">
           {% endif %}
         {% endfor %}
@@ -37,6 +37,7 @@
             <a
               class="inline-flex items-center justify-center rounded-xl border bg-white px-3 py-2 text-sm font-medium text-slate-700 transition {% if role == 'admin' %}border-slate-300 hover:border-sky-300 hover:text-sky-700{% else %}border-slate-300 hover:border-pink-300 hover:text-rose-600{% endif %}"
               href="{{ pagination_url(page=page_obj.prev_page) }}"
+              data-async-nav
             >
               {% if role == 'admin' %}Previous{% else %}Föregående{% endif %}
             </a>
@@ -56,6 +57,7 @@
                 <a
                   class="inline-flex min-w-10 items-center justify-center rounded-xl border bg-white px-3 py-2 text-sm font-medium text-slate-700 transition {% if role == 'admin' %}border-slate-300 hover:border-sky-300 hover:text-sky-700{% else %}border-slate-300 hover:border-pink-300 hover:text-rose-600{% endif %}"
                   href="{{ pagination_url(page=page_number) }}"
+                  data-async-nav
                 >
                   {{ page_number }}
                 </a>
@@ -69,6 +71,7 @@
             <a
               class="inline-flex items-center justify-center rounded-xl border bg-white px-3 py-2 text-sm font-medium text-slate-700 transition {% if role == 'admin' %}border-slate-300 hover:border-sky-300 hover:text-sky-700{% else %}border-slate-300 hover:border-pink-300 hover:text-rose-600{% endif %}"
               href="{{ pagination_url(page=page_obj.next_page) }}"
+              data-async-nav
             >
               {% if role == 'admin' %}Next{% else %}Nästa{% endif %}
             </a>

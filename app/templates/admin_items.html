@@ -1,155 +1,21 @@
 {% extends "base.html" %}
+{% import "_components.html" as ui with context %}
 {% block content %}
-<section class="relative overflow-hidden rounded-[2rem] border border-sky-100 bg-gradient-to-br from-white via-sky-50 to-slate-50 shadow-sm">
-  <div class="absolute inset-y-0 right-0 hidden w-1/3 bg-[radial-gradient(circle_at_top,rgba(14,165,233,0.16),transparent_58%)] lg:block"></div>
-  <div class="relative px-6 py-8 md:px-8">
-    <div class="flex flex-wrap items-start justify-between gap-4">
-      <div>
-        <div class="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-white/80 px-3 py-1 text-xs font-medium uppercase tracking-[0.2em] text-sky-700">
-          Inventory Control
-        </div>
-        <h1 class="mt-4 text-3xl font-semibold tracking-tight text-slate-900 md:text-4xl">Items</h1>
-        <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-          Manage physical inventory items, their active state, and the category each item belongs to.
-        </p>
-      </div>
-
-      <a class="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white transition hover:bg-sky-700" href="{{ url_for('routes.admin_item_new_form') }}">
-        Add item
-      </a>
-    </div>
-  </div>
-</section>
-
-<section class="mt-6 rounded-[2rem] border border-slate-200 bg-white shadow-sm">
-  <div class="border-b border-slate-200 px-6 py-5 md:px-8">
-    <h2 class="text-2xl font-semibold text-slate-900">Inventory register</h2>
-  </div>
-  <div class="px-6 py-6 md:px-8">
-    {% if items %}
-      <div class="grid gap-4 md:hidden">
-        {% for it in items %}
-          <div class="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4 shadow-sm">
-            <div class="flex items-start justify-between gap-3">
-              <div>
-                <div class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">Item #{{ it.id }}</div>
-                <div class="mt-1 text-lg font-semibold text-slate-900">{{ it.sku }}</div>
-                <div class="mt-1 text-sm text-slate-600">{{ it.display_name }}</div>
-              </div>
-              {% if it.is_active %}
-                <span class="inline-flex rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-800">Active</span>
-              {% else %}
-                <span class="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">Inactive</span>
-              {% endif %}
-            </div>
-            <div class="mt-3 flex flex-wrap gap-2 text-xs">
-              {% if it.is_tent %}<span class="inline-flex rounded-full bg-sky-100 px-3 py-1 font-medium text-sky-800">Tent</span>{% endif %}
-              {% if it.is_furnishing %}<span class="inline-flex rounded-full bg-emerald-100 px-3 py-1 font-medium text-emerald-800">Furnishing</span>{% endif %}
-            </div>
-            <div class="mt-3 space-y-1 text-sm text-slate-600">
-              {% if it.is_tent %}
-                <div>Capacity: {{ it.capacity }}</div>
-                <div>Season: {{ it.season_rating }}</div>
-                <div>Setup: {{ it.setup_service_fee }} kr</div>
-              {% else %}
-                <div>{{ it.furnishing_kind or "" }}</div>
-                {% if it.weight_kg %}<div>Weight: {{ it.weight_kg }} kg</div>{% endif %}
-              {% endif %}
-            </div>
-            <div class="mt-4 flex flex-wrap items-center gap-2">
-              <a class="rounded-full border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50" href="{{ url_for('routes.admin_item_edit_form', item_id=it.id) }}">
-                Edit
-              </a>
-              <form method="post" action="{{ url_for('routes.admin_item_delete', item_id=it.id) }}" onsubmit="return confirm('Delete this item?');">
-                <button class="rounded-full bg-rose-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-rose-700" type="submit">
-                  Delete
-                </button>
-              </form>
-            </div>
-          </div>
-        {% endfor %}
-      </div>
-
-      <div class="hidden overflow-hidden rounded-[1.5rem] border border-slate-200 md:block">
-        <div class="overflow-x-auto">
-          <table class="min-w-full text-sm">
-            <thead class="bg-slate-900 text-slate-100">
-              <tr>
-                <th class="p-3 text-left font-medium" data-sort-type="number">Item ID</th>
-                <th class="p-3 text-left font-medium">SKU</th>
-                <th class="p-3 text-left font-medium">Active</th>
-                <th class="p-3 text-left font-medium">Category</th>
-                <th class="p-3 text-left font-medium">Type</th>
-                <th class="p-3 text-left font-medium">Details</th>
-                <th class="p-3 text-left font-medium">Actions</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-200 bg-white">
-              {% for it in items %}
-                <tr class="align-top transition hover:bg-sky-50/60">
-                  <td class="p-3 text-slate-500">{{ it.id }}</td>
-                  <td class="p-3" data-sort-value="{{ it.sku }}">
-                    <div class="font-medium text-slate-900">{{ it.sku }}</div>
-                    <div class="mt-1 text-xs text-slate-500">{{ it.created_at }}</div>
-                  </td>
-                  <td class="p-3" data-sort-value="{{ 1 if it.is_active else 0 }}">
-                    {% if it.is_active %}
-                      <span class="inline-flex rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-800">Active</span>
-                    {% else %}
-                      <span class="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">Inactive</span>
-                    {% endif %}
-                  </td>
-                  <td class="p-3" data-sort-value="{{ it.display_name }}">
-                    <div class="font-medium text-slate-900">{{ it.display_name }}</div>
-                    <div class="mt-1 text-xs text-slate-500">Category #{{ it.category_id }}</div>
-                  </td>
-                  <td class="p-3" data-sort-value="{{ 'Tent' if it.is_tent else 'Furnishing' if it.is_furnishing else 'Item' }}">
-                    {% if it.is_tent %}
-                      <span class="inline-flex rounded-full bg-sky-100 px-2.5 py-1 text-xs font-medium text-sky-800">Tent</span>
-                    {% endif %}
-                    {% if it.is_furnishing %}
-                      <span class="inline-flex rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-800">Furnishing</span>
-                    {% endif %}
-                  </td>
-                  <td class="p-3 text-slate-700">
-                    {% if it.is_tent %}
-                      <div>Capacity: {{ it.capacity }}</div>
-                      <div>Season rating: {{ it.season_rating }}</div>
-                      <div>Build time: {{ it.estimated_build_time_minutes }} min</div>
-                      <div>Setup service: {{ it.setup_service_fee }} kr</div>
-                      {% if it.packed_weight_kg %}<div>Packed weight: {{ it.packed_weight_kg }} kg</div>{% endif %}
-                      {% if it.floor_area_m2 %}<div>Floor area: {{ it.floor_area_m2 }} m2</div>{% endif %}
-                    {% else %}
-                      <div>{{ it.furnishing_kind or "" }}</div>
-                      {% if it.weight_kg %}<div>Weight: {{ it.weight_kg }} kg</div>{% endif %}
-                      {% if it.notes %}<div class="mt-1 text-xs text-slate-500">{{ it.notes }}</div>{% endif %}
-                    {% endif %}
-                  </td>
-                  <td class="p-3">
-                    <div class="flex flex-wrap items-center gap-2">
-                      <a class="rounded-full border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50" href="{{ url_for('routes.admin_item_edit_form', item_id=it.id) }}">
-                        Edit
-                      </a>
-                      <form method="post" action="{{ url_for('routes.admin_item_delete', item_id=it.id) }}" onsubmit="return confirm('Delete this item?');">
-                        <button class="rounded-full bg-rose-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-rose-700" type="submit">
-                          Delete
-                        </button>
-                      </form>
-                    </div>
-                  </td>
-                </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    {% else %}
-      <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-600"><i>No items yet.</i></div>
-    {% endif %}
-
-    {% with page_obj=items_page %}
-      {% include "_pagination.html" %}
-    {% endwith %}
-  </div>
-</section>
+{% set hero_actions %}
+  <a class="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white transition hover:bg-sky-700" href="{{ url_for('routes.admin_item_new_form') }}">
+    Add item
+  </a>
+{% endset %}
+{{ ui.admin_page_hero(
+  "Inventory Control",
+  "Items",
+  "Manage physical inventory items, their active state, and the category each item belongs to.",
+  actions=hero_actions
+) }}
+{{ ui.async_fragment_host(
+  'list',
+  message='Loading inventory register...',
+  class_name='mt-6',
+  min_height='16rem'
+) }}
 {% endblock %}

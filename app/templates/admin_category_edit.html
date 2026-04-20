@@ -1,10 +1,13 @@
 {% extends "base.html" %}
+{% import "_components.html" as ui with context %}
 {% block content %}
-<div class="max-w-5xl bg-white border rounded-xl p-6 shadow-sm">
-  <h2 class="text-xl font-semibold">Edit category #{{ cat.id }}</h2>
-  <p class="text-sm text-slate-500 mt-1">
-    Changes here affect all items in this category and its rental period pricing.
-  </p>
+<section class="mx-auto max-w-5xl">
+  {{ ui.admin_page_hero(
+    "Catalog Control",
+    "Edit category #" ~ cat.id,
+    "Changes here affect all items in this category and its rental period pricing.",
+    title_class='mt-4 text-3xl font-semibold tracking-tight text-slate-900'
+  ) }}
 
   {% set pricing_map = {} %}
   {% for row in pricing_rows %}
@@ -19,263 +22,158 @@
     }) %}
   {% endfor %}
 
-  <form method="post" class="mt-4 space-y-6">
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <div class="md:col-span-2">
-        <h3 class="font-medium">Base</h3>
-      </div>
-
-      <div>
-        <label class="text-sm font-medium" for="display_name">Display name</label>
-        <input
-          id="display_name"
-          name="display_name"
-          value="{{ cat.display_name }}"
-          required
-          class="mt-1 w-full rounded-lg border px-3 py-2"
-        >
-      </div>
-    </div>
-
-    {% if cat.is_tent %}
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+  {% call ui.content_panel(wrapper_class='mt-6', body_class='') %}
+    <form method="post" class="grid gap-6 px-6 py-6 md:px-8">
+      <div class="grid gap-4 md:grid-cols-2">
         <div class="md:col-span-2">
-          <h3 class="font-medium">Tent details</h3>
+          <h3 class="font-medium text-slate-900">Base</h3>
         </div>
 
         <div>
-          <label class="text-sm font-medium" for="capacity">Capacity</label>
+          <label class="text-sm font-medium text-slate-700" for="display_name">Display name</label>
           <input
-            id="capacity"
-            name="capacity"
-            type="number"
-            min="1"
-            value="{{ cat.capacity }}"
+            id="display_name"
+            name="display_name"
+            value="{{ cat.display_name }}"
             required
-            class="mt-1 w-full rounded-lg border px-3 py-2"
-          >
-        </div>
-
-        <div>
-          <label class="text-sm font-medium" for="season_rating">Season rating (1–5)</label>
-          <input
-            id="season_rating"
-            name="season_rating"
-            type="number"
-            min="1"
-            max="5"
-            value="{{ cat.season_rating }}"
-            required
-            class="mt-1 w-full rounded-lg border px-3 py-2"
-          >
-        </div>
-
-        <div>
-          <label class="text-sm font-medium" for="estimated_build_time_minutes">Build time (minutes)</label>
-          <input
-            id="estimated_build_time_minutes"
-            name="estimated_build_time_minutes"
-            type="number"
-            min="0"
-            value="{{ cat.estimated_build_time_minutes }}"
-            required
-            class="mt-1 w-full rounded-lg border px-3 py-2"
-          >
-        </div>
-
-        <div>
-          <label class="text-sm font-medium" for="setup_service_fee">Setup service fee</label>
-          <input
-            id="setup_service_fee"
-            name="setup_service_fee"
-            type="number"
-            step="0.01"
-            min="0"
-            value="{{ cat.setup_service_fee }}"
-            required
-            class="mt-1 w-full rounded-lg border px-3 py-2"
-          >
-          <p class="text-xs text-slate-500 mt-1">
-            Includes construction and deconstruction together.
-          </p>
-        </div>
-
-        <div>
-          <label class="text-sm font-medium" for="packed_weight_kg">Packed weight (kg) (optional)</label>
-          <input
-            id="packed_weight_kg"
-            name="packed_weight_kg"
-            type="number"
-            step="0.01"
-            min="0"
-            value="{{ cat.packed_weight_kg or '' }}"
-            class="mt-1 w-full rounded-lg border px-3 py-2"
-          >
-        </div>
-
-        <div>
-          <label class="text-sm font-medium" for="floor_area_m2">Floor area (m²) (optional)</label>
-          <input
-            id="floor_area_m2"
-            name="floor_area_m2"
-            type="number"
-            step="0.01"
-            min="0"
-            value="{{ cat.floor_area_m2 or '' }}"
-            class="mt-1 w-full rounded-lg border px-3 py-2"
+            class="mt-1 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 shadow-sm transition focus:border-sky-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-sky-100"
           >
         </div>
       </div>
-    {% else %}
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div class="md:col-span-2">
-          <h3 class="font-medium">Furnishing details</h3>
+
+      {% if cat.is_tent %}
+        <div class="grid gap-4 md:grid-cols-2">
+          <div class="md:col-span-2">
+            <h3 class="font-medium text-slate-900">Tent details</h3>
+          </div>
+
+          <div>
+            <label class="text-sm font-medium text-slate-700" for="capacity">Capacity</label>
+            <input
+              id="capacity"
+              name="capacity"
+              type="number"
+              min="1"
+              value="{{ cat.capacity }}"
+              required
+              class="mt-1 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 shadow-sm transition focus:border-sky-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-sky-100"
+            >
+          </div>
+
+          <div>
+            <label class="text-sm font-medium text-slate-700" for="season_rating">Season rating (1-5)</label>
+            <input
+              id="season_rating"
+              name="season_rating"
+              type="number"
+              min="1"
+              max="5"
+              value="{{ cat.season_rating }}"
+              required
+              class="mt-1 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 shadow-sm transition focus:border-sky-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-sky-100"
+            >
+          </div>
+
+          <div>
+            <label class="text-sm font-medium text-slate-700" for="estimated_build_time_minutes">Build time (minutes)</label>
+            <input
+              id="estimated_build_time_minutes"
+              name="estimated_build_time_minutes"
+              type="number"
+              min="0"
+              value="{{ cat.estimated_build_time_minutes }}"
+              required
+              class="mt-1 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 shadow-sm transition focus:border-sky-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-sky-100"
+            >
+          </div>
+
+          <div>
+            <label class="text-sm font-medium text-slate-700" for="setup_service_fee">Setup service fee</label>
+            <input
+              id="setup_service_fee"
+              name="setup_service_fee"
+              type="number"
+              step="0.01"
+              min="0"
+              value="{{ cat.setup_service_fee }}"
+              required
+              class="mt-1 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 shadow-sm transition focus:border-sky-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-sky-100"
+            >
+            <p class="mt-2 text-xs text-slate-500">Includes construction and deconstruction together.</p>
+          </div>
+
+          <div>
+            <label class="text-sm font-medium text-slate-700" for="packed_weight_kg">Packed weight (kg) (optional)</label>
+            <input
+              id="packed_weight_kg"
+              name="packed_weight_kg"
+              type="number"
+              step="0.01"
+              min="0"
+              value="{{ cat.packed_weight_kg or '' }}"
+              class="mt-1 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 shadow-sm transition focus:border-sky-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-sky-100"
+            >
+          </div>
+
+          <div>
+            <label class="text-sm font-medium text-slate-700" for="floor_area_m2">Floor area (m2) (optional)</label>
+            <input
+              id="floor_area_m2"
+              name="floor_area_m2"
+              type="number"
+              step="0.01"
+              min="0"
+              value="{{ cat.floor_area_m2 or '' }}"
+              class="mt-1 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 shadow-sm transition focus:border-sky-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-sky-100"
+            >
+          </div>
         </div>
+      {% else %}
+        <div class="grid gap-4 md:grid-cols-2">
+          <div class="md:col-span-2">
+            <h3 class="font-medium text-slate-900">Furnishing details</h3>
+          </div>
 
-        <div>
-          <label class="text-sm font-medium" for="furnishing_kind">Kind</label>
-          <input
-            id="furnishing_kind"
-            name="furnishing_kind"
-            value="{{ cat.furnishing_kind }}"
-            required
-            class="mt-1 w-full rounded-lg border px-3 py-2"
-          >
+          <div>
+            <label class="text-sm font-medium text-slate-700" for="furnishing_kind">Kind</label>
+            <input
+              id="furnishing_kind"
+              name="furnishing_kind"
+              value="{{ cat.furnishing_kind }}"
+              required
+              class="mt-1 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 shadow-sm transition focus:border-sky-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-sky-100"
+            >
+          </div>
+
+          <div>
+            <label class="text-sm font-medium text-slate-700" for="weight_kg">Weight (kg) (optional)</label>
+            <input
+              id="weight_kg"
+              name="weight_kg"
+              type="number"
+              step="0.01"
+              min="0"
+              value="{{ cat.weight_kg or '' }}"
+              class="mt-1 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 shadow-sm transition focus:border-sky-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-sky-100"
+            >
+          </div>
+
+          <div class="md:col-span-2">
+            <label class="text-sm font-medium text-slate-700" for="notes">Notes (optional)</label>
+            <textarea
+              id="notes"
+              name="notes"
+              rows="3"
+              class="mt-1 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 shadow-sm transition focus:border-sky-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-sky-100"
+            >{{ cat.notes or '' }}</textarea>
+          </div>
         </div>
+      {% endif %}
 
-        <div>
-          <label class="text-sm font-medium" for="weight_kg">Weight (kg) (optional)</label>
-          <input
-            id="weight_kg"
-            name="weight_kg"
-            type="number"
-            step="0.01"
-            min="0"
-            value="{{ cat.weight_kg or '' }}"
-            class="mt-1 w-full rounded-lg border px-3 py-2"
-          >
-        </div>
+      {{ ui.category_pricing_matrix(rental_periods, pricing_map) }}
 
-        <div class="md:col-span-2">
-          <label class="text-sm font-medium" for="notes">Notes (optional)</label>
-          <textarea
-            id="notes"
-            name="notes"
-            rows="3"
-            class="mt-1 w-full rounded-lg border px-3 py-2"
-          >{{ cat.notes or '' }}</textarea>
-        </div>
-      </div>
-    {% endif %}
-
-    <div class="border rounded-xl p-4">
-      <div>
-        <h3 class="font-medium">Rental period pricing</h3>
-        <p class="text-sm text-slate-500 mt-1">
-          Choose which rental periods this category uses and set a price for each one.
-        </p>
-      </div>
-
-      <div class="overflow-x-auto border rounded-lg mt-4">
-        <table class="min-w-full text-sm">
-          <thead class="bg-slate-50 text-slate-600">
-            <tr>
-              <th class="p-3 text-left">Use</th>
-              <th class="p-3 text-left">Period</th>
-              <th class="p-3 text-left">Days</th>
-              <th class="p-3 text-left">Price</th>
-              <th class="p-3 text-left">Sort order</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for rp in rental_periods %}
-              {% set existing = pricing_map.get(rp.id) %}
-              {% set checked = existing is not none %}
-
-              <tr class="border-t">
-                <td class="p-3">
-                  <input
-                    type="checkbox"
-                    id="use_period_{{ rp.id }}"
-                    class="h-4 w-4"
-                    {% if checked %}checked{% endif %}
-                    onchange="
-                      const price = document.getElementById('period_price_{{ rp.id }}');
-                      const sort = document.getElementById('period_sort_{{ rp.id }}');
-                      price.disabled = !this.checked;
-                      sort.disabled = !this.checked;
-                      if (!this.checked) { price.value = ''; sort.value = '{{ loop.index0 }}'; }
-                    "
-                  >
-                </td>
-
-                <td class="p-3">
-                  <label for="use_period_{{ rp.id }}" class="font-medium cursor-pointer">
-                    {{ rp.label }}
-                  </label>
-                </td>
-
-                <td class="p-3">
-                  {% if rp.min_days == rp.max_days %}
-                    {{ rp.min_days }} day{% if rp.min_days != 1 %}s{% endif %}
-                  {% else %}
-                    {{ rp.min_days }}–{{ rp.max_days }} days
-                  {% endif %}
-                </td>
-
-                <td class="p-3">
-                  <input
-                    id="period_price_{{ rp.id }}"
-                    name="period_price_{{ rp.id }}"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value="{{ existing.price if existing else '' }}"
-                    {% if not checked %}disabled{% endif %}
-                    class="w-32 rounded-lg border px-3 py-2"
-                    placeholder="Price"
-                  >
-                </td>
-
-                <td class="p-3">
-                  <input
-                    id="period_sort_{{ rp.id }}"
-                    name="period_sort_{{ rp.id }}"
-                    type="number"
-                    min="0"
-                    value="{{ existing.sort_order if existing else loop.index0 }}"
-                    {% if not checked %}disabled{% endif %}
-                    class="w-24 rounded-lg border px-3 py-2"
-                  >
-                </td>
-              </tr>
-            {% else %}
-              <tr>
-                <td class="p-3" colspan="5">
-                  <i>No rental periods available yet. Create rental periods first.</i>
-                </td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-
-      <p class="text-xs text-slate-500 mt-3">
-        At least one rental period price must be entered.
-      </p>
-    </div>
-
-    <div class="flex gap-2">
-      <button class="rounded-lg bg-indigo-600 text-white px-4 py-2 hover:bg-indigo-700">
-        Save
-      </button>
-      <a
-        class="rounded-lg border px-4 py-2 hover:bg-slate-50"
-        href="{{ url_for('routes.admin_categories') }}"
-      >
-        Cancel
-      </a>
-    </div>
-  </form>
-</div>
+      {{ ui.form_actions("Save", url_for('routes.admin_categories')) }}
+    </form>
+  {% endcall %}
+</section>
 {% endblock %}

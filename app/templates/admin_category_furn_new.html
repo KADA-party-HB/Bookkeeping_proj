@@ -1,162 +1,70 @@
 {% extends "base.html" %}
+{% import "_components.html" as ui with context %}
 {% block content %}
-<div class="max-w-5xl bg-white border rounded-xl p-6 shadow-sm">
-  <h2 class="text-xl font-semibold">New furnishing category</h2>
-  <p class="text-sm text-slate-500 mt-1">
-    Create a furnishing category, then assign prices for the rental periods it should use.
-  </p>
+<section class="mx-auto max-w-5xl">
+  {{ ui.admin_page_hero(
+    "Catalog Control",
+    "New furnishing category",
+    "Create a furnishing category, then assign prices for the rental periods it should use.",
+    title_class='mt-4 text-3xl font-semibold tracking-tight text-slate-900'
+  ) }}
 
-  <form method="post" class="mt-4 space-y-6">
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <div>
-        <label class="text-sm font-medium" for="display_name">Display name</label>
-        <input
-          id="display_name"
-          name="display_name"
-          required
-          class="mt-1 w-full rounded-lg border px-3 py-2"
-          placeholder="e.g. Table, Chair, Bench set"
-        >
+  {% call ui.content_panel(wrapper_class='mt-6', body_class='') %}
+    <form method="post" class="grid gap-6 px-6 py-6 md:px-8">
+      <div class="grid gap-4 md:grid-cols-2">
+        <div>
+          <label class="text-sm font-medium text-slate-700" for="display_name">Display name</label>
+          <input
+            id="display_name"
+            name="display_name"
+            required
+            class="mt-1 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 shadow-sm transition focus:border-sky-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-sky-100"
+            placeholder="e.g. Table, Chair, Bench set"
+          >
+        </div>
+
+        <div>
+          <label class="text-sm font-medium text-slate-700" for="furnishing_kind">Kind</label>
+          <input
+            id="furnishing_kind"
+            name="furnishing_kind"
+            required
+            class="mt-1 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 shadow-sm transition focus:border-sky-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-sky-100"
+            placeholder="e.g. Chair"
+          >
+        </div>
+
+        <div>
+          <label class="text-sm font-medium text-slate-700" for="weight_kg">Weight (kg) (optional)</label>
+          <input
+            id="weight_kg"
+            name="weight_kg"
+            type="number"
+            step="0.01"
+            min="0"
+            class="mt-1 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 shadow-sm transition focus:border-sky-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-sky-100"
+          >
+        </div>
+
+        <div class="md:col-span-2">
+          <label class="text-sm font-medium text-slate-700" for="notes">Notes (optional)</label>
+          <textarea
+            id="notes"
+            name="notes"
+            rows="3"
+            class="mt-1 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 shadow-sm transition focus:border-sky-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-sky-100"
+            placeholder="Optional admin notes or item description"
+          ></textarea>
+        </div>
       </div>
 
-      <div>
-        <label class="text-sm font-medium" for="furnishing_kind">Kind</label>
-        <input
-          id="furnishing_kind"
-          name="furnishing_kind"
-          required
-          class="mt-1 w-full rounded-lg border px-3 py-2"
-          placeholder="e.g. Chair"
-        >
-      </div>
+      {{ ui.category_pricing_matrix(
+        rental_periods,
+        description='Enter prices only for the rental periods this category should use.'
+      ) }}
 
-      <div>
-        <label class="text-sm font-medium" for="weight_kg">Weight (kg) (optional)</label>
-        <input
-          id="weight_kg"
-          name="weight_kg"
-          type="number"
-          step="0.01"
-          min="0"
-          class="mt-1 w-full rounded-lg border px-3 py-2"
-        >
-      </div>
-
-      <div class="md:col-span-2">
-        <label class="text-sm font-medium" for="notes">Notes (optional)</label>
-        <textarea
-          id="notes"
-          name="notes"
-          rows="3"
-          class="mt-1 w-full rounded-lg border px-3 py-2"
-          placeholder="Optional admin notes or item description"
-        ></textarea>
-      </div>
-    </div>
-
-    <div class="border rounded-xl p-4">
-      <div>
-        <h3 class="font-medium">Rental period pricing</h3>
-        <p class="text-sm text-slate-500 mt-1">
-          Enter prices only for the rental periods this category should use.
-        </p>
-      </div>
-
-      <div class="overflow-x-auto border rounded-lg mt-4">
-        <table class="min-w-full text-sm">
-          <thead class="bg-slate-50 text-slate-600">
-            <tr>
-              <th class="p-3 text-left">Use</th>
-              <th class="p-3 text-left">Period</th>
-              <th class="p-3 text-left">Days</th>
-              <th class="p-3 text-left">Price</th>
-              <th class="p-3 text-left">Sort order</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for rp in rental_periods %}
-              <tr class="border-t">
-                <td class="p-3">
-                  <input
-                    type="checkbox"
-                    id="use_period_{{ rp.id }}"
-                    class="h-4 w-4"
-                    onchange="
-                      const price = document.getElementById('period_price_{{ rp.id }}');
-                      const sort = document.getElementById('period_sort_{{ rp.id }}');
-                      price.disabled = !this.checked;
-                      sort.disabled = !this.checked;
-                      if (!this.checked) { price.value = ''; sort.value = '{{ loop.index0 }}'; }
-                    "
-                  >
-                </td>
-
-                <td class="p-3">
-                  <label for="use_period_{{ rp.id }}" class="font-medium cursor-pointer">
-                    {{ rp.label }}
-                  </label>
-                </td>
-
-                <td class="p-3">
-                  {% if rp.min_days == rp.max_days %}
-                    {{ rp.min_days }} day{% if rp.min_days != 1 %}s{% endif %}
-                  {% else %}
-                    {{ rp.min_days }}–{{ rp.max_days }} days
-                  {% endif %}
-                </td>
-
-                <td class="p-3">
-                  <input
-                    id="period_price_{{ rp.id }}"
-                    name="period_price_{{ rp.id }}"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    disabled
-                    class="w-32 rounded-lg border px-3 py-2"
-                    placeholder="Price"
-                  >
-                </td>
-
-                <td class="p-3">
-                  <input
-                    id="period_sort_{{ rp.id }}"
-                    name="period_sort_{{ rp.id }}"
-                    type="number"
-                    min="0"
-                    value="{{ loop.index0 }}"
-                    disabled
-                    class="w-24 rounded-lg border px-3 py-2"
-                  >
-                </td>
-              </tr>
-            {% else %}
-              <tr>
-                <td class="p-3" colspan="5">
-                  <i>No rental periods available yet. Create rental periods first.</i>
-                </td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-
-      <p class="text-xs text-slate-500 mt-3">
-        At least one rental period price must be entered.
-      </p>
-    </div>
-
-    <div class="flex gap-2">
-      <button class="rounded-lg bg-indigo-600 text-white px-4 py-2 hover:bg-indigo-700">
-        Create category
-      </button>
-      <a
-        class="rounded-lg border px-4 py-2 hover:bg-slate-50"
-        href="{{ url_for('routes.admin_categories') }}"
-      >
-        Cancel
-      </a>
-    </div>
-  </form>
-</div>
+      {{ ui.form_actions("Create category", url_for('routes.admin_categories')) }}
+    </form>
+  {% endcall %}
+</section>
 {% endblock %}

@@ -12,6 +12,13 @@
   ].join("");
 
   const isIsoDate = (value) => ISO_DATE_PATTERN.test((value || "").trim());
+  const getTodayIsoDate = () => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, "0");
+    const day = String(today.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
   const resolveFlatpickrLocale = (localeName) => {
     if (!window.flatpickr || !localeName) {
       return {
@@ -81,22 +88,65 @@
 
     const shouldUseThemedCalendar = container.dataset.dateRangeCalendar === "themed" && Boolean(window.flatpickr);
     const localeName = container.dataset.dateRangeLocale || "";
+    const rawMinDate = (container.dataset.dateRangeMin || "").trim();
+    const minSelectableDate = rawMinDate === "today"
+      ? getTodayIsoDate()
+      : (isIsoDate(rawMinDate) ? rawMinDate : "");
 
     let startPicker = null;
     let endPicker = null;
 
-    const updateEndConstraints = () => {
+    const getMinEndDate = () => {
       const startValue = isIsoDate(startInput.value) ? startInput.value : "";
-      endInput.min = startValue || "";
+      if (!startValue) {
+        return minSelectableDate;
+      }
+
+      if (!minSelectableDate || startValue > minSelectableDate) {
+        return startValue;
+      }
+
+      return minSelectableDate;
+    };
+
+    const updateStartConstraints = () => {
+      startInput.min = minSelectableDate || "";
+
+      if (startPicker) {
+        startPicker.set("minDate", minSelectableDate || null);
+      }
+    };
+
+    const clampStartDate = () => {
+      const startValue = isIsoDate(startInput.value) ? startInput.value : "";
+
+      if (minSelectableDate && startValue && startValue < minSelectableDate) {
+        setInputValue(startInput, startPicker, minSelectableDate);
+        return minSelectableDate;
+      }
+
+      return startValue;
+    };
+
+    const updateEndConstraints = () => {
+      const minEndDate = getMinEndDate();
+      const endValue = isIsoDate(endInput.value) ? endInput.value : "";
+
+      endInput.min = minEndDate || "";
 
       if (endPicker) {
-        endPicker.set("minDate", startValue || null);
+        endPicker.set("minDate", minEndDate || null);
+      }
+
+      if (minEndDate && endValue && endValue < minEndDate) {
+        setInputValue(endInput, endPicker, minEndDate);
       }
     };
 
     const syncEndDate = () => {
-      const startValue = isIsoDate(startInput.value) ? startInput.value : "";
+      const startValue = clampStartDate();
       const endValue = isIsoDate(endInput.value) ? endInput.value : "";
+      const minEndDate = getMinEndDate();
 
       updateEndConstraints();
 
@@ -104,14 +154,15 @@
         return;
       }
 
-      if (!endValue || endValue < startValue) {
-        setInputValue(endInput, endPicker, startValue);
+      if (!endValue || endValue < minEndDate) {
+        setInputValue(endInput, endPicker, minEndDate);
       }
     };
 
     if (shouldUseThemedCalendar) {
       startPicker = initThemedDatePicker(startInput, {
         defaultDate: isIsoDate(startInput.value) ? startInput.value : null,
+        minDate: minSelectableDate || null,
         localeName,
         onChange() {
           syncEndDate();
@@ -123,7 +174,7 @@
 
       endPicker = initThemedDatePicker(endInput, {
         defaultDate: isIsoDate(endInput.value) ? endInput.value : null,
-        minDate: isIsoDate(startInput.value) ? startInput.value : null,
+        minDate: getMinEndDate() || null,
         localeName,
         onChange() {
           updateEndConstraints();
@@ -139,6 +190,7 @@
     endInput.addEventListener("change", updateEndConstraints);
     endInput.addEventListener("input", updateEndConstraints);
 
+    updateStartConstraints();
     syncEndDate();
   };
 
