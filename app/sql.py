@@ -797,6 +797,7 @@ SELECT
   END AS total_cost,
   b.include_delivery,
   b.delivery_fee,
+  b.delivery_address,
   b.include_setup_service,
   b.custom_total_price,
   b.custom_price_note,
@@ -806,6 +807,8 @@ SELECT
   c.id AS customer_id,
   c.full_name,
   c.email,
+  c.phone,
+  c.address,
   c.postal_city
 FROM bookings b
 JOIN customers c ON c.id = b.customer_id
@@ -940,12 +943,20 @@ SET customer_id = %s,
     status = %s,
     include_delivery = %s,
     delivery_fee = %s,
+    delivery_address = %s,
     include_setup_service = %s,
     custom_total_price = %s,
     custom_price_note = %s,
     booking_note = %s,
     admin_note = %s
 WHERE id = %s;
+"""
+
+SQL_UPDATE_BOOKING_NOTE = """
+UPDATE bookings
+SET booking_note = %s
+WHERE id = %s
+RETURNING booking_note;
 """
 
 SQL_GET_CUSTOMER_FOR_EDIT = """

@@ -1,0 +1,153 @@
+{
+  "products": [
+    {
+      "label": "Bord",
+      "sheet_product": "Bord",
+      "applies_to_categories": ["Bord"],
+      "rental_period_prices": {
+        "1 dag": 80,
+        "2-3 dagar": 80,
+        "4-7 dagar": 95
+      }
+    },
+    {
+      "label": "Stolar",
+      "sheet_product": "Stolar",
+      "applies_to_categories": ["Stolar premium", "Stolar standard"],
+      "rental_period_prices": {
+        "1 dag": 20,
+        "2-3 dagar": 20,
+        "4-7 dagar": 25
+      }
+    },
+    {
+      "label": "Bankset liten",
+      "sheet_product": "Bänkset liten 6-8",
+      "applies_to_categories": ["Bänkset små"],
+      "rental_period_prices": {
+        "1 dag": 329,
+        "2-3 dagar": 329,
+        "4-7 dagar": 399
+      }
+    },
+    {
+      "label": "Bankset stor",
+      "sheet_product": "Bänkset stor 8-10",
+      "applies_to_categories": ["Bänkset stor"],
+      "rental_period_prices": {
+        "1 dag": 399,
+        "2-3 dagar": 399,
+        "4-7 dagar": 499
+      }
+    },
+    {
+      "label": "Ljusslinga",
+      "sheet_product": "Lampslinga",
+      "applies_to_categories": ["Ljusslinga 10m", "Ljusslinga 15m"],
+      "rental_period_prices": {
+        "1 dag": 299,
+        "2-3 dagar": 299,
+        "4-7 dagar": 299
+      }
+    },
+    {
+      "label": "6×10",
+      "sheet_product": "6x10 m (Premium)",
+      "applies_to_categories": ["6×10"],
+      "setup_service_fee": 2499,
+      "rental_period_prices": {
+        "3 dagar": 2099,
+        "4-5 dagar": 2999,
+        "6-7 dagar": 3899
+      }
+    },
+    {
+      "label": "5×10",
+      "sheet_product": "5x10 m (Premium)",
+      "applies_to_categories": ["5×10"],
+      "setup_service_fee": 2299,
+      "rental_period_prices": {
+        "3 dagar": 1999,
+        "4-5 dagar": 2699,
+        "6-7 dagar": 3799
+      }
+    },
+    {
+      "label": "8×5PVC",
+      "sheet_product": "8x5 m (Premium)",
+      "applies_to_categories": ["8×5PVC"],
+      "setup_service_fee": 1799,
+      "rental_period_prices": {
+        "3 dagar": 1599,
+        "4-5 dagar": 2499,
+        "6-7 dagar": 3199
+      }
+    },
+    {
+      "label": "6×6",
+      "sheet_product": "6x6 m (Premium)",
+      "applies_to_categories": ["6×6"],
+      "setup_service_fee": 1999,
+      "rental_period_prices": {
+        "3 dagar": 1499,
+        "4-5 dagar": 2199,
+        "6-7 dagar": 2999
+      }
+    },
+    {
+      "label": "6×4",
+      "sheet_product": "6x4 m (Premium)",
+      "applies_to_categories": ["6×4"],
+      "setup_service_fee": 1399,
+      "rental_period_prices": {
+        "3 dagar": 1299,
+        "4-5 dagar": 1899,
+        "6-7 dagar": 2499
+      }
+    },
+    {
+      "label": "8×4",
+      "sheet_product": "8x4 m (Standard)",
+      "applies_to_categories": ["8×4"],
+      "setup_service_fee": 1399,
+      "rental_period_prices": {
+        "3 dagar": 1299,
+        "4-5 dagar": 1699,
+        "6-7 dagar": 2199
+      }
+    },
+    {
+      "label": "5×3",
+      "sheet_product": "5x3 m (Standard)",
+      "applies_to_categories": ["5×3"],
+      "setup_service_fee": 1099,
+      "rental_period_prices": {
+        "3 dagar": 999,
+        "4-5 dagar": 1499,
+        "6-7 dagar": 1899
+      }
+    },
+    {
+      "label": "3×3",
+      "sheet_product": "3x3 (standard)",
+      "applies_to_categories": ["3×3"],
+      "setup_service_fee": 699,
+      "rental_period_prices": {
+        "3 dagar": 299,
+        "4-5 dagar": 499,
+        "6-7 dagar": 599
+      }
+    },
+    {
+      "label": "8x5 (PE)",
+      "sheet_product": "8x5 m (Standard)",
+      "applies_to_categories": ["8x5 (PE)"],
+      "setup_service_fee": 1399,
+      "rental_period_prices": {
+        "3 dagar": 1299,
+        "4-5 dagar": 1899,
+        "6-7 dagar": 2399
+      }
+    }
+  ]
+}

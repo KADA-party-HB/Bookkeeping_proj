@@ -31,6 +31,13 @@
       </p>
     </div>
     <div class="flex flex-wrap items-center gap-3">
+      <a
+        id="calendar-new-booking-link"
+        class="hidden inline-flex items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white transition hover:bg-sky-700"
+        href="{{ url_for('routes.home') }}"
+      >
+        New booking
+      </a>
       <button
         type="button"
         id="calendar-free-toggle"
@@ -105,38 +112,49 @@
 
 <div id="calendar-booking-popup" class="fixed inset-0 z-50 hidden">
   <div class="absolute inset-0 bg-slate-950/45" data-popup-close></div>
-  <div class="absolute left-1/2 top-1/2 w-[calc(100%-2rem)] max-w-[24rem] -translate-x-1/2 -translate-y-1/2 rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-2xl">
+  <div class="absolute left-1/2 top-1/2 max-h-[calc(100vh-2rem)] w-[calc(100%-2rem)] max-w-[46rem] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-[1.5rem] border border-slate-200 bg-white p-5 shadow-2xl md:p-6">
     <div class="flex items-start justify-between gap-4">
-      <div>
+      <div class="min-w-0 flex-1">
         <div id="calendar-popup-ref" class="text-xs font-medium uppercase tracking-[0.2em] text-slate-400"></div>
         <h3 id="calendar-popup-title" class="mt-2 text-xl font-semibold text-slate-900"></h3>
         <div id="calendar-popup-status" class="mt-2"></div>
+        <dl id="calendar-popup-contact-list" class="mt-4 grid gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm sm:grid-cols-3"></dl>
       </div>
       <button
         type="button"
-        class="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:bg-slate-50 hover:text-slate-800"
+        class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:bg-slate-50 hover:text-slate-800"
         data-popup-close
       >
         x
       </button>
     </div>
 
-    <div class="mt-5 grid gap-3 text-sm text-slate-600">
-      <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-        <div class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">Total</div>
-        <div id="calendar-popup-price" class="mt-1 text-lg font-semibold text-slate-900"></div>
+    <div class="mt-5">
+      <div class="flex items-end justify-between gap-4 border-b border-slate-200 pb-3">
+        <div class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">Booked price list</div>
+        <div id="calendar-popup-price" class="text-xl font-semibold text-slate-900"></div>
       </div>
-
-      <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-        <div class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">Tent</div>
-        <div id="calendar-popup-tent" class="mt-1 font-medium text-slate-900"></div>
-      </div>
-
-      <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-        <div class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">Extras</div>
-        <div id="calendar-popup-extras" class="mt-1 font-medium text-slate-900"></div>
-      </div>
+      <div id="calendar-popup-price-list" class="divide-y divide-slate-100 text-sm"></div>
     </div>
+
+    <form id="calendar-popup-note-form" class="mt-5">
+      <label class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400" for="calendar-popup-note">Booking note</label>
+      <textarea
+        id="calendar-popup-note"
+        rows="4"
+        class="mt-2 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-800 shadow-sm transition focus:border-sky-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-sky-100"
+      ></textarea>
+      <div class="mt-3 flex flex-wrap items-center gap-3">
+        <button
+          type="submit"
+          id="calendar-popup-note-save"
+          class="inline-flex items-center justify-center rounded-2xl bg-sky-700 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-sky-800"
+        >
+          Save note
+        </button>
+        <span id="calendar-popup-note-status" class="text-sm text-slate-500"></span>
+      </div>
+    </form>
 
     <div class="mt-5 flex flex-wrap gap-3">
       <a id="calendar-popup-open" class="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white transition hover:bg-sky-700" href="#">
@@ -269,12 +287,22 @@
         "status": {{ b.status|tojson }},
         "customer": {{ (b.full_name or "")|tojson }},
         "email": {{ (b.email or "")|tojson }},
+        "phone": {{ (b.phone or "")|tojson }},
+        "address": {{ (b.address or "")|tojson }},
+        "postal_city": {{ (b.postal_city or "")|tojson }},
+        "delivery_address": {{ (b.delivery_address or "")|tojson }},
         "total_cost": {{ b.total_cost|tojson }},
         "booking_start_date": {{ (b.start_date|string)|tojson }},
         "booking_end_date": {{ (b.end_date|string)|tojson }},
         "item_summary": {{ b.calendar_item_summary|tojson }},
+        "items": {{ b.calendar_items|tojson }},
+        "booking_note": {{ (b.booking_note or "")|tojson }},
+        "note_url": {{ url_for('routes.admin_booking_note_save', booking_id=b.id)|tojson }},
         "tent_summary": {{ (b.tent_summary or "No tent")|tojson }},
+        "calendar_city": {{ (b.calendar_city or "")|tojson }},
         "has_booking_override": {{ (b.custom_total_price is not none)|tojson }},
+        "custom_price_note": {{ (b.custom_price_note or "")|tojson }},
+        "delivery_fee": {{ b.delivery_fee|tojson }},
         "include_delivery": {{ b.include_delivery|tojson }},
         "include_setup_service": {{ b.include_setup_service|tojson }}
       }
@@ -299,8 +327,12 @@
     const popupTitleEl = document.getElementById("calendar-popup-title");
     const popupStatusEl = document.getElementById("calendar-popup-status");
     const popupPriceEl = document.getElementById("calendar-popup-price");
-    const popupTentEl = document.getElementById("calendar-popup-tent");
-    const popupExtrasEl = document.getElementById("calendar-popup-extras");
+    const popupPriceListEl = document.getElementById("calendar-popup-price-list");
+    const popupContactListEl = document.getElementById("calendar-popup-contact-list");
+    const popupNoteFormEl = document.getElementById("calendar-popup-note-form");
+    const popupNoteEl = document.getElementById("calendar-popup-note");
+    const popupNoteSaveEl = document.getElementById("calendar-popup-note-save");
+    const popupNoteStatusEl = document.getElementById("calendar-popup-note-status");
     const popupOpenEl = document.getElementById("calendar-popup-open");
     const categoryInventoryDataEl = document.getElementById("booking-category-inventory-data");
     const daySummarySectionEl = document.getElementById("calendar-day-summary-section");
@@ -311,6 +343,7 @@
     const daySummaryTableWrapEl = document.getElementById("calendar-day-summary-table-wrap");
     const daySummaryBodyEl = document.getElementById("calendar-day-summary-body");
     const daySummaryOverrideNoteEl = document.getElementById("calendar-day-summary-override-note");
+    const newBookingLinkEl = document.getElementById("calendar-new-booking-link");
     const freeToggleEl = document.getElementById("calendar-free-toggle");
     const freeToggleTrackEl = document.getElementById("calendar-free-toggle-track");
     const freeToggleStateEl = document.getElementById("calendar-free-toggle-state");
@@ -328,16 +361,70 @@
       day: "numeric",
     });
     let showFreeInventory = false;
+    let activePopupEvent = null;
 
     const closePopup = () => {
       popupEl.classList.add("hidden");
+      activePopupEvent = null;
+    };
+
+    const parseAmount = (value) => {
+      const parsed = parseFloat(`${value ?? ""}`.replace(",", "."));
+      return Number.isFinite(parsed) ? parsed : 0;
+    };
+
+    const formatAmount = (value) => `${parseAmount(value).toFixed(2)} kr`;
+
+    const addPriceRow = (label, detail, amount, options = {}) => {
+      const row = document.createElement("div");
+      row.className = "flex items-start justify-between gap-4 py-2.5";
+
+      const text = document.createElement("div");
+      text.className = "min-w-0";
+
+      const title = document.createElement("div");
+      title.className = "font-medium text-slate-900";
+      title.textContent = label;
+      text.appendChild(title);
+
+      if (detail) {
+        const sub = document.createElement("div");
+        sub.className = "mt-0.5 text-xs leading-5 text-slate-500";
+        sub.textContent = detail;
+        text.appendChild(sub);
+      }
+
+      const price = document.createElement("div");
+      price.className = options.muted
+        ? "shrink-0 whitespace-nowrap text-sm text-slate-400"
+        : "shrink-0 whitespace-nowrap text-sm font-semibold text-slate-900";
+      price.textContent = amount;
+
+      row.appendChild(text);
+      row.appendChild(price);
+      popupPriceListEl.appendChild(row);
+    };
+
+    const addContactRow = (label, value) => {
+      const row = document.createElement("div");
+      row.className = "min-w-0";
+
+      const term = document.createElement("dt");
+      term.className = "text-[0.65rem] font-medium uppercase tracking-[0.12em] text-slate-400";
+      term.textContent = label;
+
+      const desc = document.createElement("dd");
+      desc.className = value ? "mt-0.5 break-words font-medium text-slate-900" : "mt-0.5 text-slate-400";
+      desc.textContent = value || "Missing";
+
+      row.appendChild(term);
+      row.appendChild(desc);
+      popupContactListEl.appendChild(row);
     };
 
     const openPopup = (event) => {
+      activePopupEvent = event;
       const props = event.extendedProps;
-      const extras = [];
-      if (props.include_setup_service) extras.push("Setup");
-      if (props.include_delivery) extras.push("Delivery");
 
       popupRefEl.textContent = `Booking #${event.id}`;
       popupTitleEl.textContent = props.customer || "Unknown customer";
@@ -345,9 +432,51 @@
       const statusClass = "inline-flex rounded-full bg-sky-100 px-3 py-1 text-xs font-medium text-sky-800";
       popupStatusEl.innerHTML = `<span class="${statusClass}">${props.status}</span>`;
 
-      popupPriceEl.textContent = `${props.total_cost} kr`;
-      popupTentEl.textContent = props.tent_summary || "No tent";
-      popupExtrasEl.textContent = extras.length ? extras.join(" - ") : "No extras";
+      popupPriceEl.textContent = formatAmount(props.total_cost);
+      popupPriceListEl.innerHTML = "";
+      popupContactListEl.innerHTML = "";
+      popupNoteStatusEl.textContent = "";
+      popupNoteEl.value = props.booking_note || "";
+
+      const itemRows = props.item_summary || [];
+      if (itemRows.length) {
+        itemRows.forEach((row) => {
+          const quantity = Number(row.quantity || 0);
+          const setupFee = parseAmount(row.effective_setup_fee);
+          const detailParts = [
+            row.type_label,
+            row.quoted_period_label,
+            row.quoted_period_price !== null && row.quoted_period_price !== undefined
+              ? `Base ${formatAmount(row.quoted_period_price)}`
+              : null,
+            setupFee > 0 ? `Setup ${formatAmount(setupFee)}` : "Setup not included",
+            row.custom_total_price !== null && row.custom_total_price !== undefined
+              ? `Override ${formatAmount(row.custom_total_price)}`
+              : null,
+          ].filter(Boolean).join(" - ");
+
+          addPriceRow(
+            `${quantity || 1} x ${row.display_name || "Booked item"}`,
+            detailParts,
+            formatAmount(row.group_total),
+          );
+        });
+      } else {
+        addPriceRow("No booked items", "", "0.00 kr", { muted: true });
+      }
+
+      if (props.include_delivery) {
+        addPriceRow("Delivery", props.delivery_address || "Delivery service", formatAmount(props.delivery_fee));
+      }
+
+      if (props.has_booking_override) {
+        addPriceRow("Booking total override", props.custom_price_note || "Overrides calculated line total", formatAmount(props.total_cost));
+      }
+
+      const addressParts = [props.address, props.postal_city].filter(Boolean);
+      addContactRow("Full name", props.customer || "");
+      addContactRow("Phone", props.phone || "");
+      addContactRow("Address", props.delivery_address || addressParts.join(", "));
       popupOpenEl.href = event.url || "#";
 
       popupEl.classList.remove("hidden");
@@ -360,12 +489,16 @@
       return `${year}-${month}-${day}`;
     };
 
-    const parseAmount = (value) => {
-      const parsed = parseFloat(`${value ?? ""}`.replace(",", "."));
-      return Number.isFinite(parsed) ? parsed : 0;
+    const addDaysToIsoDate = (isoDate, dayOffset) => {
+      const date = new Date(`${isoDate}T00:00:00`);
+      if (Number.isNaN(date.getTime())) {
+        return "";
+      }
+
+      date.setDate(date.getDate() + dayOffset);
+      return formatIsoDateLocal(date);
     };
 
-    const formatAmount = (value) => `${parseAmount(value).toFixed(2)} kr`;
     const createSummaryCell = ({ className = "", text = null, html = null }) => {
       const cell = document.createElement("td");
       cell.className = className;
@@ -381,6 +514,7 @@
       const isDayView = view.type === "dayGridDay" || view.type === "timeGridDay";
       if (!isDayView) {
         daySummarySectionEl.classList.add("hidden");
+        newBookingLinkEl.classList.add("hidden");
         freeToggleEl.classList.add("hidden");
         freeSummaryWrapEl.classList.add("hidden");
         daySummaryEmptyEl.classList.add("hidden");
@@ -390,6 +524,12 @@
       }
 
       const selectedDate = formatIsoDateLocal(view.currentStart);
+      const newBookingUrl = new URL({{ url_for('routes.home')|tojson }}, window.location.origin);
+      newBookingUrl.searchParams.set("start_date", selectedDate);
+      newBookingUrl.searchParams.set("end_date", addDaysToIsoDate(selectedDate, 2));
+      newBookingUrl.searchParams.set("initial_end_offset_days", "2");
+      newBookingLinkEl.href = newBookingUrl.toString();
+      newBookingLinkEl.classList.remove("hidden");
       const selectedBookings = events.filter((event) => {
         const props = event.extendedProps || {};
         return (
@@ -569,6 +709,44 @@
       el.addEventListener("click", closePopup);
     });
 
+    popupNoteFormEl.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      if (!activePopupEvent) return;
+
+      const props = activePopupEvent.extendedProps;
+      popupNoteSaveEl.disabled = true;
+      popupNoteSaveEl.textContent = "Saving...";
+      popupNoteStatusEl.textContent = "";
+
+      try {
+        const response = await fetch(props.note_url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Requested-With": "XMLHttpRequest",
+          },
+          body: JSON.stringify({ booking_note: popupNoteEl.value }),
+        });
+        const result = await response.json();
+
+        if (!response.ok || !result.ok) {
+          throw new Error(result.error || "Could not save note.");
+        }
+
+        activePopupEvent.setExtendedProp("booking_note", result.booking_note || "");
+        const eventData = events.find((row) => String(row.id) === String(activePopupEvent.id));
+        if (eventData?.extendedProps) {
+          eventData.extendedProps.booking_note = result.booking_note || "";
+        }
+        popupNoteStatusEl.textContent = "Saved";
+      } catch (error) {
+        popupNoteStatusEl.textContent = error.message || "Could not save note.";
+      } finally {
+        popupNoteSaveEl.disabled = false;
+        popupNoteSaveEl.textContent = "Save note";
+      }
+    });
+
     document.addEventListener("keydown", (event) => {
       if (event.key === "Escape") {
         closePopup();
@@ -636,7 +814,10 @@
         const tentSuffix = props.tent_summary
           ? (props.tent_summary === "2+" ? " - (1+ tents)" : ` - ${props.tent_summary}`)
           : "";
-        name.textContent = `${props.customer || "Unknown customer"}${suffix}${tentSuffix}`;
+        const citySuffix = props.calendar_city
+          ? (tentSuffix ? ` ${props.calendar_city}` : ` - ${props.calendar_city}`)
+          : "";
+        name.textContent = `${props.customer || "Unknown customer"}${suffix}${tentSuffix}${citySuffix}`;
         textWrap.appendChild(name);
 
         chip.appendChild(textWrap);

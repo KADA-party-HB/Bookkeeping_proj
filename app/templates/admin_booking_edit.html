@@ -28,7 +28,11 @@
             class="mt-1 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 shadow-sm transition focus:border-sky-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-sky-100"
           >
             {% for customer in customers %}
-              <option value="{{ customer.id }}" {% if customer.id == booking.customer_id %}selected{% endif %}>
+              <option
+                value="{{ customer.id }}"
+                data-phone="{{ customer.phone or '' }}"
+                {% if customer.id == booking.customer_id %}selected{% endif %}
+              >
                 {{ customer.full_name }} ({{ customer.email or "No email" }})
               </option>
             {% endfor %}
@@ -48,6 +52,17 @@
             <option value="cancelled" {% if booking.status == 'cancelled' %}selected{% endif %}>Cancelled</option>
           </select>
         </div>
+      </div>
+
+      <div>
+        <label class="text-sm font-medium text-slate-700" for="customer_phone">Phone number</label>
+        <input
+          id="customer_phone"
+          name="customer_phone"
+          value="{{ booking.phone or '' }}"
+          class="mt-1 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 shadow-sm transition focus:border-sky-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-sky-100"
+        >
+        <p class="mt-2 text-xs text-slate-500">Saving updates the selected customer's phone number.</p>
       </div>
 
       <div class="grid gap-4 md:grid-cols-2">
@@ -121,6 +136,16 @@
               value="{{ booking.delivery_fee if booking.delivery_fee is not none else '' }}"
               class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 shadow-sm transition focus:border-sky-400 focus:outline-none focus:ring-4 focus:ring-sky-100"
             >
+          </div>
+
+          <div class="mt-4">
+            <label class="text-sm font-medium text-slate-700" for="delivery_address">Delivery address</label>
+            <textarea
+              id="delivery_address"
+              name="delivery_address"
+              rows="3"
+              class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 shadow-sm transition focus:border-sky-400 focus:outline-none focus:ring-4 focus:ring-sky-100"
+            >{{ booking.delivery_address or '' }}</textarea>
           </div>
         </div>
       </div>
@@ -212,5 +237,19 @@
     {% endcall %}
   </aside>
 </form>
+
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const customerSelect = document.getElementById("customer_id");
+    const phoneInput = document.getElementById("customer_phone");
+
+    customerSelect?.addEventListener("change", () => {
+      const selected = customerSelect.selectedOptions[0];
+      if (phoneInput && selected) {
+        phoneInput.value = selected.dataset.phone || "";
+      }
+    });
+  });
+</script>
 
 {% endblock %}
