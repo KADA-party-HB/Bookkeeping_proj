@@ -16,12 +16,14 @@ from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 import re
 from werkzeug.security import generate_password_hash
 
+from .city_lookup import extract_city_name
 from .db import PaginationOptions, paginate_query, query, execute, tx
 from .delivery import (
     DeliveryAddressValidationError,
     DeliveryServiceError,
     resolve_delivery_quote,
 )
+from .price_sync import apply_price_catalog
 from .sql import (
     # auth / users
     SQL_CREATE_USER,
@@ -89,6 +91,7 @@ from .sql import (
     SQL_CANCEL_BOOKING,
     SQL_DELETE_BOOKING,
     SQL_UPDATE_BOOKING_ADMIN_FIELDS,
+    SQL_UPDATE_BOOKING_NOTE,
     SQL_BOOKING_ALLOCATION_CANDIDATES,
     SQL_DELETE_BOOKING_ITEMS_FOR_BOOKING,
     SQL_INSERT_BOOKING_ITEM,
@@ -210,6 +213,22 @@ def _to_str_or_none(value):
 
 def _normalize_email(value):
     return (value or "").strip().lower()
+
+
+def _truncate_joined(values, *, limit=5):
+    unique_values = []
+    seen = set()
+    for value in values:
+        if not value or value in seen:
+            continue
+        seen.add(value)
+        unique_values.append(value)
+
+    if len(unique_values) <= limit:
+        return ", ".join(unique_values)
+
+    remaining = len(unique_values) - limit
+    return f"{', '.join(unique_values[:limit])} (+{remaining} more)"
 
 
 def _expire_stale_pending_bookings():
@@ -790,6 +809,19 @@ def _parse_iso_date_or_none(value: str):
         return None
 
 
+def _parse_nonnegative_int_or_none(value):
+    value = (value or "").strip()
+    if not value:
+        return None
+
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return None
+
+    return parsed if parsed >= 0 else None
+
+
 def _normalize_public_date_range(start_value: str, end_value: str):
     minimum_start_date = date.today() + timedelta(days=7)
     start_date = _parse_iso_date_or_none(start_value)
@@ -860,9 +892,17 @@ def home():
     uid, role = current_user()
     start = request.args.get("start_date", "")
     end = request.args.get("end_date", "")
+    initial_end_offset_days = None
 
     if role != "admin":
         start, end = _normalize_public_date_range(start, end)
+    else:
+        initial_end_offset_days = _parse_nonnegative_int_or_none(
+            request.args.get("initial_end_offset_days", "")
+        )
+        start_date = _parse_iso_date_or_none(start)
+        if initial_end_offset_days is not None and start_date is not None and not _parse_iso_date_or_none(end):
+            end = (start_date + timedelta(days=initial_end_offset_days)).isoformat()
 
     categories = None
     customers = None
@@ -882,6 +922,7 @@ def home():
             "home.html",
             start_date=start,
             end_date=end,
+            initial_end_offset_days=initial_end_offset_days,
             categories=categories,
             customers=customers,
             role=role,
@@ -1236,7 +1277,24 @@ def booking_create_from_home():
 
     include_delivery = _to_bool(request.form.get("include_delivery"))
     include_setup_service = _to_bool(request.form.get("include_setup_service"))
+    booking_delivery_address = None
+    booking_delivery_postal_city = None
+    booking_delivery_full_address = None
+    delivery_distance_km = None
     if include_delivery:
+        if role == "admin":
+            booking_delivery_address = _to_str_or_none(request.form.get("booking_delivery_address"))
+            booking_delivery_postal_city = _sanitize_postal_city(
+                request.form.get("booking_delivery_postal_city")
+            )
+            booking_delivery_full_address = _build_full_delivery_address(
+                booking_delivery_address,
+                booking_delivery_postal_city,
+            )
+            if not booking_delivery_full_address:
+                flash("Enter the delivery address for this booking.", "error")
+                return redirect(url_for("routes.home", start_date=start, end_date=end))
+
         admin_delivery_override = role == "admin" and _to_bool(
             request.form.get("delivery_fee_override_enabled")
         )
@@ -1255,9 +1313,8 @@ def booking_create_from_home():
                 return redirect(url_for("routes.home", start_date=start, end_date=end))
         else:
             try:
-                delivery_fee = str(
-                    _calculate_delivery_fee_from_distance(request.form.get("delivery_distance_km"))
-                )
+                delivery_distance_km = (request.form.get("delivery_distance_km") or "").strip().replace(",", ".")
+                delivery_fee = str(_calculate_delivery_fee_from_distance(delivery_distance_km))
             except ValueError as exc:
                 error_map = {
                     "missing_delivery_distance": "Enter a delivery distance in km to calculate the delivery fee.",
@@ -1379,8 +1436,8 @@ def booking_create_from_home():
                     selections=selections,
                     include_delivery=include_delivery,
                     delivery_fee=delivery_fee,
-                    delivery_address=None,
-                    delivery_distance_km=None,
+                    delivery_address=booking_delivery_full_address,
+                    delivery_distance_km=delivery_distance_km,
                     include_setup_service=include_setup_service,
                     booking_custom_total_price=booking_custom_total_price,
                     booking_custom_price_note=booking_custom_price_note,
@@ -1686,6 +1743,42 @@ def admin_rental_period_delete(rental_period_id: int):
         flash(f"Delete failed: {str(e)}", "error")
 
     return redirect(url_for("routes.admin_rental_periods"))
+
+
+@bp.post("/admin/prices/update")
+def admin_prices_update():
+    require_admin()
+
+    try:
+        summary = tx(apply_price_catalog)
+    except Exception as exc:
+        flash(f"Price update failed: {str(exc)}", "error")
+        return redirect(request.referrer or url_for("routes.admin_items"))
+
+    flash(
+        (
+            f"Updated {len(summary['updated_categories'])} categories, "
+            f"{summary['updated_period_prices']} rental-period prices, and "
+            f"{summary['updated_setup_fees']} tent setup fees from prices.json."
+        ),
+        "success",
+    )
+
+    if summary["missing_category_targets"]:
+        flash(
+            "Unmatched category targets: "
+            + _truncate_joined(summary["missing_category_targets"], limit=4),
+            "error",
+        )
+
+    if summary["missing_period_labels"]:
+        flash(
+            "Unknown rental period labels in prices.json: "
+            + _truncate_joined(summary["missing_period_labels"], limit=4),
+            "error",
+        )
+
+    return redirect(request.referrer or url_for("routes.admin_items"))
 
 
 # Admin: Items
@@ -2568,6 +2661,8 @@ def admin_booking_edit_save(booking_id: int):
     include_delivery = _to_bool(request.form.get("include_delivery"))
     include_setup_service = _to_bool(request.form.get("include_setup_service"))
     delivery_fee = _to_str_or_none(request.form.get("delivery_fee")) if include_delivery else None
+    delivery_address = _to_str_or_none(request.form.get("delivery_address")) if include_delivery else None
+    customer_phone = _to_str_or_none(request.form.get("customer_phone"))
     custom_total_price = _to_str_or_none(request.form.get("custom_total_price"))
     custom_price_note = _to_str_or_none(request.form.get("custom_price_note"))
     booking_note = _to_str_or_none(request.form.get("booking_note"))
@@ -2587,6 +2682,23 @@ def admin_booking_edit_save(booking_id: int):
 
     try:
         def work(cur):
+            cur.execute(SQL_GET_CUSTOMER, (customer_id,))
+            selected_customer = cur.fetchone()
+            if not selected_customer:
+                raise ValueError("Selected customer not found.")
+
+            cur.execute(
+                SQL_UPDATE_CUSTOMER,
+                (
+                    selected_customer["full_name"],
+                    selected_customer["email"],
+                    customer_phone,
+                    selected_customer["address"],
+                    selected_customer["postal_city"],
+                    customer_id,
+                ),
+            )
+
             cur.execute(
                 SQL_UPDATE_BOOKING_ADMIN_FIELDS,
                 (
@@ -2596,6 +2708,7 @@ def admin_booking_edit_save(booking_id: int):
                     status,
                     include_delivery,
                     delivery_fee,
+                    delivery_address,
                     include_setup_service,
                     custom_total_price,
                     custom_price_note,
@@ -2656,6 +2769,19 @@ def admin_booking_edit_save(booking_id: int):
     except Exception as e:
         flash(f"Update failed: {str(e)}", "error")
         return redirect(url_for("routes.admin_booking_edit_form", booking_id=booking_id))
+
+
+@bp.post("/admin/bookings/<int:booking_id>/note")
+def admin_booking_note_save(booking_id: int):
+    require_admin()
+
+    payload = request.get_json(silent=True) or {}
+    booking_note = _to_str_or_none(payload.get("booking_note"))
+    updated = query(SQL_UPDATE_BOOKING_NOTE, (booking_note, booking_id), one=True, commit=True)
+    if not updated:
+        return jsonify({"ok": False, "error": "Booking not found."}), 404
+
+    return jsonify({"ok": True, "booking_note": updated["booking_note"] or ""})
 
 
 @bp.post("/bookings/<int:booking_id>/confirm")
@@ -2772,11 +2898,27 @@ def admin_bookings_calendar():
         category_inventory[category_id]["total_active"] += 1
 
     for b in bookings:
+        booking_items = items_by_booking_id.get(b["id"], [])
         b["end_date_plus_one"] = b["end_date"] + timedelta(days=1)
+        b["calendar_city"] = extract_city_name(
+            b.get("delivery_address"),
+            b.get("postal_city"),
+            b.get("address"),
+        )
         b["calendar_item_summary"] = [
             dict(row)
-            for row in _build_booking_item_summary(items_by_booking_id.get(b["id"], []))
+            for row in _build_booking_item_summary(booking_items)
         ]
+        b["calendar_items"] = []
+        for row in booking_items:
+            item_data = dict(row)
+            if row.get("is_tent"):
+                item_data["type_label"] = "Tent"
+            elif row.get("is_furnishing"):
+                item_data["type_label"] = "Furnishing"
+            else:
+                item_data["type_label"] = "Item"
+            b["calendar_items"].append(item_data)
 
     return render_template(
         "booking_calendar.html",

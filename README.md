@@ -31,3 +31,10 @@ Run it after you have applied the schema and set `DATABASE_URL`:
 ```bash
 python seed.py
 ```
+
+source .venv/bin/activate
+python3 docker/migrate
+flask --app run.py --debug run
+
+karl.wikell@gmail.com
+DV1703

@@ -2,11 +2,33 @@
 {% set active_role = role if role is defined else session.get('role') %}
 {% set is_admin_view = active_role == 'admin' %}
 {% set customer_logo_url = url_for('static', filename='img/Kada_logo_horizontel.png') %}
+{% set page_title = meta_title|default("Kada Party Rentals", true) %}
+{% set page_description = meta_description|default("Hyr tält och festutrustning smidigt med Kada Party Rentals. Boka tält, möbler, leverans och montering för ditt event.", true) %}
+{% set canonical_url = canonical_url|default(request.base_url, true) %}
+{% set social_image_url = social_image_url|default(url_for('static', filename='img/kada_logo.png', _external=True), true) %}
 <html lang="{% if is_admin_view %}en{% else %}sv{% endif %}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Kada Party Rentals</title>
+  <title>{{ page_title }}</title>
+  <meta name="description" content="{{ page_description }}">
+  <link rel="canonical" href="{{ canonical_url }}">
+  <meta property="og:title" content="{{ page_title }}">
+  <meta property="og:description" content="{{ page_description }}">
+  <meta property="og:url" content="{{ canonical_url }}">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Kada Party Rentals">
+  <meta property="og:locale" content="sv_SE">
+  <meta property="og:image" content="{{ social_image_url }}">
+  <meta property="og:image:secure_url" content="{{ social_image_url }}">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="787">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Kada Party Rentals">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{{ page_title }}">
+  <meta name="twitter:description" content="{{ page_description }}">
+  <meta name="twitter:image" content="{{ social_image_url }}">
   <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/kada_logo_no_text.png') }}">
   <script src="https://cdn.tailwindcss.com"></script>
   {% block extra_head %}{% endblock %}
@@ -111,6 +133,14 @@
           </div>
 
           <div class="ml-auto hidden items-center gap-3 md:flex">
+            <form method="post" action="{{ url_for('routes.admin_prices_update') }}">
+              <button
+                type="submit"
+                class="inline-flex items-center justify-center rounded-full border border-amber-300 bg-[linear-gradient(135deg,#fff7ed_0%,#fef3c7_45%,#fde68a_100%)] px-4 py-2 text-sm font-semibold text-amber-900 shadow-[0_10px_24px_-18px_rgba(217,119,6,0.9)] transition hover:-translate-y-[1px] hover:border-amber-400 hover:shadow-[0_16px_30px_-18px_rgba(217,119,6,0.55)]"
+              >
+                Update prices
+              </button>
+            </form>
             <span class="inline-flex rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-medium uppercase tracking-[0.18em] text-slate-500">
               {{ session.get('role') }}
             </span>
@@ -128,6 +158,14 @@
                 {{ session.get('role') }}
               </div>
               <div class="grid gap-2">
+                <form method="post" action="{{ url_for('routes.admin_prices_update') }}">
+                  <button
+                    type="submit"
+                    class="inline-flex w-full items-center justify-center rounded-2xl border border-amber-300 bg-[linear-gradient(135deg,#fff7ed_0%,#fef3c7_45%,#fde68a_100%)] px-4 py-3 text-sm font-semibold text-amber-900 shadow-[0_10px_24px_-18px_rgba(217,119,6,0.9)] transition hover:border-amber-400"
+                  >
+                    Update prices
+                  </button>
+                </form>
                 <a class="rounded-2xl px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-sky-50 hover:text-sky-800" href="{{ url_for('routes.customers') }}">
                   Customers
                 </a>

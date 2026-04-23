@@ -12,6 +12,10 @@
   ].join("");
 
   const isIsoDate = (value) => ISO_DATE_PATTERN.test((value || "").trim());
+  const parseNonNegativeInt = (value) => {
+    const parsed = Number.parseInt(String(value || "").trim(), 10);
+    return Number.isInteger(parsed) && parsed >= 0 ? parsed : null;
+  };
   const getTodayIsoDate = () => {
     const today = new Date();
     const year = today.getFullYear();
@@ -70,6 +74,10 @@
   };
 
   const setInputValue = (input, picker, value) => {
+    if (!input) {
+      return;
+    }
+
     if (picker) {
       picker.setDate(value || null, false, "Y-m-d");
       return;
@@ -81,13 +89,13 @@
   const initDateRange = (container) => {
     const startInput = container.querySelector("[data-date-range-start]");
     const endInput = container.querySelector("[data-date-range-end]");
-
     if (!startInput || !endInput) {
       return;
     }
 
     const shouldUseThemedCalendar = container.dataset.dateRangeCalendar === "themed" && Boolean(window.flatpickr);
     const localeName = container.dataset.dateRangeLocale || "";
+    const initialEndOffsetDays = parseNonNegativeInt(container.dataset.dateRangeInitialEndOffsetDays);
     const rawMinDate = (container.dataset.dateRangeMin || "").trim();
     const minSelectableDate = rawMinDate === "today"
       ? getTodayIsoDate()
@@ -95,6 +103,27 @@
 
     let startPicker = null;
     let endPicker = null;
+
+    const addDaysToIsoDate = (isoDate, dayOffset) => {
+      if (!isIsoDate(isoDate)) {
+        return "";
+      }
+
+      const date = new Date(`${isoDate}T00:00:00`);
+      if (Number.isNaN(date.getTime())) {
+        return "";
+      }
+
+      date.setDate(date.getDate() + dayOffset);
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const day = String(date.getDate()).padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    };
+
+    const setEndValue = (value) => {
+      setInputValue(endInput, endPicker, value);
+    };
 
     const getMinEndDate = () => {
       const startValue = isIsoDate(startInput.value) ? startInput.value : "";
@@ -139,23 +168,29 @@
       }
 
       if (minEndDate && endValue && endValue < minEndDate) {
-        setInputValue(endInput, endPicker, minEndDate);
+        setEndValue(minEndDate);
       }
     };
 
     const syncEndDate = () => {
       const startValue = clampStartDate();
       const endValue = isIsoDate(endInput.value) ? endInput.value : "";
-      const minEndDate = getMinEndDate();
 
       updateEndConstraints();
 
       if (!startValue) {
+        setEndValue("");
         return;
       }
 
+      if (initialEndOffsetDays !== null) {
+        setEndValue(addDaysToIsoDate(startValue, initialEndOffsetDays));
+        return;
+      }
+
+      const minEndDate = getMinEndDate();
       if (!endValue || endValue < minEndDate) {
-        setInputValue(endInput, endPicker, minEndDate);
+        setEndValue(minEndDate);
       }
     };
 

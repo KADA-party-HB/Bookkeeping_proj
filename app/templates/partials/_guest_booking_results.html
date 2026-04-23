@@ -401,12 +401,13 @@
           {% endif %}
 
           <div>
-            <label class="text-sm font-medium text-slate-700" for="address">Adress</label>
+            <label class="text-sm font-medium text-slate-700" for="address">Adress (gata, stad)</label>
             <input
               id="address"
               name="address"
               type="text"
               value="{{ customer_profile.address if customer_profile else '' }}"
+              placeholder="Gatuadress, stad"
               autocomplete="street-address"
               class="mt-1 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 shadow-sm transition focus:border-pink-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-pink-100"
             >
