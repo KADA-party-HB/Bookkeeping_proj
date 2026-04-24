@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="sv">
+  <body style="margin:0;padding:24px;background:#f8fafc;color:#0f172a;font-family:Arial,sans-serif;">
+    <div style="max-width:640px;margin:0 auto;background:#ffffff;border:1px solid #e2e8f0;border-radius:24px;padding:32px;">
+      <div style="font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:#64748b;">{{ site_name }}</div>
+      <h1 style="margin:12px 0 0;font-size:28px;line-height:1.2;color:#0f172a;">{{ headline }}</h1>
+      <p style="margin:12px 0 0;font-size:16px;line-height:1.7;color:#334155;">Hej {{ customer_name }},</p>
+      <p style="margin:12px 0 0;font-size:16px;line-height:1.7;color:#334155;">{{ intro }}</p>
+
+      <div style="margin-top:24px;border:1px solid #e2e8f0;border-radius:18px;padding:20px;background:#f8fafc;">
+        <div style="font-size:14px;line-height:1.8;color:#334155;"><strong>Bokningsnummer:</strong> {{ booking_id }}</div>
+        <div style="font-size:14px;line-height:1.8;color:#334155;"><strong>Status:</strong> {{ status_label }}</div>
+        <div style="font-size:14px;line-height:1.8;color:#334155;"><strong>Datum:</strong> {{ start_date }} till {{ end_date }}</div>
+        <div style="font-size:14px;line-height:1.8;color:#334155;"><strong>Total:</strong> {{ total_cost_text }}</div>
+      </div>
+
+      {% if items %}
+      <div style="margin-top:24px;">
+        <h2 style="margin:0 0 12px;font-size:18px;color:#0f172a;">Valda artiklar</h2>
+        <table role="presentation" style="width:100%;border-collapse:collapse;">
+          {% for item in items %}
+          <tr>
+            <td style="padding:10px 0;border-top:1px solid #e2e8f0;font-size:14px;color:#334155;">{{ item.display_name }} x{{ item.quantity }}</td>
+            <td style="padding:10px 0;border-top:1px solid #e2e8f0;font-size:14px;color:#0f172a;text-align:right;">{{ item.line_total_text }}</td>
+          </tr>
+          {% endfor %}
+        </table>
+      </div>
+      {% endif %}
+
+      {% if include_delivery or include_setup_service %}
+      <div style="margin-top:24px;">
+        <h2 style="margin:0 0 12px;font-size:18px;color:#0f172a;">Tjänster</h2>
+        {% if include_delivery %}
+        <p style="margin:8px 0 0;font-size:14px;line-height:1.7;color:#334155;">
+          <strong>Leverans:</strong> Ja{% if delivery_address %}, {{ delivery_address }}{% endif %} ({{ delivery_cost_text }})
+        </p>
+        {% endif %}
+        {% if include_setup_service %}
+        <p style="margin:8px 0 0;font-size:14px;line-height:1.7;color:#334155;">
+          <strong>Montering:</strong> Ja ({{ setup_cost_text }})
+        </p>
+        {% endif %}
+      </div>
+      {% endif %}
+
+      {% if booking_note %}
+      <div style="margin-top:24px;border-left:4px solid #f43f5e;padding-left:16px;">
+        <div style="font-size:13px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#94a3b8;">Meddelande från bokningen</div>
+        <p style="margin:8px 0 0;font-size:14px;line-height:1.7;color:#334155;">{{ booking_note }}</p>
+      </div>
+      {% endif %}
+
+      <div style="margin-top:28px;">
+        <a href="{{ booking_url }}" style="display:inline-block;border-radius:999px;background:#e11d48;color:#ffffff;text-decoration:none;padding:12px 18px;font-weight:700;">Öppna bokningen</a>
+      </div>
+
+      <p style="margin:20px 0 0;font-size:14px;line-height:1.7;color:#334155;">
+        Om du har ett konto kan du även logga in här: <a href="{{ login_url }}" style="color:#be123c;">{{ login_url }}</a>
+      </p>
+      {% if contact_email %}
+      <p style="margin:8px 0 0;font-size:14px;line-height:1.7;color:#334155;">
+        Frågor? Svara till <a href="mailto:{{ contact_email }}" style="color:#be123c;">{{ contact_email }}</a>.
+      </p>
+      {% endif %}
+    </div>
+  </body>
+</html>

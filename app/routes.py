@@ -16,7 +16,11 @@ from flask import (
 from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 import json
+import secrets
 import re
+import time
+from collections import deque
+from threading import Lock
 from werkzeug.security import generate_password_hash
 
 from .city_lookup import extract_city_name
@@ -26,6 +30,7 @@ from .delivery import (
     DeliveryServiceError,
     resolve_delivery_quote,
 )
+from .mailer import send_booking_event_email
 from .price_sync import (
     apply_price_catalog,
     export_price_catalog,
@@ -114,12 +119,18 @@ DEFAULT_META_DESCRIPTION = (
 )
 INDEXABLE_ROBOTS_VALUE = "index,follow,max-image-preview:large"
 NOINDEX_ROBOTS_VALUE = "noindex,nofollow,noarchive"
+CSRF_TOKEN_SESSION_KEY = "_csrf_token"
 
 DELIVERY_BASE_FEE = Decimal("449.00")
 DELIVERY_INCLUDED_DISTANCE_KM = Decimal("10")
 DELIVERY_EXTRA_FEE_PER_KM = Decimal("5.00")
 DEFAULT_PAGE_SIZE = 10
 MAX_PAGE_SIZE = 100
+
+_rate_limiter_registry = {}
+_rate_limiter_registry_lock = Lock()
+_stale_booking_cleanup_lock = Lock()
+_last_stale_booking_cleanup_monotonic = 0.0
 
 CUSTOMER_LIST_SORTS = {
     "id": ("id",),
@@ -204,9 +215,213 @@ NOINDEX_ENDPOINTS = {
     "routes.customers",
 }
 
+FAQ_ITEMS = [
+    {
+        "question": "Hur fungerar bokningen hos Kada Party Rentals?",
+        "answer": (
+            "Du väljer först datum för uthyrningen, ser vilka artiklar som är "
+            "tillgängliga och skickar sedan in din bokning. När bokningen är "
+            "skapad reserveras lagret medan bokningen är väntande på bekräftelse."
+        ),
+    },
+    {
+        "question": "Hur långt i förväg måste jag boka?",
+        "answer": (
+            "För den din bokningen behöver startdatum ligga minst sju dagar fram. "
+            "Det ger tid för planering, leverans och eventuell montering."
+        ),
+    },
+    {
+        "question": "Kan jag få leverans och montering?",
+        "answer": (
+            "Ja. Leverans kan läggas till i bokningen och priset räknas ut utifrån "
+            "körsträckan. Montering samt nedmontering kan väljas för och kostar för "
+            "tält om tilvalt hjälper vi även med möblering."
+        ),
+    },
+    {
+        "question": "Vilka produkter kan jag hyra?",
+        "answer": (
+            "Vi hyr ut tält och annan festutrustning som bord, stolar, bänkar och andra "
+            "artiklar som visas i bokningsflödet. Sortimentet i systemet visar vad "
+            "som finns tillgängligt för de datum du valt."
+        ),
+    },
+    {
+        "question": "Vad händer efter att jag skickat in en bokning?",
+        "answer": (
+            "Du får en bokning skapad i systemet och lagret reserveras under en "
+            "begränsad tid medan bokningen är väntande. Personalen kan sedan "
+            "bekräfta bokningen eller kontakta dig om något behöver justeras."
+            "DU kan alltid se din status här i hemsidan ifall du loggar in."
+        ),
+    },
+    {
+        "question": "Hur kontaktar jag er om jag har frågor?",
+        "answer": (
+            "Du kan kontakta Kada Party Rentals via e-post på "
+            "kadaparty@kadaparty.se eller via telefon på 0730813710."
+        ),
+    },
+]
+
+
+class SimpleRateLimiter:
+    def __init__(self, *, limit: int, window_seconds: int):
+        self.limit = limit
+        self.window_seconds = window_seconds
+        self._entries = {}
+        self._lock = Lock()
+
+    def check(self, key: str):
+        now = time.monotonic()
+
+        with self._lock:
+            bucket = self._entries.get(key)
+            if bucket is None:
+                bucket = deque()
+                self._entries[key] = bucket
+
+            cutoff = now - self.window_seconds
+            while bucket and bucket[0] <= cutoff:
+                bucket.popleft()
+
+            if len(bucket) >= self.limit:
+                retry_after_seconds = max(1, int(self.window_seconds - (now - bucket[0])))
+                return False, retry_after_seconds
+
+            bucket.append(now)
+
+            stale_keys = [
+                existing_key
+                for existing_key, existing_bucket in self._entries.items()
+                if not existing_bucket or existing_bucket[-1] <= cutoff
+            ]
+            for stale_key in stale_keys:
+                self._entries.pop(stale_key, None)
+
+            return True, 0
+
 
 def current_user():
     return session.get("user_id"), session.get("role")
+
+
+def _csrf_token():
+    token = session.get(CSRF_TOKEN_SESSION_KEY)
+    if not token:
+        token = secrets.token_urlsafe(32)
+        session[CSRF_TOKEN_SESSION_KEY] = token
+    return token
+
+
+def _client_ip():
+    if request.access_route:
+        return request.access_route[0]
+    return request.remote_addr or "unknown"
+
+
+def _same_origin_request():
+    origin = request.headers.get("Origin")
+    if origin:
+        return origin.rstrip("/") == request.host_url.rstrip("/")
+
+    referer = request.headers.get("Referer")
+    if referer:
+        return referer.startswith(request.host_url)
+
+    return False
+
+
+def _unsafe_http_method():
+    return request.method.upper() in {"POST", "PUT", "PATCH", "DELETE"}
+
+
+def _csrf_exempt_request():
+    return request.endpoint in {"static"}
+
+
+def _request_csrf_token():
+    header_token = (
+        request.headers.get("X-CSRF-Token")
+        or request.headers.get("X-CSRFToken")
+    )
+    if header_token:
+        return header_token
+    return request.form.get("csrf_token")
+
+
+def _csrf_failure_response():
+    if request.is_json or _is_ajax_request():
+        return jsonify({"ok": False, "error": "Invalid CSRF token."}), 400
+    abort(400, description="Invalid CSRF token.")
+
+
+def _rate_limiter(scope: str, *, limit: int, window_seconds: int) -> SimpleRateLimiter:
+    limiter_key = (scope, limit, window_seconds)
+    with _rate_limiter_registry_lock:
+        limiter = _rate_limiter_registry.get(limiter_key)
+        if limiter is None:
+            limiter = SimpleRateLimiter(limit=limit, window_seconds=window_seconds)
+            _rate_limiter_registry[limiter_key] = limiter
+        return limiter
+
+
+def _check_rate_limit(scope: str, *, key: str, limit: int, window_seconds: int):
+    return _rate_limiter(
+        scope,
+        limit=limit,
+        window_seconds=window_seconds,
+    ).check(key)
+
+
+def _rate_limit_response(*, message: str, retry_after_seconds: int):
+    if request.is_json or _is_ajax_request():
+        response = jsonify(
+            {
+                "ok": False,
+                "error": message,
+                "retry_after_seconds": retry_after_seconds,
+            }
+        )
+        response.status_code = 429
+        response.headers["Retry-After"] = str(retry_after_seconds)
+        return response
+
+    flash(message, "error")
+    redirect_target = request.referrer
+    if not redirect_target:
+        endpoint = request.endpoint or ""
+        if endpoint == "auth.login":
+            redirect_target = url_for("auth.login_form")
+        elif endpoint == "auth.register":
+            redirect_target = url_for("auth.register_form")
+        else:
+            redirect_target = url_for("routes.home")
+
+    response = redirect(redirect_target)
+    response.headers["Retry-After"] = str(retry_after_seconds)
+    return response
+
+
+def _expire_stale_pending_bookings_if_due():
+    interval_seconds = current_app.config["STALE_BOOKING_CLEANUP_INTERVAL_SECONDS"]
+    if interval_seconds == 0:
+        _expire_stale_pending_bookings()
+        return
+
+    now = time.monotonic()
+    global _last_stale_booking_cleanup_monotonic
+
+    if now - _last_stale_booking_cleanup_monotonic < interval_seconds:
+        return
+
+    with _stale_booking_cleanup_lock:
+        now = time.monotonic()
+        if now - _last_stale_booking_cleanup_monotonic < interval_seconds:
+            return
+        _expire_stale_pending_bookings()
+        _last_stale_booking_cleanup_monotonic = time.monotonic()
 
 
 def require_login():
@@ -260,10 +475,13 @@ def _truncate_joined(values, *, limit=5):
 
 
 def _expire_stale_pending_bookings():
-    execute(
+    expired_rows = query(
         SQL_EXPIRE_STALE_PENDING_BOOKINGS,
         (current_app.config["PENDING_BOOKING_HOLD_DAYS"],),
+        commit=True,
     )
+    for row in expired_rows or []:
+        _notify_booking_event_email("cancelled", row["id"])
 
 
 def _customer_pending_booking_limit_reached(customer_id: int) -> bool:
@@ -283,6 +501,31 @@ def _customer_pending_booking_limit_reached(customer_id: int) -> bool:
 def _pending_booking_hold_label() -> str:
     days = current_app.config["PENDING_BOOKING_HOLD_DAYS"]
     return f"{days} dag{'ar' if days != 1 else ''}"
+
+
+def _notify_booking_event_email(notification_type: str, booking_id: int):
+    try:
+        booking = query(SQL_BOOKING_DETAIL, (booking_id,), one=True)
+        if not booking:
+            return False
+
+        total = query(SQL_BOOKING_TOTAL, (booking_id,), one=True)
+        items = query(SQL_BOOKING_ITEMS, (booking_id,))
+        item_summary = _build_booking_item_summary(items)
+        return send_booking_event_email(
+            notification_type=notification_type,
+            booking=booking,
+            total=total,
+            item_summary=item_summary,
+            pending_hold_label=_pending_booking_hold_label(),
+        )
+    except Exception:
+        current_app.logger.exception(
+            "booking_email_failed booking_id=%s type=%s",
+            booking_id,
+            notification_type,
+        )
+        return False
 
 
 def _pagination_options(*, default_per_page=DEFAULT_PAGE_SIZE):
@@ -390,6 +633,24 @@ def _route_meta_defaults():
             meta_description="Skapa ett konto för att boka tält och festutrustning hos Kada Party Rentals.",
             canonical_url=_site_url("auth.register_form"),
         )
+    elif endpoint == "routes.faq":
+        metadata.update(
+            meta_title=f"Vanliga frågor | {SITE_NAME}",
+            meta_description=(
+                "Las vanliga fragor om bokning, leverans, montering och hur "
+                "uthyrningen fungerar hos Kada Party Rentals."
+            ),
+            canonical_url=_site_url("routes.faq"),
+        )
+    elif endpoint == "routes.about":
+        metadata.update(
+            meta_title=f"Om Oss | {SITE_NAME}",
+            meta_description=(
+                "Las mer om Kada Party Rentals, hur vi arbetar med uthyrning av "
+                "talt och festutrustning och hur du kommer i kontakt med oss."
+            ),
+            canonical_url=_site_url("routes.about"),
+        )
 
     return metadata
 
@@ -455,6 +716,7 @@ def inject_pagination_helpers():
     return {
         "pagination_url": pagination_url,
         "sort_url": sort_url,
+        "csrf_token": _csrf_token,
         **_route_meta_defaults(),
     }
 
@@ -467,6 +729,88 @@ def apply_robots_header(response):
             _route_meta_defaults()["meta_robots"],
         )
     return response
+
+
+@bp.before_app_request
+def protect_against_csrf():
+    if not _unsafe_http_method() or _csrf_exempt_request():
+        return None
+
+    session_token = _csrf_token()
+    request_token = _request_csrf_token()
+
+    if request_token and secrets.compare_digest(request_token, session_token):
+        return None
+
+    if _same_origin_request():
+        return _csrf_failure_response()
+
+    return _csrf_failure_response()
+
+
+@bp.before_app_request
+def apply_request_rate_limits():
+    if request.method.upper() != "POST":
+        return None
+
+    endpoint = request.endpoint or ""
+    ip_address = _client_ip()
+
+    if endpoint == "auth.login":
+        email = _normalize_email(request.form.get("email"))
+        allowed, retry_after_seconds = _check_rate_limit(
+            "login",
+            key=f"{ip_address}|{email or 'unknown'}",
+            limit=current_app.config["LOGIN_RATE_LIMIT_ATTEMPTS"],
+            window_seconds=current_app.config["LOGIN_RATE_LIMIT_WINDOW_SECONDS"],
+        )
+        if not allowed:
+            return _rate_limit_response(
+                message="Too many login attempts. Try again in a few minutes.",
+                retry_after_seconds=retry_after_seconds,
+            )
+
+    if endpoint == "auth.register":
+        email = _normalize_email(request.form.get("email"))
+        allowed, retry_after_seconds = _check_rate_limit(
+            "register",
+            key=f"{ip_address}|{email or 'unknown'}",
+            limit=current_app.config["REGISTRATION_RATE_LIMIT_ATTEMPTS"],
+            window_seconds=current_app.config["REGISTRATION_RATE_LIMIT_WINDOW_SECONDS"],
+        )
+        if not allowed:
+            return _rate_limit_response(
+                message="Too many registration attempts. Try again later.",
+                retry_after_seconds=retry_after_seconds,
+            )
+
+    if endpoint == "routes.guest_delivery_quote":
+        allowed, retry_after_seconds = _check_rate_limit(
+            "guest_delivery_quote",
+            key=ip_address,
+            limit=current_app.config["GUEST_QUOTE_RATE_LIMIT_ATTEMPTS"],
+            window_seconds=current_app.config["GUEST_QUOTE_RATE_LIMIT_WINDOW_SECONDS"],
+        )
+        if not allowed:
+            return _rate_limit_response(
+                message="Too many delivery quote requests. Try again shortly.",
+                retry_after_seconds=retry_after_seconds,
+            )
+
+    if endpoint == "routes.guest_booking_create":
+        allowed, retry_after_seconds = _check_rate_limit(
+            "guest_booking_create",
+            key=ip_address,
+            limit=current_app.config["GUEST_BOOKING_RATE_LIMIT_ATTEMPTS"],
+            window_seconds=current_app.config["GUEST_BOOKING_RATE_LIMIT_WINDOW_SECONDS"],
+        )
+        if not allowed:
+            return _rate_limit_response(
+                message="Too many booking attempts. Try again shortly.",
+                retry_after_seconds=retry_after_seconds,
+            )
+
+    return None
 
 
 def _delivery_validation_error_message(code: str) -> str:
@@ -493,7 +837,10 @@ def _delivery_service_error_message(code: str) -> str:
 
 @bp.before_app_request
 def expire_stale_pending_bookings_before_request():
-    _expire_stale_pending_bookings()
+    if request.endpoint == "static":
+        return None
+    _expire_stale_pending_bookings_if_due()
+    return None
 
 
 def _calculate_delivery_fee_from_distance(distance_km_value):
@@ -1019,7 +1366,17 @@ def sitemap_xml():
             "loc": _site_url("routes.home"),
             "changefreq": "daily",
             "priority": "1.0",
-        }
+        },
+        {
+            "loc": _site_url("routes.faq"),
+            "changefreq": "weekly",
+            "priority": "0.7",
+        },
+        {
+            "loc": _site_url("routes.about"),
+            "changefreq": "monthly",
+            "priority": "0.6",
+        },
     ]
     return Response(
         render_template("sitemap.xml", pages=pages),
@@ -1058,6 +1415,33 @@ def favicon():
         "img/kada_logo_no_text.png",
         mimetype="image/png",
         max_age=604800,
+    )
+
+
+@bp.get("/faq")
+def faq():
+    return render_template(
+        "faq.html",
+        faq_items=FAQ_ITEMS,
+        meta_title=f"Vanliga frågor | {SITE_NAME}",
+        meta_description=(
+            "Läs vanliga frågor om bokning, leverans, montering och hur "
+            "uthyrningen fungerar hos Kada Party Rentals."
+        ),
+        canonical_url=_site_url("routes.faq"),
+    )
+
+
+@bp.get("/about")
+def about():
+    return render_template(
+        "about.html",
+        meta_title=f"Om oss | {SITE_NAME}",
+        meta_description=(
+            "Läs mer om Kada Party Rentals, hur vi arbetar med uthyrning av "
+            "tält och festutrustning och hur du kommer i kontakt med oss."
+        ),
+        canonical_url=_site_url("routes.about"),
     )
 
 
@@ -1391,6 +1775,8 @@ def guest_booking_create():
             session["user_id"] = created_user["id"]
             session["role"] = created_user["role"]
 
+        _notify_booking_event_email("created", booking_id)
+
         flash(f"Bokning skapad (id={booking_id}).", "success")
         flash(
             f"Väntande bokningar reserverar lagret i {_pending_booking_hold_label()} om inte personalen bekräftar dem tidigare.",
@@ -1650,6 +2036,8 @@ def booking_create_from_home():
             booking_id = row["booking_id"]
             turnaround_item_labels = []
 
+        _notify_booking_event_email("created", booking_id)
+
         flash(f"Booking created (id={booking_id}).", "success")
         if role != "admin":
             flash(
@@ -1693,7 +2081,7 @@ def customers():
 
     cust = query(SQL_GET_CUSTOMER_BY_USER_ID, (uid,), one=True)
     if not cust:
-        flash("Det finns ingen kundprofil kopplad till det hÃ¤r kontot.", "error")
+        flash("Det finns ingen kundprofil kopplad till det här kontot.", "error")
         return redirect(url_for("routes.home"))
 
     return redirect(url_for("routes.customer_detail", customer_id=cust["id"]))
@@ -2964,6 +3352,8 @@ def admin_booking_edit_save(booking_id: int):
                 f"Same-day turnaround items are now allocated on this booking: {_format_turnaround_item_labels(turnaround_item_labels)}.",
                 "warning",
             )
+        if booking["status"] != status and status in {"confirmed", "cancelled"}:
+            _notify_booking_event_email(status, booking_id)
         return redirect(url_for("routes.booking_detail", booking_id=booking_id))
     except ValueError as e:
         flash(str(e), "error")
@@ -2991,6 +3381,7 @@ def booking_confirm(booking_id: int):
     require_admin()
     updated = execute(SQL_CONFIRM_BOOKING, (booking_id,))
     if updated:
+        _notify_booking_event_email("confirmed", booking_id)
         flash("Booking confirmed.", "success")
     else:
         flash("Only pending bookings can be confirmed.", "error")
@@ -3002,6 +3393,7 @@ def booking_cancel(booking_id: int):
     require_admin()
     updated = execute(SQL_CANCEL_BOOKING, (booking_id,))
     if updated:
+        _notify_booking_event_email("cancelled", booking_id)
         flash("Booking cancelled.", "success")
     else:
         flash("Booking is already cancelled.", "error")

@@ -7,7 +7,8 @@ Flask + PostgreSQL backend prepared to run as a standalone WSGI service on Railw
 2. Copy `.env.example` to `.env` and set at least `DATABASE_URL` and `SECRET_KEY`.
 3. Create the database and apply `schema_postgres.sql` or the SQL files in `migrations/`.
 4. If you want guest delivery quotes, also set `MAP_API_KEY` and `DELIVERY_ORIGIN_ADDRESS` in `.env`.
-5. Run the app with `flask --app run.py --debug run`.
+5. If you want booking notification emails, set `MAIL_ENABLED=1` together with `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, and `SMTP_FROM_EMAIL` in `.env`.
+6. Run the app with `flask --app run.py --debug run`.
 
 ## Local container smoke test
 Run `docker compose up --build` and open `http://localhost:8080`.
