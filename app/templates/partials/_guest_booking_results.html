@@ -242,14 +242,14 @@
         {% endif %}
 
         <div
-          class="mt-6 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 sm:flex-row sm:items-center sm:justify-between"
+          class="mt-6 flex flex-col gap-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 lg:flex-row lg:items-center lg:justify-between"
           data-local-pager
         >
           <div class="text-sm text-slate-600">
             <span data-pager-status>Visar 0 av 0</span>
           </div>
 
-          <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div class="grid gap-3 min-[420px]:grid-cols-[auto_1fr] min-[420px]:items-center lg:flex lg:items-center lg:justify-end">
             <div class="flex items-center gap-2">
               <label class="text-sm font-medium text-slate-700" for="items-per-page">Rader</label>
               <select
@@ -264,18 +264,18 @@
               </select>
             </div>
 
-            <div class="flex items-center gap-2">
+            <div class="grid grid-cols-2 items-center gap-2 min-[420px]:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] min-[420px]:justify-self-end sm:min-w-[18rem]">
               <button
                 type="button"
                 data-pager-prev
-                class="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:border-pink-300 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-50"
+                class="inline-flex w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:border-pink-300 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Föregående
               </button>
 
               <span
                 data-pager-page
-                class="min-w-[90px] text-center text-sm font-medium text-slate-700"
+                class="hidden min-w-0 text-center text-sm font-medium text-slate-700 min-[420px]:block"
               >
                 Sida 1 av 1
               </span>
@@ -283,7 +283,7 @@
               <button
                 type="button"
                 data-pager-next
-                class="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:border-pink-300 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-50"
+                class="inline-flex w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:border-pink-300 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Nästa
               </button>
@@ -521,6 +521,25 @@
         return `${value} kr`;
       }
 
+      function clampQtyInput(input) {
+        if (!input || input.disabled) {
+          return 0;
+        }
+
+        const min = Math.max(0, Number.parseInt(input.min || "0", 10) || 0);
+        const rawMax = Number.parseInt(input.max || "", 10);
+        const max = Number.isFinite(rawMax) ? Math.max(min, rawMax) : Number.MAX_SAFE_INTEGER;
+        const parsed = Number.parseInt(input.value || "0", 10);
+        const normalized = Number.isFinite(parsed) ? parsed : min;
+        const clamped = Math.min(Math.max(normalized, min), max);
+
+        if (String(clamped) !== String(input.value || "")) {
+          input.value = String(clamped);
+        }
+
+        return clamped;
+      }
+
       function updateTotalColor(total) {
         summaryTotal.classList.remove("text-rose-600", "text-emerald-600");
         summaryTotal.classList.add(total > 0 ? "text-emerald-600" : "text-rose-600");
@@ -533,7 +552,7 @@
         let tentQty = 0;
 
         qtyInputs.forEach((input) => {
-          const qty = safeNumber(input.value);
+          const qty = clampQtyInput(input);
           const unitPrice = safeNumber(input.dataset.unitPrice);
           const setupFee = safeNumber(input.dataset.setupFee);
           const isTent = input.dataset.isTent === "true";
@@ -583,8 +602,14 @@
       }
 
       qtyInputs.forEach((input) => {
-        input.addEventListener("input", updateSummary);
-        input.addEventListener("change", updateSummary);
+        input.addEventListener("input", () => {
+          clampQtyInput(input);
+          updateSummary();
+        });
+        input.addEventListener("change", () => {
+          clampQtyInput(input);
+          updateSummary();
+        });
       });
 
       if (deliveryCheckbox) {
@@ -595,6 +620,7 @@
         setupCheckbox.addEventListener("change", updateSummary);
       }
 
+      qtyInputs.forEach(clampQtyInput);
       updateSummary();
     });
   </script>

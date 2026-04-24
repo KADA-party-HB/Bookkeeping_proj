@@ -1,0 +1,42 @@
+{{ headline }}
+
+Hej {{ customer_name }},
+
+{{ intro }}
+
+Bokningsnummer: {{ booking_id }}
+Status: {{ status_label }}
+Datum: {{ start_date }} till {{ end_date }}
+Total: {{ total_cost_text }}
+
+{% if items %}
+Valda artiklar:
+{% for item in items %}
+- {{ item.display_name }} x{{ item.quantity }} ({{ item.line_total_text }})
+{% endfor %}
+{% endif %}
+{% if include_delivery %}
+Leverans: Ja{% if delivery_address %} - {{ delivery_address }}{% endif %} ({{ delivery_cost_text }})
+{% endif %}
+{% if include_setup_service %}
+Montering: Ja ({{ setup_cost_text }})
+{% endif %}
+{% if notification_type == "created" and pending_hold_label %}
+Väntande bokningar håller lagret reserverat i {{ pending_hold_label }} om de inte bekräftas tidigare.
+{% endif %}
+{% if booking_note %}
+Meddelande från bokningen:
+{{ booking_note }}
+{% endif %}
+
+Om du har ett konto kan du logga in här:
+{{ login_url }}
+
+Din bokningssida finns här:
+{{ booking_url }}
+
+{% if contact_email %}
+Frågor? Svara till {{ contact_email }}.
+{% endif %}
+
+{{ site_name }}

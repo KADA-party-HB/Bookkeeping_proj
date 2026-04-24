@@ -109,7 +109,7 @@
                 <div class="text-sm font-bold text-rose-600">Bokning #{{ b.id }}</div>
                 <div class="mt-1 text-sm text-slate-600">{{ b.start_date }} - {{ b.end_date }}</div>
               </div>
-              {{ ui.booking_status_badge(b.status, variant='customer', confirmed_label='BekrÃ¤ftad', pending_label='VÃ¤ntande', cancelled_label='Avbokad') }}
+              {{ ui.booking_status_badge(b.status, variant='customer', confirmed_label='Bekräftad', pending_label='Väntande', cancelled_label='Avbokad') }}
             </div>
             <div class="mt-3 flex flex-wrap gap-2 text-xs">
               {% if b.include_setup_service %}<span class="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 font-medium text-emerald-700">Montering</span>{% endif %}
@@ -148,13 +148,13 @@
                   </td>
                   <td class="p-3" data-sort-value="{{ b.status }}">
                     <a class="block w-full h-full" href="{{ url_for('routes.booking_detail', booking_id=b.id) }}">
-                      {{ ui.booking_status_badge(b.status, variant='customer', confirmed_label='BekrÃ¤ftad', pending_label='VÃ¤ntande', cancelled_label='Avbokad') }}
+                      {{ ui.booking_status_badge(b.status, variant='customer', confirmed_label='Bekräftad', pending_label='Väntande', cancelled_label='Avbokad') }}
                     </a>
                   </td>
                   <td class="p-3 text-xs text-slate-600">
                     <a class="block w-full h-full space-y-1" href="{{ url_for('routes.booking_detail', booking_id=b.id) }}">
-                      {% if b.include_setup_service %}<div>Montering ingÃ¥r</div>{% endif %}
-                      {% if b.include_delivery %}<div>Leverans ingÃ¥r{% if b.delivery_fee is not none %} ({{ b.delivery_fee }} kr){% endif %}</div>{% endif %}
+                      {% if b.include_setup_service %}<div>Montering ingår</div>{% endif %}
+                      {% if b.include_delivery %}<div>Leverans ingår{% if b.delivery_fee is not none %} ({{ b.delivery_fee }} kr){% endif %}</div>{% endif %}
                       {% if b.booking_note %}<div class="text-slate-500">Har bokningsanteckning</div>{% endif %}
                       {% if not b.include_setup_service and not b.include_delivery and not b.booking_note %}
                         <span class="text-slate-400">Inga tillval</span>
@@ -171,7 +171,7 @@
         </div>
       </div>
     {% else %}
-      {{ ui.empty_state("Inga bokningar Ã¤nnu.", theme='customer') }}
+      {{ ui.empty_state("Inga bokningar ännu.", theme='customer') }}
     {% endif %}
 
     {% with page_obj=bookings_page %}

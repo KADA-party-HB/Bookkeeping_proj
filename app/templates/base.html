@@ -18,6 +18,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>{{ page_title }}</title>
   <meta name="description" content="{{ page_description }}">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
   <meta name="robots" content="{{ page_robots }}">
   <meta name="googlebot" content="{{ page_robots }}">
   <meta name="theme-color" content="{{ theme_color }}">
@@ -43,6 +44,68 @@
   <link rel="shortcut icon" href="{{ favicon_url }}">
   <link rel="apple-touch-icon" href="{{ apple_touch_icon_url }}">
   <link rel="manifest" href="{{ manifest_url }}">
+  <script>
+    (() => {
+      const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+      const getCsrfToken = () => csrfMeta?.getAttribute("content") || "";
+      const isUnsafeMethod = (method) => !["GET", "HEAD", "OPTIONS", "TRACE"].includes((method || "GET").toUpperCase());
+
+      const ensureFormCsrfToken = (form) => {
+        if (!(form instanceof HTMLFormElement)) {
+          return;
+        }
+
+        const formMethod = (form.getAttribute("method") || "GET").toUpperCase();
+        if (!isUnsafeMethod(formMethod)) {
+          return;
+        }
+
+        const action = form.getAttribute("action") || window.location.href;
+        const actionUrl = new URL(action, window.location.href);
+        if (actionUrl.origin !== window.location.origin) {
+          return;
+        }
+
+        let csrfInput = form.querySelector('input[name="csrf_token"]');
+        if (!csrfInput) {
+          csrfInput = document.createElement("input");
+          csrfInput.type = "hidden";
+          csrfInput.name = "csrf_token";
+          form.appendChild(csrfInput);
+        }
+        csrfInput.value = getCsrfToken();
+      };
+
+      document.addEventListener("submit", (event) => {
+        ensureFormCsrfToken(event.target);
+      }, true);
+
+      if (typeof window.fetch === "function") {
+        const nativeFetch = window.fetch.bind(window);
+        window.fetch = (input, init = {}) => {
+          const requestUrl = new URL(
+            typeof input === "string" ? input : (input?.url || window.location.href),
+            window.location.href,
+          );
+          const method = (
+            init.method
+            || (typeof input !== "string" && input?.method)
+            || "GET"
+          ).toUpperCase();
+
+          if (requestUrl.origin === window.location.origin && isUnsafeMethod(method)) {
+            const headers = new Headers(init.headers || (typeof input !== "string" ? input?.headers : undefined) || {});
+            if (!headers.has("X-CSRF-Token")) {
+              headers.set("X-CSRF-Token", getCsrfToken());
+            }
+            return nativeFetch(input, { ...init, headers });
+          }
+
+          return nativeFetch(input, init);
+        };
+      }
+    })();
+  </script>
   <script src="https://cdn.tailwindcss.com"></script>
   {% block extra_head %}{% endblock %}
   <style>
@@ -113,7 +176,7 @@
 <body class="min-h-screen text-slate-900 {% if is_admin_view %}bg-[linear-gradient(180deg,#f6fbff_0%,#f8fafc_38%,#ffffff_100%)]{% else %}customer-theme{% endif %}">
   <nav class="{% if is_admin_view %}sticky top-0 z-30 border-b border-white/70 bg-white/85 backdrop-blur{% else %}sticky top-0 z-30 border-b border-pink-100/80 bg-white/95 backdrop-blur-xl shadow-[0_18px_40px_-28px_rgba(15,23,42,0.12)]{% endif %}">
     <div class="mx-auto flex max-w-7xl items-center gap-3 px-4 py-4 md:px-6">
-      <a class="{% if is_admin_view %}inline-flex items-center gap-3 rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm{% else %}inline-flex items-center justify-center transition hover:scale-[1.01]{% endif %}" href="{{ url_for('routes.home') }}" aria-label="{% if is_admin_view %}Home{% else %}Hem{% endif %}">
+      <a class="{% if is_admin_view %}inline-flex items-center gap-3 rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm{% else %}inline-flex items-center justify-center transition hover:scale-[1.01]{% endif %}" href="{{ url_for('routes.home') }}" aria-label="{% if is_admin_view %}Home{% else %}Boka{% endif %}">
         {% if is_admin_view %}
           <span class="inline-flex h-2.5 w-2.5 rounded-full bg-sky-400"></span>
           Kada Party Rentals
@@ -124,7 +187,7 @@
 
       {% if session.get('user_id') %}
         {% if session.get('role') == 'admin' %}
-          <div class="hidden flex-wrap items-center gap-2 md:flex">
+          <div class="hidden flex-wrap items-center gap-2 lg:flex">
             <a class="rounded-full px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-sky-50 hover:text-sky-800" href="{{ url_for('routes.customers') }}">
               Customers
             </a>
@@ -145,7 +208,7 @@
             </a>
           </div>
 
-          <div class="ml-auto hidden items-center gap-3 md:flex">
+          <div class="ml-auto hidden items-center gap-3 lg:flex">
             <button
               type="button"
               data-price-sync-open
@@ -156,12 +219,14 @@
             <span class="inline-flex rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-medium uppercase tracking-[0.18em] text-slate-500">
               {{ session.get('role') }}
             </span>
-            <a class="rounded-full bg-sky-100 px-4 py-2 text-sm font-medium text-sky-800 transition hover:bg-sky-200" href="{{ url_for('auth.logout') }}">
-              Log out
-            </a>
+            <form method="post" action="{{ url_for('auth.logout') }}" class="m-0">
+              <button class="rounded-full bg-sky-100 px-4 py-2 text-sm font-medium text-sky-800 transition hover:bg-sky-200" type="submit">
+                Log out
+              </button>
+            </form>
           </div>
 
-          <details class="ml-auto md:hidden">
+          <details class="ml-auto lg:hidden">
             <summary class="list-none rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm">
               Menu
             </summary>
@@ -195,26 +260,36 @@
                 <a class="rounded-2xl px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-sky-50 hover:text-sky-800" href="{{ url_for('routes.admin_rental_periods') }}">
                   Rental periods
                 </a>
-                <a class="mt-2 inline-flex items-center justify-center rounded-2xl bg-sky-100 px-4 py-3 text-sm font-medium text-sky-800 transition hover:bg-sky-200" href="{{ url_for('auth.logout') }}">
-                  Log out
-                </a>
+                <form method="post" action="{{ url_for('auth.logout') }}" class="m-0">
+                  <button class="mt-2 inline-flex w-full items-center justify-center rounded-2xl bg-sky-100 px-4 py-3 text-sm font-medium text-sky-800 transition hover:bg-sky-200" type="submit">
+                    Log out
+                  </button>
+                </form>
               </div>
             </div>
           </details>
         {% else %}
-          <div class="ml-auto hidden items-center gap-2 md:flex">
+          <div class="ml-auto hidden items-center gap-2 lg:flex">
             <a class="px-1 py-2 text-sm font-semibold text-slate-900 underline decoration-pink-300 underline-offset-4 transition hover:text-rose-600 hover:decoration-pink-500" href="{{ url_for('routes.home') }}">
               Hem
+            </a>
+            <a class="px-1 py-2 text-sm font-semibold text-slate-900 underline decoration-pink-300 underline-offset-4 transition hover:text-rose-600 hover:decoration-pink-500" href="{{ url_for('routes.faq') }}">
+              FAQ
+            </a>
+            <a class="px-1 py-2 text-sm font-semibold text-slate-900 underline decoration-pink-300 underline-offset-4 transition hover:text-rose-600 hover:decoration-pink-500" href="{{ url_for('routes.about') }}">
+              Om oss
             </a>
             <a class="px-1 py-2 text-sm font-semibold text-slate-900 underline decoration-pink-300 underline-offset-4 transition hover:text-rose-600 hover:decoration-pink-500" href="{{ url_for('routes.customers') }}">
               Min profil
             </a>
-            <a class="rounded-full bg-emerald-100 px-4 py-2 text-sm font-medium text-emerald-900 transition hover:bg-emerald-200" href="{{ url_for('auth.logout') }}">
-              Logga ut
-            </a>
+            <form method="post" action="{{ url_for('auth.logout') }}" class="m-0">
+              <button class="rounded-full bg-emerald-100 px-4 py-2 text-sm font-medium text-emerald-900 transition hover:bg-emerald-200" type="submit">
+                Logga ut
+              </button>
+            </form>
           </div>
 
-          <details class="ml-auto md:hidden">
+          <details class="ml-auto lg:hidden">
             <summary class="list-none rounded-full border border-emerald-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm">
               Meny
             </summary>
@@ -223,21 +298,37 @@
                 <a class="rounded-2xl px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-pink-50 hover:text-rose-600" href="{{ url_for('routes.home') }}">
                   Hem
                 </a>
+                <a class="rounded-2xl px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-pink-50 hover:text-rose-600" href="{{ url_for('routes.faq') }}">
+                  FAQ
+                </a>
+                <a class="rounded-2xl px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-pink-50 hover:text-rose-600" href="{{ url_for('routes.about') }}">
+                  Om oss
+                </a>
                 <a class="rounded-2xl px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-pink-50 hover:text-rose-600" href="{{ url_for('routes.customers') }}">
                   Min profil
                 </a>
-                <a class="mt-2 inline-flex items-center justify-center rounded-2xl bg-emerald-100 px-4 py-3 text-sm font-medium text-emerald-900 transition hover:bg-emerald-200" href="{{ url_for('auth.logout') }}">
-                  Logga ut
-                </a>
+                <form method="post" action="{{ url_for('auth.logout') }}" class="m-0">
+                  <button class="mt-2 inline-flex w-full items-center justify-center rounded-2xl bg-emerald-100 px-4 py-3 text-sm font-medium text-emerald-900 transition hover:bg-emerald-200" type="submit">
+                    Logga ut
+                  </button>
+                </form>
               </div>
             </div>
           </details>
         {% endif %}
       {% else %}
-        <div class="ml-auto hidden items-center gap-2 md:flex">
+        <div class="ml-auto hidden items-center gap-2 lg:flex">
           <a class="{% if is_admin_view %}rounded-full px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100{% else %}px-1 py-2 text-sm font-semibold text-slate-900 underline decoration-pink-300 underline-offset-4 transition hover:text-rose-600 hover:decoration-pink-500{% endif %}" href="{{ url_for('routes.home') }}">
-            {% if is_admin_view %}Home{% else %}Hem{% endif %}
+            {% if is_admin_view %}Home{% else %}Boka{% endif %}
           </a>
+          {% if not is_admin_view %}
+            <a class="px-1 py-2 text-sm font-semibold text-slate-900 underline decoration-pink-300 underline-offset-4 transition hover:text-rose-600 hover:decoration-pink-500" href="{{ url_for('routes.faq') }}">
+              FAQ
+            </a>
+            <a class="px-1 py-2 text-sm font-semibold text-slate-900 underline decoration-pink-300 underline-offset-4 transition hover:text-rose-600 hover:decoration-pink-500" href="{{ url_for('routes.about') }}">
+              Om oss
+            </a>
+          {% endif %}
           <a class="{% if is_admin_view %}rounded-full px-4 py-2 text-sm font-medium text-slate-500 transition hover:bg-slate-100{% else %}rounded-full bg-emerald-100 px-4 py-2 text-sm font-medium text-emerald-900 transition hover:bg-emerald-200{% endif %}" href="{{ url_for('auth.login_form') }}">
             {% if is_admin_view %}Log in{% else %}Logga in{% endif %}
           </a>
@@ -246,15 +337,23 @@
           </a>
         </div>
 
-        <details class="ml-auto md:hidden">
+        <details class="ml-auto lg:hidden">
           <summary class="{% if is_admin_view %}list-none rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm{% else %}list-none rounded-full border border-emerald-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm{% endif %}">
             {% if is_admin_view %}Menu{% else %}Meny{% endif %}
           </summary>
           <div class="{% if is_admin_view %}absolute left-4 right-4 top-[calc(100%-0.25rem)] rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-xl{% else %}absolute left-4 right-4 top-[calc(100%-0.25rem)] rounded-[1.5rem] border border-emerald-200 bg-white p-4 shadow-xl shadow-emerald-100{% endif %}">
             <div class="grid gap-2">
               <a class="{% if is_admin_view %}rounded-2xl px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-100{% else %}rounded-2xl px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-pink-50 hover:text-rose-600{% endif %}" href="{{ url_for('routes.home') }}">
-                {% if is_admin_view %}Home{% else %}Hem{% endif %}
+                {% if is_admin_view %}Home{% else %}Boka{% endif %}
               </a>
+              {% if not is_admin_view %}
+                <a class="rounded-2xl px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-pink-50 hover:text-rose-600" href="{{ url_for('routes.faq') }}">
+                  FAQ
+                </a>
+                <a class="rounded-2xl px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-pink-50 hover:text-rose-600" href="{{ url_for('routes.about') }}">
+                  Om oss
+                </a>
+              {% endif %}
               <a class="{% if is_admin_view %}rounded-2xl px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-100{% else %}rounded-2xl bg-emerald-100 px-4 py-3 text-sm font-medium text-emerald-900 transition hover:bg-emerald-200{% endif %}" href="{{ url_for('auth.login_form') }}">
                 {% if is_admin_view %}Log in{% else %}Logga in{% endif %}
               </a>

@@ -44,6 +44,11 @@ def login():
     return redirect(url_for("routes.home"))
 
 
+@bp.get("/logout")
+def logout_redirect():
+    return redirect(url_for("routes.home"))
+
+
 @bp.get("/register")
 def register_form():
     return render_template("register.html")
@@ -103,7 +108,7 @@ def register():
     return redirect(url_for("routes.home"))
 
 
-@bp.get("/logout")
+@bp.post("/logout")
 def logout():
     session.clear()
     flash("Du är nu utloggad.", "success")

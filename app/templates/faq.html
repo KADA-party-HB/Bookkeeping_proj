@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block extra_head %}
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {% for item in faq_items %}
+          {
+            "@type": "Question",
+            "name": {{ item.question|tojson }},
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": {{ item.answer|tojson }}
+            }
+          }{% if not loop.last %},{% endif %}
+        {% endfor %}
+      ]
+    }
+  </script>
+{% endblock %}
+
+{% block content %}
+  <section class="relative overflow-hidden rounded-[2rem] border border-pink-100 bg-[linear-gradient(135deg,#fffdfd_0%,#ffffff_52%,#fbfffc_100%)] shadow-[0_28px_70px_-42px_rgba(15,23,42,0.12)]">
+    <div class="absolute -left-10 top-0 h-36 w-36 rounded-full bg-emerald-200/30 blur-3xl"></div>
+    <div class="absolute right-10 top-8 h-28 w-28 rounded-full bg-pink-200/25 blur-3xl"></div>
+    <div class="relative px-3.5 py-6 md:px-8">
+      <div class="inline-flex items-center gap-2 rounded-full border border-pink-200 bg-white/90 px-3 py-1 text-xs font-medium uppercase tracking-[0.2em] text-rose-500">
+        Hjälp och information
+      </div>
+      <h1 class="mt-4 max-w-3xl text-4xl font-black tracking-tight text-slate-950 md:text-5xl">
+        Vanliga frågor
+      </h1>
+      <p class="mt-4 max-w-3xl text-sm leading-7 text-slate-700 md:text-base">
+        Här har vi samlat svar på de vanligaste frågorna om bokning, leverans, montering och hur uthyrningen fungerar hos Kada Party Rentals.
+      </p>
+    </div>
+  </section>
+
+  <section class="mt-5">
+    <div class="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm md:p-6">
+      <div class="mb-4">
+        <h2 class="mt-1 text-2xl font-semibold text-slate-900">Svar på vanliga frågor</h2>
+      </div>
+
+      <div class="space-y-3">
+        {% for item in faq_items %}
+          <details class="group overflow-hidden rounded-[1.5rem] border border-slate-200 bg-slate-50/70 transition open:border-pink-200 open:bg-white">
+            <summary class="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 text-left text-base font-semibold text-slate-900">
+              <span>{{ item.question }}</span>
+              <span class="inline-flex h-8 w-8 flex-none items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition group-open:border-pink-200 group-open:text-rose-500">
+                <span class="relative block h-3.5 w-3.5">
+                  <span class="absolute left-1/2 top-1/2 h-[2px] w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-current"></span>
+                  <span class="absolute left-1/2 top-1/2 h-3.5 w-[2px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-current transition duration-200 group-open:rotate-90 group-open:scale-y-0"></span>
+                </span>
+              </span>
+            </summary>
+            <div class="border-t border-slate-100 px-5 py-4 text-sm leading-7 text-slate-600">
+              {{ item.answer }}
+            </div>
+          </details>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+
+  <footer class="mt-5 rounded-[2rem] border border-slate-200 bg-white px-6 py-3 shadow-sm md:px-8">
+    <div class="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-center">
+      <div class="self-center">
+        <h2 class="mt-0 text-2xl font-semibold text-slate-950">Kom i kontakt med oss</h2>
+        <p class="mt-3 max-w-2xl text-sm leading-7 text-slate-600 md:text-base">
+          Om du har en fråga om ett event, en större uthyrning eller specialönskemål är du välkommen att kontakta oss direkt. Om du redan vet vilka datum du vill hyra kan du sedan gå vidare till bokningssidan och kontrollera tillgänglighet.
+        </p>
+      </div>
+
+      <div class="grid gap-3 sm:min-w-[320px]">
+        <a
+          href="mailto:kadaparty@kadaparty.se"
+          class="rounded-[1.25rem] border border-rose-100 px-4 py-3 transition hover:border-rose-200 hover:bg-rose-50/50"
+        >
+          <div class="text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-slate-400">E-post</div>
+          <div class="mt-1 text-base font-semibold text-rose-600">kadaparty@kadaparty.se</div>
+        </a>
+        <a
+          href="tel:0730813710"
+          class="rounded-[1.25rem] border border-emerald-100 px-4 py-3 transition hover:border-emerald-200 hover:bg-emerald-50/50"
+        >
+          <div class="text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-slate-400">Telefon</div>
+          <div class="mt-1 text-base font-semibold text-emerald-700">0730813710</div>
+        </a>
+      </div>
+    </div>
+  </footer>
+{% endblock %}

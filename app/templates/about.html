@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-sm">
+    <div class="grid gap-0 lg:grid-cols-[0.95fr_1.05fr]">
+      <div class="border-b border-slate-200 bg-slate-50 lg:border-b-0 lg:border-r">
+        <div class="flex h-full items-center justify-center px-6 py-8 md:px-12 md:py-10">
+          <img
+            src="{{ url_for('static', filename='img/kada_logo.png') }}"
+            alt="Kada Party Rentals"
+            class="h-auto w-full max-w-md object-contain"
+          >
+        </div>
+      </div>
+
+      <div class="px-6 py-7 md:px-10 md:py-6">
+        <div class="text-xs font-semibold uppercase tracking-[0.2em] text-rose-600">Kada Party Rentals</div>
+        <h1 class="mt-3 text-4xl font-black tracking-tight text-slate-950 md:text-5xl">Om oss</h1>
+        <p class="mt-5 max-w-2xl text-base leading-8 text-slate-700">
+          Kada Party Rentals hjälper kunder att hyra tält och festutrustning för event, fester och arrangemang i Blekinge.
+        </p>
+
+        <div class="mt-8 border-l-4 border-emerald-500 pl-5">
+          <div class="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">Vårt arbetssätt</div>
+          <h2 class="mt-2 text-2xl font-semibold text-slate-900">Vi gör uthyrning enklare</h2>
+          <div class="mt-4 space-y-4 text-sm leading-7 text-slate-600 md:text-base">
+            <p>
+              Vårt mål är att göra det enkelt att boka tält och annan festutrustning så att man slipper fylla upp föråden hemma med saker man sällan kommer till att använda.
+            </p>
+            <p>
+              Vi arbetar med ett bokningsflöde där datum, lagerstatus och priser håller ihop. Systemet kontrollerar bokningen i förväg, så när vi bekräftar den är förutsättningarna nästan alltid redan på plats.
+            </p>
+            <p>
+              Oavsett om du planerar en mindre privat tillställning eller ett större arrangemang är tanken densamma: tydlig information, enkelt att hitta samt boka och en smidigare väg från förfrågan till leverans.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="mt-8 rounded-[2rem] border border-slate-200 bg-white px-6 py-4 shadow-sm md:px-8">
+    <div class="text-xs font-semibold uppercase tracking-[0.2em] text-sky-700">Det här erbjuder vi</div>
+    <h2 class="mt-2 text-2xl font-semibold text-slate-950">Tjänster och uthyrning</h2>
+
+    <ul class="mt-6 grid gap-4 text-sm leading-7 text-slate-700 md:grid-cols-2 md:text-base">
+      <li class="flex gap-3">
+        <span class="mt-[0.5em] inline-flex h-2.5 w-2.5 flex-none rounded-full bg-rose-500"></span>
+        <span>Uthyrning av tält och festutrustning för både mindre och större arrangemang.</span>
+      </li>
+      <li class="flex gap-3">
+        <span class="mt-[0.5em] inline-flex h-2.5 w-2.5 flex-none rounded-full bg-rose-500"></span>
+        <span>Tillgänglighet synlig direkt i bokningen så att du snabbt ser vad som går att reservera.</span>
+      </li>
+      <li class="flex gap-3">
+        <span class="mt-[0.5em] inline-flex h-2.5 w-2.5 flex-none rounded-full bg-rose-500"></span>
+        <span>Leverans direkt till festen med pris baserat på adress och körsträcka.</span>
+      </li>
+      <li class="flex gap-3">
+        <span class="mt-[0.5em] inline-flex h-2.5 w-2.5 flex-none rounded-full bg-rose-500"></span>
+        <span>Montering och demontering för tält när du vill ha en mer komplett lösning.</span>
+      </li>
+    </ul>
+  </section>
+
+  <footer class="mt-8 rounded-[2rem] border border-slate-200 bg-white px-6 py-4 shadow-sm md:px-8">
+    <div class="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-center">
+      <div class="self-center">
+        <h2 class="mt-2 text-2xl font-semibold text-slate-950">Kom i kontakt med oss</h2>
+        <p class="mt-3 max-w-2xl text-sm leading-7 text-slate-600 md:text-base">
+          Har du frågor om tillgänglighet, planering eller en kommande bokning är du välkommen att höra av dig. Om du redan vet vilka datum du är intresserad av kan du gå vidare till bokningssidan och kontrollera tillgänglighet direkt.
+        </p>
+      </div>
+
+      <div class="grid gap-3 sm:min-w-[320px]">
+        <a
+          href="mailto:kadaparty@kadaparty.se"
+          class="rounded-[1.25rem] border border-rose-100 px-4 py-3 transition hover:border-rose-200 hover:bg-rose-50/50"
+        >
+          <div class="text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-slate-400">E-post</div>
+          <div class="mt-1 text-base font-semibold text-rose-600">kadaparty@kadaparty.se</div>
+        </a>
+        <a
+          href="tel:0730813710"
+          class="rounded-[1.25rem] border border-sky-100 px-4 py-3 transition hover:border-sky-200 hover:bg-sky-50/50"
+        >
+          <div class="text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-slate-400">Telefon</div>
+          <div class="mt-1 text-base font-semibold text-sky-700">0730813710</div>
+        </a>
+      </div>
+    </div>
+  </footer>
+{% endblock %}
