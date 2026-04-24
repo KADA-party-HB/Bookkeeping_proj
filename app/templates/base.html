@@ -6,12 +6,21 @@
 {% set page_description = meta_description|default("Hyr tält och festutrustning smidigt med Kada Party Rentals. Boka tält, möbler, leverans och montering för ditt event.", true) %}
 {% set canonical_url = canonical_url|default(request.base_url, true) %}
 {% set social_image_url = social_image_url|default(url_for('static', filename='img/kada_logo.png', _external=True), true) %}
-<html lang="{% if is_admin_view %}en{% else %}sv{% endif %}">
+{% set page_robots = meta_robots|default("index,follow,max-image-preview:large", true) %}
+{% set favicon_url = favicon_url|default(url_for('routes.favicon'), true) %}
+{% set apple_touch_icon_url = apple_touch_icon_url|default(url_for('static', filename='img/kada_logo_no_text.png', _external=True), true) %}
+{% set manifest_url = manifest_url|default(url_for('routes.site_webmanifest'), true) %}
+{% set theme_color = theme_color|default("#ec4899", true) %}
+{% set sort_button_prefix = "Sort by" if is_admin_view else "Sortera efter" %}
+<html lang="{% if is_admin_view %}en{% else %}sv{% endif %}" data-sort-button-prefix="{{ sort_button_prefix }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>{{ page_title }}</title>
   <meta name="description" content="{{ page_description }}">
+  <meta name="robots" content="{{ page_robots }}">
+  <meta name="googlebot" content="{{ page_robots }}">
+  <meta name="theme-color" content="{{ theme_color }}">
   <link rel="canonical" href="{{ canonical_url }}">
   <meta property="og:title" content="{{ page_title }}">
   <meta property="og:description" content="{{ page_description }}">
@@ -29,7 +38,11 @@
   <meta name="twitter:title" content="{{ page_title }}">
   <meta name="twitter:description" content="{{ page_description }}">
   <meta name="twitter:image" content="{{ social_image_url }}">
-  <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/kada_logo_no_text.png') }}">
+  <link rel="icon" href="{{ favicon_url }}">
+  <link rel="icon" type="image/png" href="{{ apple_touch_icon_url }}" sizes="512x512">
+  <link rel="shortcut icon" href="{{ favicon_url }}">
+  <link rel="apple-touch-icon" href="{{ apple_touch_icon_url }}">
+  <link rel="manifest" href="{{ manifest_url }}">
   <script src="https://cdn.tailwindcss.com"></script>
   {% block extra_head %}{% endblock %}
   <style>
@@ -133,14 +146,13 @@
           </div>
 
           <div class="ml-auto hidden items-center gap-3 md:flex">
-            <form method="post" action="{{ url_for('routes.admin_prices_update') }}">
-              <button
-                type="submit"
-                class="inline-flex items-center justify-center rounded-full border border-amber-300 bg-[linear-gradient(135deg,#fff7ed_0%,#fef3c7_45%,#fde68a_100%)] px-4 py-2 text-sm font-semibold text-amber-900 shadow-[0_10px_24px_-18px_rgba(217,119,6,0.9)] transition hover:-translate-y-[1px] hover:border-amber-400 hover:shadow-[0_16px_30px_-18px_rgba(217,119,6,0.55)]"
-              >
-                Update prices
-              </button>
-            </form>
+            <button
+              type="button"
+              data-price-sync-open
+              class="inline-flex items-center justify-center rounded-full border border-amber-300 bg-[linear-gradient(135deg,#fff7ed_0%,#fef3c7_45%,#fde68a_100%)] px-4 py-2 text-sm font-semibold text-amber-900 shadow-[0_10px_24px_-18px_rgba(217,119,6,0.9)] transition hover:-translate-y-[1px] hover:border-amber-400 hover:shadow-[0_16px_30px_-18px_rgba(217,119,6,0.55)]"
+            >
+              Update prices
+            </button>
             <span class="inline-flex rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-medium uppercase tracking-[0.18em] text-slate-500">
               {{ session.get('role') }}
             </span>
@@ -158,14 +170,13 @@
                 {{ session.get('role') }}
               </div>
               <div class="grid gap-2">
-                <form method="post" action="{{ url_for('routes.admin_prices_update') }}">
-                  <button
-                    type="submit"
-                    class="inline-flex w-full items-center justify-center rounded-2xl border border-amber-300 bg-[linear-gradient(135deg,#fff7ed_0%,#fef3c7_45%,#fde68a_100%)] px-4 py-3 text-sm font-semibold text-amber-900 shadow-[0_10px_24px_-18px_rgba(217,119,6,0.9)] transition hover:border-amber-400"
-                  >
-                    Update prices
-                  </button>
-                </form>
+                <button
+                  type="button"
+                  data-price-sync-open
+                  class="inline-flex w-full items-center justify-center rounded-2xl border border-amber-300 bg-[linear-gradient(135deg,#fff7ed_0%,#fef3c7_45%,#fde68a_100%)] px-4 py-3 text-sm font-semibold text-amber-900 shadow-[0_10px_24px_-18px_rgba(217,119,6,0.9)] transition hover:border-amber-400"
+                >
+                  Update prices
+                </button>
                 <a class="rounded-2xl px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-sky-50 hover:text-sky-800" href="{{ url_for('routes.customers') }}">
                   Customers
                 </a>
@@ -257,6 +268,117 @@
     </div>
   </nav>
 
+  {% if session.get('role') == 'admin' %}
+    <div
+      class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/55 px-4 py-6 backdrop-blur-sm"
+      data-price-sync-modal
+      aria-hidden="true"
+    >
+      <div class="w-full max-w-2xl overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-2xl">
+        <div class="border-b border-slate-200 bg-[linear-gradient(135deg,#fff7ed_0%,#fef3c7_45%,#ffffff_100%)] px-6 py-5">
+          <div class="flex items-start justify-between gap-4">
+            <div>
+              <div class="inline-flex rounded-full border border-amber-200 bg-white/80 px-3 py-1 text-[0.7rem] font-semibold uppercase tracking-[0.2em] text-amber-700">
+                Price sync
+              </div>
+              <h2 class="mt-3 text-2xl font-semibold text-slate-950">Download, edit, and upload pricing JSON</h2>
+              <p class="mt-2 max-w-xl text-sm leading-6 text-slate-600">
+                Export the current price catalog from the database, update the JSON locally, then drop the edited file here to apply the changes.
+              </p>
+            </div>
+            <button
+              type="button"
+              data-price-sync-close
+              class="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/80 bg-white/90 text-lg text-slate-500 transition hover:text-slate-900"
+              aria-label="Close price sync"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+
+        <div class="px-6 py-6">
+          <div class="grid gap-3 md:grid-cols-2">
+            <a
+              href="{{ url_for('routes.admin_prices_export') }}"
+              download
+              class="inline-flex items-center justify-center rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-semibold text-sky-900 transition hover:border-sky-300 hover:bg-sky-100"
+            >
+              Download current JSON
+            </a>
+            <button
+              type="button"
+              data-price-sync-pick
+              class="inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-800 transition hover:border-slate-400 hover:bg-slate-50"
+            >
+              Choose JSON file
+            </button>
+          </div>
+
+          <div class="mt-4 grid gap-2 rounded-[1.5rem] border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-600">
+            <p>1. Download the latest JSON from the database.</p>
+            <p>2. Update prices or tent setup fees in the file.</p>
+            <p>3. Drop the edited JSON here and confirm the upload.</p>
+          </div>
+
+          <form
+            method="post"
+            action="{{ url_for('routes.admin_prices_update') }}"
+            enctype="multipart/form-data"
+            class="mt-5"
+            data-price-sync-form
+          >
+            <input
+              type="file"
+              name="catalog_file"
+              accept=".json,application/json"
+              class="sr-only"
+              data-price-sync-input
+              required
+            >
+
+            <div
+              class="rounded-[1.75rem] border-2 border-dashed border-amber-300 bg-[linear-gradient(180deg,#fffdf7_0%,#ffffff_100%)] px-6 py-10 text-center transition"
+              data-price-sync-dropzone
+              tabindex="0"
+              role="button"
+              aria-label="Choose or drop JSON file"
+            >
+              <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-amber-100 text-2xl text-amber-700">
+                ⇪
+              </div>
+              <h3 class="mt-4 text-lg font-semibold text-slate-900">Drop updated pricing JSON here</h3>
+              <p class="mt-2 text-sm text-slate-600">
+                Drag and drop a `.json` file, or click this area to pick one from your computer.
+              </p>
+              <p class="mt-4 text-sm font-medium text-slate-800" data-price-sync-file-label>
+                No file selected yet.
+              </p>
+            </div>
+
+            <div class="mt-5 flex flex-col gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                data-price-sync-close
+                class="inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                data-price-sync-submit
+                disabled
+                class="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:bg-slate-300"
+              >
+                Upload and update prices
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+
   <main class="mx-auto max-w-7xl px-4 py-6 md:px-6 md:py-8">
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
@@ -284,7 +406,7 @@
     (() => {
       const tables = Array.from(document.querySelectorAll("table"));
       const actionHeaderPattern = /^(action|actions)$/i;
-      const sortButtonPrefix = {{ "'Sort by'" if is_admin_view else "'Sortera efter'" }};
+      const sortButtonPrefix = document.documentElement.dataset.sortButtonPrefix || "Sort by";
 
       const normalizeText = (value) => (value || "").replace(/\s+/g, " ").trim();
 
@@ -521,6 +643,9 @@
   </script>
   <script src="{{ url_for('static', filename='js/client-list-controls.js') }}"></script>
   <script src="{{ url_for('static', filename='js/async-fragment-controls.js') }}"></script>
+  {% if session.get('role') == 'admin' %}
+    <script src="{{ url_for('static', filename='js/admin-price-sync.js') }}"></script>
+  {% endif %}
   {% block extra_scripts %}{% endblock %}
   <script src="{{ url_for('static', filename='js/date-range-controls.js') }}"></script>
 </body>
