@@ -94,6 +94,7 @@ from .sql import (
     SQL_BOOKING_ITEMS_FOR_BOOKINGS,
     SQL_BOOKING_TOTAL,
     SQL_LIST_ALL_BOOKINGS,
+    SQL_ADMIN_BOOKING_METRICS,
     SQL_CONFIRM_BOOKING,
     SQL_CANCEL_BOOKING,
     SQL_DELETE_BOOKING,
@@ -1773,19 +1774,19 @@ def admin_bookings():
     require_admin()
     fragment = _fragment_name()
     if fragment in {"hero", "list"}:
+        if fragment == "hero":
+            metrics = query(SQL_ADMIN_BOOKING_METRICS, one=True)
+            return render_template(
+                "_admin_bookings_hero_extra.html",
+                metrics=metrics,
+                role="admin",
+            )
         bookings_page, sort_key, sort_dir = _paginate_sorted_list(
             SQL_LIST_ALL_BOOKINGS,
             ADMIN_BOOKING_LIST_SORTS,
             default_key="created",
             default_dir="desc",
         )
-        if fragment == "hero":
-            return render_template(
-                "_admin_bookings_hero_extra.html",
-                bookings=bookings_page.items,
-                bookings_page=bookings_page,
-                role="admin",
-            )
         return render_template(
             "_admin_bookings_list.html",
             bookings=bookings_page.items,

@@ -831,6 +831,45 @@ LEFT JOIN booking_rollup br ON br.booking_id = b.id
 ORDER BY b.created_at DESC;
 """
 
+SQL_ADMIN_BOOKING_METRICS = """
+WITH booking_rollup AS (
+  SELECT
+    bi.booking_id,
+    BOOL_OR(tc.category_id IS NOT NULL) AS has_tent,
+    COALESCE(SUM(COALESCE(bi.custom_total_price, bi.quoted_period_price)), 0) AS rental_sum,
+    COALESCE(SUM(COALESCE(bi.setup_service_fee, 0)), 0) AS setup_sum
+  FROM booking_items bi
+  JOIN items i ON i.id = bi.item_id
+  JOIN categories c ON c.id = i.category_id
+  LEFT JOIN tent_categories tc ON tc.category_id = c.id
+  GROUP BY bi.booking_id
+),
+booking_totals AS (
+  SELECT
+    b.id,
+    b.status,
+    COALESCE(br.has_tent, FALSE) AS has_tent,
+    CASE
+      WHEN b.custom_total_price IS NOT NULL THEN b.custom_total_price
+      ELSE
+        COALESCE(br.rental_sum, 0)
+        + CASE WHEN b.include_setup_service THEN COALESCE(br.setup_sum, 0) ELSE 0 END
+        + CASE WHEN b.include_delivery THEN COALESCE(b.delivery_fee, 0) ELSE 0 END
+    END AS total_cost
+  FROM bookings b
+  LEFT JOIN booking_rollup br ON br.booking_id = b.id
+)
+SELECT
+  COUNT(*) AS total_bookings,
+  COUNT(*) FILTER (WHERE status = 'confirmed') AS confirmed_bookings,
+  COUNT(*) FILTER (WHERE status = 'pending') AS pending_bookings,
+  COUNT(*) FILTER (WHERE has_tent) AS bookings_with_tents,
+  COUNT(*) FILTER (WHERE status <> 'pending') AS revenue_booking_count,
+  COALESCE(SUM(total_cost) FILTER (WHERE status <> 'pending'), 0) AS total_income,
+  COALESCE(AVG(total_cost) FILTER (WHERE status <> 'pending'), 0) AS average_booking
+FROM booking_totals;
+"""
+
 SQL_CONFIRM_BOOKING = """
 UPDATE bookings
 SET status = 'confirmed'
