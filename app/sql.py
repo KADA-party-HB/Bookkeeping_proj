@@ -455,6 +455,21 @@ WHERE crpp.category_id = %s
 ORDER BY crpp.sort_order, rp.min_days, rp.max_days, rp.label;
 """
 
+SQL_LIST_ALL_CATEGORY_RENTAL_PERIOD_PRICES = """
+SELECT
+  crpp.category_id,
+  rp.id AS rental_period_id,
+  rp.label,
+  rp.min_days,
+  rp.max_days,
+  crpp.price,
+  crpp.sort_order,
+  crpp.created_at
+FROM category_rental_period_prices crpp
+JOIN rental_periods rp ON rp.id = crpp.rental_period_id
+ORDER BY crpp.category_id, crpp.sort_order, rp.min_days, rp.max_days, rp.label;
+"""
+
 SQL_GET_CATEGORY_RENTAL_PERIOD_PRICE = """
 SELECT
   crpp.category_id,

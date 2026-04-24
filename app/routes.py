@@ -1,5 +1,6 @@
 from flask import (
     Blueprint,
+    Response,
     current_app,
     request,
     render_template,
@@ -9,10 +10,12 @@ from flask import (
     session,
     abort,
     jsonify,
+    send_from_directory,
 )
 
 from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+import json
 import re
 from werkzeug.security import generate_password_hash
 
@@ -23,7 +26,11 @@ from .delivery import (
     DeliveryServiceError,
     resolve_delivery_quote,
 )
-from .price_sync import apply_price_catalog
+from .price_sync import (
+    apply_price_catalog,
+    export_price_catalog,
+    load_price_catalog_from_bytes,
+)
 from .sql import (
     # auth / users
     SQL_CREATE_USER,
@@ -98,6 +105,14 @@ from .sql import (
 )
 
 bp = Blueprint("routes", __name__)
+
+SITE_NAME = "Kada Party Rentals"
+DEFAULT_META_DESCRIPTION = (
+    "Hyr tält och festutrustning smidigt med Kada Party Rentals. "
+    "Boka tält, möbler, leverans och montering för ditt event."
+)
+INDEXABLE_ROBOTS_VALUE = "index,follow,max-image-preview:large"
+NOINDEX_ROBOTS_VALUE = "noindex,nofollow,noarchive"
 
 DELIVERY_BASE_FEE = Decimal("449.00")
 DELIVERY_INCLUDED_DISTANCE_KM = Decimal("10")
@@ -174,6 +189,18 @@ CATEGORY_LIST_SORTS = {
         "id",
     ),
     "items": ("active_items", "total_items", "lower(display_name)", "id"),
+}
+
+NOINDEX_ENDPOINT_PREFIXES = (
+    "routes.admin_",
+    "routes.booking_",
+    "routes.customer_",
+)
+
+NOINDEX_ENDPOINTS = {
+    "auth.login_form",
+    "auth.register_form",
+    "routes.customers",
 }
 
 
@@ -295,6 +322,77 @@ def _current_query_args():
     }
 
 
+def _site_url(endpoint: str, **values) -> str:
+    return url_for(endpoint, _external=True, **values)
+
+
+def _request_is_indexable() -> bool:
+    endpoint = request.endpoint or ""
+
+    if session.get("user_id"):
+        return False
+
+    if endpoint in NOINDEX_ENDPOINTS:
+        return False
+
+    return not endpoint.startswith(NOINDEX_ENDPOINT_PREFIXES)
+
+
+def _route_meta_defaults():
+    endpoint = request.endpoint or ""
+
+    metadata = {
+        "meta_title": SITE_NAME,
+        "meta_description": DEFAULT_META_DESCRIPTION,
+        "meta_robots": (
+            INDEXABLE_ROBOTS_VALUE if _request_is_indexable() else NOINDEX_ROBOTS_VALUE
+        ),
+        "canonical_url": request.base_url,
+        "social_image_url": _site_url("static", filename="img/kada_logo.png"),
+        "favicon_url": url_for("routes.favicon"),
+        "apple_touch_icon_url": _site_url(
+            "static",
+            filename="img/kada_logo_no_text.png",
+        ),
+        "manifest_url": url_for("routes.site_webmanifest"),
+        "theme_color": "#ec4899",
+    }
+
+    if endpoint == "routes.home":
+        metadata.update(
+            meta_title="Hyr tält och festutrustning i Blekinge | Kada Party Rentals",
+            meta_description=(
+                "Kada Party Rentals hyr ut tält, bord, stolar och festutrustning "
+                "i Blekinge med möjlighet till leverans och montering."
+            ),
+            canonical_url=_site_url("routes.home"),
+        )
+        if session.get("role") == "admin":
+            metadata.update(
+                meta_title=f"Booking Studio | {SITE_NAME}",
+                meta_description=(
+                    "Intern översikt för bokningsplanering, tillgänglighet och "
+                    "administration."
+                ),
+                meta_robots=NOINDEX_ROBOTS_VALUE,
+                theme_color="#0f172a",
+            )
+    elif endpoint == "auth.login_form":
+        metadata.update(
+            meta_title=f"Logga In | {SITE_NAME}",
+            meta_description="Logga in för att se dina bokningar och fortsätta med din kundprofil.",
+            canonical_url=_site_url("auth.login_form"),
+        )
+    elif endpoint == "auth.register_form":
+        metadata.update(
+            meta_title=f"Skapa Konto | {SITE_NAME}",
+            meta_description="Skapa ett konto för att boka tält och festutrustning hos Kada Party Rentals.",
+            canonical_url=_site_url("auth.register_form"),
+        )
+
+    return metadata
+
+
 def _paginate_sorted_list(
     sql,
     sort_map,
@@ -353,7 +451,21 @@ def inject_pagination_helpers():
 
         return url_for(request.endpoint, **(request.view_args or {}), **args)
 
-    return {"pagination_url": pagination_url, "sort_url": sort_url}
+    return {
+        "pagination_url": pagination_url,
+        "sort_url": sort_url,
+        **_route_meta_defaults(),
+    }
+
+
+@bp.after_app_request
+def apply_robots_header(response):
+    if response.mimetype == "text/html":
+        response.headers.setdefault(
+            "X-Robots-Tag",
+            _route_meta_defaults()["meta_robots"],
+        )
+    return response
 
 
 def _delivery_validation_error_message(code: str) -> str:
@@ -883,6 +995,69 @@ def _collect_selected_quantities_from_form():
         selections.append((category_id, qty))
 
     return selections
+
+
+@bp.get("/robots.txt")
+def robots_txt():
+    lines = [
+        "User-agent: *",
+        "Allow: /",
+        "Disallow: /admin/",
+        "Disallow: /auth/",
+        "Disallow: /customers",
+        "Disallow: /bookings/",
+        f"Sitemap: {_site_url('routes.sitemap_xml')}",
+    ]
+    return Response("\n".join(lines) + "\n", mimetype="text/plain")
+
+
+@bp.get("/sitemap.xml")
+def sitemap_xml():
+    pages = [
+        {
+            "loc": _site_url("routes.home"),
+            "changefreq": "daily",
+            "priority": "1.0",
+        }
+    ]
+    return Response(
+        render_template("sitemap.xml", pages=pages),
+        mimetype="application/xml",
+    )
+
+
+@bp.get("/site.webmanifest")
+def site_webmanifest():
+    response = jsonify(
+        {
+            "name": SITE_NAME,
+            "short_name": "Kada",
+            "icons": [
+                {
+                    "src": _site_url("static", filename="img/kada_logo_no_text.png"),
+                    "sizes": "512x512",
+                    "type": "image/png",
+                    "purpose": "any",
+                }
+            ],
+            "theme_color": "#ec4899",
+            "background_color": "#ffffff",
+            "display": "standalone",
+            "start_url": _site_url("routes.home"),
+        }
+    )
+    response.mimetype = "application/manifest+json"
+    return response
+
+
+@bp.get("/favicon.ico")
+def favicon():
+    return send_from_directory(
+        current_app.static_folder,
+        "img/kada_logo_no_text.png",
+        mimetype="image/png",
+        max_age=604800,
+    )
 
 
 # Home (category availability)
@@ -1749,8 +1924,19 @@ def admin_rental_period_delete(rental_period_id: int):
 def admin_prices_update():
     require_admin()
 
+    catalog_file = request.files.get("catalog_file")
+    if not catalog_file or not catalog_file.filename:
+        flash("Choose a JSON file before updating prices.", "error")
+        return redirect(request.referrer or url_for("routes.admin_items"))
+
     try:
-        summary = tx(apply_price_catalog)
+        catalog = load_price_catalog_from_bytes(catalog_file.read())
+    except Exception as exc:
+        flash(f"Price update failed: {str(exc)}", "error")
+        return redirect(request.referrer or url_for("routes.admin_items"))
+
+    try:
+        summary = tx(lambda cur: apply_price_catalog(cur, catalog))
     except Exception as exc:
         flash(f"Price update failed: {str(exc)}", "error")
         return redirect(request.referrer or url_for("routes.admin_items"))
@@ -1759,7 +1945,7 @@ def admin_prices_update():
         (
             f"Updated {len(summary['updated_categories'])} categories, "
             f"{summary['updated_period_prices']} rental-period prices, and "
-            f"{summary['updated_setup_fees']} tent setup fees from prices.json."
+            f"{summary['updated_setup_fees']} tent setup fees from {catalog_file.filename}."
         ),
         "success",
     )
@@ -1773,12 +1959,27 @@ def admin_prices_update():
 
     if summary["missing_period_labels"]:
         flash(
-            "Unknown rental period labels in prices.json: "
+            "Unknown rental period labels in the uploaded file: "
             + _truncate_joined(summary["missing_period_labels"], limit=4),
             "error",
         )
 
     return redirect(request.referrer or url_for("routes.admin_items"))
+
+
+@bp.get("/admin/prices/export")
+def admin_prices_export():
+    require_admin()
+
+    catalog = tx(export_price_catalog)
+    payload = json.dumps(catalog, ensure_ascii=False, indent=2) + "\n"
+    return Response(
+        payload,
+        mimetype="application/json",
+        headers={
+            "Content-Disposition": 'attachment; filename="kada-price-catalog.json"',
+        },
+    )
 
 
 # Admin: Items

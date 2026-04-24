@@ -2,17 +2,17 @@ from __future__ import annotations
 
 import json
 import re
+from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
-from pathlib import Path
 
 from .sql import (
+    SQL_LIST_ALL_CATEGORY_RENTAL_PERIOD_PRICES,
     SQL_LIST_CATEGORIES,
     SQL_LIST_RENTAL_PERIODS,
     SQL_UPSERT_CATEGORY_RENTAL_PERIOD_PRICE,
 )
 
 
-_PRICE_FILE_PATH = Path(__file__).with_name("prices.json")
 _NON_ALNUM_RE = re.compile(r"[^a-z0-9]+")
 
 
@@ -33,15 +33,96 @@ def _to_decimal(value, *, field_name: str) -> Decimal:
     return amount.quantize(Decimal("0.01"))
 
 
-def load_price_catalog() -> dict:
-    return json.loads(_PRICE_FILE_PATH.read_text(encoding="utf-8"))
+def _format_decimal(value) -> str:
+    if value is None:
+        return "0.00"
+    return str(Decimal(str(value)).quantize(Decimal("0.01")))
 
 
-def apply_price_catalog(cur) -> dict:
-    catalog = load_price_catalog()
+def load_price_catalog_from_bytes(data: bytes) -> dict:
+    if not data:
+        raise ValueError("The uploaded JSON file is empty.")
+
+    try:
+        text = data.decode("utf-8-sig")
+    except UnicodeDecodeError as exc:
+        raise ValueError("The uploaded file must be valid UTF-8 JSON.") from exc
+
+    try:
+        catalog = json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Invalid JSON file: {exc.msg}.") from exc
+
+    if not isinstance(catalog, dict):
+        raise ValueError("The uploaded JSON file must contain an object at the top level.")
+
+    return catalog
+
+
+def export_price_catalog(cur) -> dict:
+    cur.execute(SQL_LIST_CATEGORIES)
+    categories = cur.fetchall()
+
+    cur.execute(SQL_LIST_RENTAL_PERIODS)
+    rental_periods = cur.fetchall()
+
+    cur.execute(SQL_LIST_ALL_CATEGORY_RENTAL_PERIOD_PRICES)
+    price_rows = cur.fetchall()
+
+    prices_by_category_id: dict[int, list] = {}
+    for row in price_rows:
+        prices_by_category_id.setdefault(row["category_id"], []).append(row)
+
+    products = []
+    for category in categories:
+        category_prices = prices_by_category_id.get(category["id"], [])
+        rental_period_prices = {
+            row["label"]: _format_decimal(row["price"])
+            for row in category_prices
+        }
+
+        if category["is_tent"]:
+            category_type = "tent"
+        elif category["is_furnishing"]:
+            category_type = "furnishing"
+        else:
+            category_type = "item"
+
+        product = {
+            "label": category["display_name"],
+            "category": category["display_name"],
+            "category_id": category["id"],
+            "category_type": category_type,
+            "applies_to_categories": [category["display_name"]],
+            "rental_period_prices": rental_period_prices,
+        }
+
+        if category["is_tent"] and category["setup_service_fee"] is not None:
+            product["setup_service_fee"] = _format_decimal(category["setup_service_fee"])
+
+        products.append(product)
+
+    return {
+        "schema_version": 1,
+        "source": "database",
+        "exported_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "rental_periods": [
+            {
+                "id": row["id"],
+                "label": row["label"],
+                "min_days": row["min_days"],
+                "max_days": row["max_days"],
+            }
+            for row in rental_periods
+        ],
+        "products": products,
+    }
+
+
+def apply_price_catalog(cur, catalog: dict) -> dict:
     product_rows = catalog.get("products")
     if not isinstance(product_rows, list) or not product_rows:
-        raise ValueError("prices.json must contain a non-empty 'products' list.")
+        raise ValueError("The JSON file must contain a non-empty 'products' list.")
 
     cur.execute(SQL_LIST_CATEGORIES)
     categories = cur.fetchall()
@@ -110,7 +191,13 @@ def apply_price_catalog(cur) -> dict:
                     SET setup_service_fee = %s
                     WHERE category_id = %s;
                     """,
-                    (_to_decimal(setup_service_fee, field_name=f"{product_label} setup_service_fee"), category["id"]),
+                    (
+                        _to_decimal(
+                            setup_service_fee,
+                            field_name=f"{product_label} setup_service_fee",
+                        ),
+                        category["id"],
+                    ),
                 )
                 updated_setup_fees += 1
                 category_changed = True
@@ -142,5 +229,4 @@ def apply_price_catalog(cur) -> dict:
         "updated_setup_fees": updated_setup_fees,
         "missing_category_targets": missing_category_targets,
         "missing_period_labels": sorted(missing_period_labels),
-        "source_path": str(_PRICE_FILE_PATH),
     }
