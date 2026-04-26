@@ -82,7 +82,10 @@
 
 {% macro async_fragment_host(partial, message='Loading...', class_name='', loading_class='rounded-[2rem] border border-slate-200 bg-white px-6 py-8 text-sm text-slate-500 shadow-sm', min_height=None) -%}
 <div{% if class_name %} class="{{ class_name }}"{% endif %} data-async-fragment="{{ partial }}" aria-live="polite">
-  <div class="{{ loading_class }}"{% if min_height %} style="min-height: {{ min_height }};"{% endif %}>
+  <div
+    class="{{ loading_class }}"
+    {% if min_height %}style="min-height: {{ min_height }};"{% endif %}
+  >
     {{ message }}
   </div>
 </div>

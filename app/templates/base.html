@@ -2,8 +2,9 @@
 {% set active_role = role if role is defined else session.get('role') %}
 {% set is_admin_view = active_role == 'admin' %}
 {% set customer_logo_url = url_for('static', filename='img/Kada_logo_horizontel.png') %}
-{% set page_title = meta_title|default("Kada Party Rentals", true) %}
-{% set page_description = meta_description|default("Hyr tält och festutrustning smidigt med Kada Party Rentals. Boka tält, möbler, leverans och montering för ditt event.", true) %}
+{% set page_title = meta_title|default("KADA PartyTillbehör", true) %}
+{% set page_keywords = meta_keywords|default("", true) %}
+{% set page_description = meta_description|default("Hyr tält och festutrustning smidigt med KADA PartyTillbehör. Boka tält, möbler, leverans och montering för ditt event.", true) %}
 {% set canonical_url = canonical_url|default(request.base_url, true) %}
 {% set social_image_url = social_image_url|default(url_for('static', filename='img/kada_logo.png', _external=True), true) %}
 {% set page_robots = meta_robots|default("index,follow,max-image-preview:large", true) %}
@@ -11,6 +12,11 @@
 {% set apple_touch_icon_url = apple_touch_icon_url|default(url_for('static', filename='img/kada_logo_no_text.png', _external=True), true) %}
 {% set manifest_url = manifest_url|default(url_for('routes.site_webmanifest'), true) %}
 {% set theme_color = theme_color|default("#ec4899", true) %}
+{% set business_full_address = business_full_address|default("", true) %}
+{% set business_plus_code = business_plus_code|default("", true) %}
+{% set geo_region = geo_region|default("", true) %}
+{% set geo_placename = geo_placename|default("", true) %}
+{% set structured_data = structured_data|default([], true) %}
 {% set sort_button_prefix = "Sort by" if is_admin_view else "Sortera efter" %}
 <html lang="{% if is_admin_view %}en{% else %}sv{% endif %}" data-sort-button-prefix="{{ sort_button_prefix }}">
 <head>
@@ -18,23 +24,29 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>{{ page_title }}</title>
   <meta name="description" content="{{ page_description }}">
+  {% if page_keywords %}<meta name="keywords" content="{{ page_keywords }}">{% endif %}
+  <meta name="author" content="KADA PartyTillbehör">
   <meta name="csrf-token" content="{{ csrf_token() }}">
   <meta name="robots" content="{{ page_robots }}">
   <meta name="googlebot" content="{{ page_robots }}">
   <meta name="theme-color" content="{{ theme_color }}">
+  {% if business_full_address %}<meta name="address" content="{{ business_full_address }}">{% endif %}
+  {% if business_plus_code %}<meta name="location" content="{{ business_plus_code }}">{% endif %}
+  {% if geo_region %}<meta name="geo.region" content="{{ geo_region }}">{% endif %}
+  {% if geo_placename %}<meta name="geo.placename" content="{{ geo_placename }}">{% endif %}
   <link rel="canonical" href="{{ canonical_url }}">
   <meta property="og:title" content="{{ page_title }}">
   <meta property="og:description" content="{{ page_description }}">
   <meta property="og:url" content="{{ canonical_url }}">
   <meta property="og:type" content="website">
-  <meta property="og:site_name" content="Kada Party Rentals">
+  <meta property="og:site_name" content="KADA PartyTillbehör">
   <meta property="og:locale" content="sv_SE">
   <meta property="og:image" content="{{ social_image_url }}">
   <meta property="og:image:secure_url" content="{{ social_image_url }}">
   <meta property="og:image:type" content="image/png">
   <meta property="og:image:width" content="787">
   <meta property="og:image:height" content="630">
-  <meta property="og:image:alt" content="Kada Party Rentals">
+  <meta property="og:image:alt" content="KADA PartyTillbehör">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="{{ page_title }}">
   <meta name="twitter:description" content="{{ page_description }}">
@@ -44,6 +56,9 @@
   <link rel="shortcut icon" href="{{ favicon_url }}">
   <link rel="apple-touch-icon" href="{{ apple_touch_icon_url }}">
   <link rel="manifest" href="{{ manifest_url }}">
+  {% for item in structured_data %}
+  <script type="application/ld+json">{{ item|tojson }}</script>
+  {% endfor %}
   <script>
     (() => {
       const csrfMeta = document.querySelector('meta[name="csrf-token"]');
@@ -179,9 +194,9 @@
       <a class="{% if is_admin_view %}inline-flex items-center gap-3 rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm{% else %}inline-flex items-center justify-center transition hover:scale-[1.01]{% endif %}" href="{{ url_for('routes.home') }}" aria-label="{% if is_admin_view %}Home{% else %}Boka{% endif %}">
         {% if is_admin_view %}
           <span class="inline-flex h-2.5 w-2.5 rounded-full bg-sky-400"></span>
-          Kada Party Rentals
+          KADA PartyTillbehör
         {% else %}
-          <img src="{{ customer_logo_url }}" alt="Kada Party" class="h-20 w-auto object-contain md:h-24">
+          <img src="{{ customer_logo_url }}" alt="KADA PartyTillbehör" class="h-20 w-auto object-contain md:h-24">
         {% endif %}
       </a>
 

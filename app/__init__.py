@@ -214,9 +214,9 @@ def create_app():
         SMTP_USE_SSL=smtp_use_ssl,
         SMTP_TIMEOUT_SECONDS=smtp_timeout_seconds,
         SMTP_FROM_EMAIL=smtp_from_email,
-        SMTP_FROM_NAME=(os.getenv("SMTP_FROM_NAME") or "Kada Party Rentals").strip(),
+        SMTP_FROM_NAME=(os.getenv("SMTP_FROM_NAME") or "KADA PartyTillbehör").strip(),
         BOOKING_EMAIL_REPLY_TO=(os.getenv("BOOKING_EMAIL_REPLY_TO") or "").strip(),
-        BOOKING_EMAIL_SITE_NAME=(os.getenv("BOOKING_EMAIL_SITE_NAME") or "Kada Party Rentals").strip(),
+        BOOKING_EMAIL_SITE_NAME=(os.getenv("BOOKING_EMAIL_SITE_NAME") or "KADA PartyTillbehör").strip(),
     )
 
     if _env_flag("TRUST_PROXY_HEADERS", default=False):

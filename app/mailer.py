@@ -74,7 +74,7 @@ def send_booking_event_email(
         return False
 
     context = {
-        "site_name": current_app.config.get("BOOKING_EMAIL_SITE_NAME", "Kada Party Rentals"),
+        "site_name": current_app.config.get("BOOKING_EMAIL_SITE_NAME", "KADA PartyTillbehör"),
         "headline": copy["headline"],
         "intro": copy["intro"],
         "notification_type": notification_type,

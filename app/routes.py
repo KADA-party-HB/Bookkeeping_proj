@@ -21,6 +21,7 @@ import re
 import time
 from collections import deque
 from threading import Lock
+from urllib.parse import quote
 from werkzeug.security import generate_password_hash
 
 from .city_lookup import extract_city_name
@@ -112,9 +113,31 @@ from .sql import (
 
 bp = Blueprint("routes", __name__)
 
-SITE_NAME = "Kada Party Rentals"
+DEFAULT_META_KEYWORDS = (
+    "kada, kada party, t\u00e4ltuthyrning, party, fest, fest utrustning, "
+    "festutrustning, partyt\u00e4lt, partytalt, karlshamn, blekinge"
+)
+HOME_META_TITLE = (
+    "KADA PartyTillbeh\u00f6r - t\u00e4ltuthyrning, partyt\u00e4lt och festutrustning i Karlshamn"
+)
+HOME_META_DESCRIPTION = (
+    "KADA PartyTillbeh\u00f6r erbjuder t\u00e4ltuthyrning, partyt\u00e4lt, party- och "
+    "festutrustning i Karlshamn och Blekinge med leverans och montering."
+)
+KADA_STREET_ADDRESS = "\u00d6stersj\u00f6v\u00e4gen 45"
+KADA_POSTAL_CODE = "374 31"
+KADA_LOCALITY = "Karlshamn"
+KADA_REGION = "Blekinge"
+KADA_GEO_REGION = "SE-K"
+KADA_COUNTRY_CODE = "SE"
+KADA_PLUS_CODE = "5R9F+5R Karlshamn"
+KADA_CONTACT_PHONE_E164 = "+46730813710"
+KADA_CONTACT_EMAIL = "kadaparty@kadaparty.se"
+KADA_FULL_ADDRESS = f"{KADA_STREET_ADDRESS}, {KADA_POSTAL_CODE} {KADA_LOCALITY}"
+
+SITE_NAME = "KADA PartyTillbehör"
 DEFAULT_META_DESCRIPTION = (
-    "Hyr tält och festutrustning smidigt med Kada Party Rentals. "
+    "Hyr tält och festutrustning smidigt med KADA PartyTillbehör. "
     "Boka tält, möbler, leverans och montering för ditt event."
 )
 INDEXABLE_ROBOTS_VALUE = "index,follow,max-image-preview:large"
@@ -217,7 +240,7 @@ NOINDEX_ENDPOINTS = {
 
 FAQ_ITEMS = [
     {
-        "question": "Hur fungerar bokningen hos Kada Party Rentals?",
+        "question": "Hur fungerar bokningen hos KADA PartyTillbehör?",
         "answer": (
             "Du väljer först datum för uthyrningen, ser vilka artiklar som är "
             "tillgängliga och skickar sedan in din bokning. När bokningen är "
@@ -259,7 +282,7 @@ FAQ_ITEMS = [
     {
         "question": "Hur kontaktar jag er om jag har frågor?",
         "answer": (
-            "Du kan kontakta Kada Party Rentals via e-post på "
+            "Du kan kontakta KADA PartyTillbehör via e-post på "
             "kadaparty@kadaparty.se eller via telefon på 0730813710."
         ),
     },
@@ -570,6 +593,36 @@ def _site_url(endpoint: str, **values) -> str:
     return url_for(endpoint, _external=True, **values)
 
 
+def _local_business_structured_data():
+    map_query = quote(f"{KADA_PLUS_CODE}, {KADA_FULL_ADDRESS}")
+    return {
+        "@context": "https://schema.org",
+        "@type": "LocalBusiness",
+        "name": SITE_NAME,
+        "alternateName": "KADA PartyTillbehör",
+        "url": _site_url("routes.home"),
+        "image": _site_url("static", filename="img/kada_logo.png"),
+        "logo": _site_url("static", filename="img/kada_logo_no_text.png"),
+        "description": HOME_META_DESCRIPTION,
+        "telephone": KADA_CONTACT_PHONE_E164,
+        "email": KADA_CONTACT_EMAIL,
+        "keywords": DEFAULT_META_KEYWORDS,
+        "address": {
+            "@type": "PostalAddress",
+            "streetAddress": KADA_STREET_ADDRESS,
+            "postalCode": KADA_POSTAL_CODE,
+            "addressLocality": KADA_LOCALITY,
+            "addressRegion": KADA_REGION,
+            "addressCountry": KADA_COUNTRY_CODE,
+        },
+        "areaServed": [
+            {"@type": "City", "name": KADA_LOCALITY},
+            {"@type": "AdministrativeArea", "name": KADA_REGION},
+        ],
+        "hasMap": f"https://www.google.com/maps/search/?api=1&query={map_query}",
+    }
+
+
 def _request_is_indexable() -> bool:
     endpoint = request.endpoint or ""
 
@@ -588,6 +641,7 @@ def _route_meta_defaults():
     metadata = {
         "meta_title": SITE_NAME,
         "meta_description": DEFAULT_META_DESCRIPTION,
+        "meta_keywords": DEFAULT_META_KEYWORDS,
         "meta_robots": (
             INDEXABLE_ROBOTS_VALUE if _request_is_indexable() else NOINDEX_ROBOTS_VALUE
         ),
@@ -600,16 +654,32 @@ def _route_meta_defaults():
         ),
         "manifest_url": url_for("routes.site_webmanifest"),
         "theme_color": "#ec4899",
+        "business_full_address": KADA_FULL_ADDRESS,
+        "business_plus_code": KADA_PLUS_CODE,
+        "geo_region": KADA_GEO_REGION,
+        "geo_placename": KADA_LOCALITY,
+        "structured_data": [],
     }
 
     if endpoint == "routes.home":
         metadata.update(
-            meta_title="Hyr tält och festutrustning i Blekinge | Kada Party Rentals",
+            meta_title="Hyr tält och festutrustning i Blekinge | KADA PartyTillbehör",
             meta_description=(
-                "Kada Party Rentals hyr ut tält, bord, stolar och festutrustning "
+                "KADA PartyTillbehör hyr ut tält, bord, stolar och festutrustning "
                 "i Blekinge med möjlighet till leverans och montering."
             ),
             canonical_url=_site_url("routes.home"),
+        )
+        metadata.update(
+            meta_title=HOME_META_TITLE,
+            meta_description=HOME_META_DESCRIPTION,
+            meta_keywords=(
+                "kada, kada party, t\u00e4ltuthyrning, party, fest, fest "
+                "utrustning, festutrustning, partyt\u00e4lt, partytalt, "
+                "karlshamn, blekinge, partyt\u00e4lt karlshamn, "
+                "festutrustning karlshamn"
+            ),
+            structured_data=[_local_business_structured_data()],
         )
         if session.get("role") == "admin":
             metadata.update(
@@ -620,6 +690,12 @@ def _route_meta_defaults():
                 ),
                 meta_robots=NOINDEX_ROBOTS_VALUE,
                 theme_color="#0f172a",
+                meta_keywords="",
+                business_full_address="",
+                business_plus_code="",
+                geo_region="",
+                geo_placename="",
+                structured_data=[],
             )
     elif endpoint == "auth.login_form":
         metadata.update(
@@ -630,7 +706,7 @@ def _route_meta_defaults():
     elif endpoint == "auth.register_form":
         metadata.update(
             meta_title=f"Skapa Konto | {SITE_NAME}",
-            meta_description="Skapa ett konto för att boka tält och festutrustning hos Kada Party Rentals.",
+            meta_description="Skapa ett konto för att boka tält och festutrustning hos KADA PartyTillbehör.",
             canonical_url=_site_url("auth.register_form"),
         )
     elif endpoint == "routes.faq":
@@ -638,7 +714,7 @@ def _route_meta_defaults():
             meta_title=f"Vanliga frågor | {SITE_NAME}",
             meta_description=(
                 "Las vanliga fragor om bokning, leverans, montering och hur "
-                "uthyrningen fungerar hos Kada Party Rentals."
+                "uthyrningen fungerar hos KADA PartyTillbehör."
             ),
             canonical_url=_site_url("routes.faq"),
         )
@@ -646,7 +722,7 @@ def _route_meta_defaults():
         metadata.update(
             meta_title=f"Om Oss | {SITE_NAME}",
             meta_description=(
-                "Las mer om Kada Party Rentals, hur vi arbetar med uthyrning av "
+                "Las mer om KADA PartyTillbehör, hur vi arbetar med uthyrning av "
                 "talt och festutrustning och hur du kommer i kontakt med oss."
             ),
             canonical_url=_site_url("routes.about"),
@@ -1426,7 +1502,7 @@ def faq():
         meta_title=f"Vanliga frågor | {SITE_NAME}",
         meta_description=(
             "Läs vanliga frågor om bokning, leverans, montering och hur "
-            "uthyrningen fungerar hos Kada Party Rentals."
+            "uthyrningen fungerar hos KADA PartyTillbehör."
         ),
         canonical_url=_site_url("routes.faq"),
     )
@@ -1438,7 +1514,7 @@ def about():
         "about.html",
         meta_title=f"Om oss | {SITE_NAME}",
         meta_description=(
-            "Läs mer om Kada Party Rentals, hur vi arbetar med uthyrning av "
+            "Läs mer om KADA PartyTillbehör, hur vi arbetar med uthyrning av "
             "tält och festutrustning och hur du kommer i kontakt med oss."
         ),
         canonical_url=_site_url("routes.about"),
