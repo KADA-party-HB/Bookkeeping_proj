@@ -937,6 +937,73 @@ def _calculate_delivery_fee_from_distance(distance_km_value):
     return delivery_fee.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
+def _delivery_quote_json_response(address: str, *, log_prefix: str):
+    current_app.logger.info(
+        "%s_requested address=%r",
+        log_prefix,
+        address,
+    )
+
+    try:
+        quote = resolve_delivery_quote(address)
+    except DeliveryAddressValidationError as exc:
+        current_app.logger.info(
+            "%s_validation_failed address=%r error_code=%s",
+            log_prefix,
+            address,
+            exc.code,
+        )
+        return (
+            jsonify(
+                {
+                    "ok": False,
+                    "error": _delivery_validation_error_message(exc.code),
+                    "error_code": exc.code,
+                }
+            ),
+            422,
+        )
+    except DeliveryServiceError as exc:
+        current_app.logger.warning(
+            "%s_service_failed address=%r error_code=%s",
+            log_prefix,
+            address,
+            exc.code,
+        )
+        return (
+            jsonify(
+                {
+                    "ok": False,
+                    "error": _delivery_service_error_message(exc.code),
+                    "error_code": exc.code,
+                }
+            ),
+            503,
+        )
+
+    delivery_fee = _calculate_delivery_fee_from_distance(str(quote["distance_km"]))
+    current_app.logger.info(
+        "%s_succeeded address=%r formatted=%r distance_km=%s delivery_fee=%s confidence=%s result_type=%r",
+        log_prefix,
+        address,
+        quote["formatted_address"],
+        str(quote["distance_km"]),
+        str(delivery_fee),
+        str(quote["confidence"]),
+        quote["result_type"],
+    )
+    return jsonify(
+        {
+            "ok": True,
+            "formatted_address": quote["formatted_address"],
+            "distance_km": str(quote["distance_km"]),
+            "delivery_fee": str(delivery_fee),
+            "confidence": str(quote["confidence"]),
+            "result_type": quote["result_type"],
+        }
+    )
+
+
 def _parse_manual_delivery_fee(delivery_fee_value):
     fee_text = (delivery_fee_value or "").strip().replace(",", ".")
     if fee_text == "":
@@ -999,6 +1066,78 @@ def _build_booking_item_summary(items):
     return summary_rows
 
 
+def _count_booking_items_by_category(items):
+    counts = {}
+    for item in items:
+        category_id = item.get("category_id")
+        if category_id is None:
+            continue
+        counts[category_id] = counts.get(category_id, 0) + 1
+    return counts
+
+
+def _normalize_category_quantity_map(quantity_map):
+    return {
+        int(category_id): qty
+        for category_id, qty in quantity_map.items()
+        if qty and qty > 0
+    }
+
+
+def _build_booking_edit_category_rows(current_items, all_categories, available_categories):
+    quantity_by_category = _count_booking_items_by_category(current_items)
+    custom_qty_by_category = {}
+    available_by_category_id = {row["id"]: row for row in available_categories}
+
+    for item in current_items:
+        if item.get("custom_total_price") is None:
+            continue
+        category_id = item.get("category_id")
+        custom_qty_by_category[category_id] = custom_qty_by_category.get(category_id, 0) + 1
+
+    rows = []
+    for category in all_categories:
+        category_id = category["id"]
+        available_row = available_by_category_id.get(category_id, {})
+        current_qty = quantity_by_category.get(category_id, 0)
+        available_extra_qty = available_row.get("admin_available_items") or 0
+
+        if category["is_tent"]:
+            type_label = "Tent"
+        elif category["is_furnishing"]:
+            type_label = category.get("furnishing_kind") or "Furnishing"
+        else:
+            type_label = "Category"
+
+        rows.append(
+            {
+                "id": category_id,
+                "display_name": category["display_name"],
+                "type_label": type_label,
+                "is_tent": category["is_tent"],
+                "is_furnishing": category["is_furnishing"],
+                "furnishing_kind": category.get("furnishing_kind"),
+                "has_standard_price": available_row.get("has_standard_price", False),
+                "quoted_period_price": available_row.get("quoted_period_price"),
+                "rental_period_label": available_row.get("rental_period_label"),
+                "current_qty": current_qty,
+                "custom_qty": custom_qty_by_category.get(category_id, 0),
+                "available_extra_qty": available_extra_qty,
+                "max_editable_qty": current_qty + available_extra_qty,
+            }
+        )
+
+    rows.sort(
+        key=lambda row: (
+            0 if row["current_qty"] > 0 else 1,
+            0 if row["available_extra_qty"] > 0 else 1,
+            row["display_name"].lower(),
+            row["id"],
+        )
+    )
+    return rows
+
+
 def _query_available_categories(start_date: str, end_date: str):
     return query(SQL_AVAILABLE_CATEGORIES, (start_date, end_date))
 
@@ -1021,6 +1160,40 @@ def _load_booking_allocation_candidates(
 def _format_turnaround_item_labels(item_labels):
     labels = [label for label in dict.fromkeys(item_labels) if label]
     return ", ".join(labels)
+
+
+def _collect_booking_category_quantities_from_form():
+    quantities = {}
+
+    for key, value in request.form.items():
+        if not key.startswith("category_qty_"):
+            continue
+
+        raw_category_id = key.split("category_qty_", 1)[1].strip()
+        if not raw_category_id:
+            continue
+
+        try:
+            category_id = int(raw_category_id)
+        except ValueError:
+            continue
+
+        raw_qty = (value or "").strip()
+        if raw_qty == "":
+            quantities[category_id] = 0
+            continue
+
+        try:
+            qty = int(raw_qty)
+        except ValueError as exc:
+            raise ValueError("Category quantities must be whole numbers.") from exc
+
+        if qty < 0:
+            raise ValueError("Category quantities cannot be negative.")
+
+        quantities[category_id] = qty
+
+    return quantities
 
 def _build_full_delivery_address(address, postal_city):
     parts = []
@@ -1162,26 +1335,58 @@ def _reallocate_booking_items_for_dates(
     *,
     include_setup_service: bool,
     booking_has_total_override: bool,
+    category_context_by_id,
+    requested_category_quantities=None,
 ):
     cur.execute(SQL_BOOKING_ITEMS, (booking_id,))
     current_items = cur.fetchall()
-    if not current_items:
-        return 0, 0, []
-
     rows_by_category = {}
     for row in current_items:
         rows_by_category.setdefault(row["category_id"], []).append(row)
 
-    reassigned_rows = []
+    desired_category_quantities = {}
+    requested_category_quantities = requested_category_quantities or {}
+
+    for category_id, category_rows in rows_by_category.items():
+        desired_category_quantities[category_id] = requested_category_quantities.get(
+            category_id,
+            len(category_rows),
+        )
+
+    for category_id, qty in requested_category_quantities.items():
+        desired_category_quantities[category_id] = qty
+
+    reassigned_existing_rows = []
+    added_rows = []
     moved_rows_with_metadata = 0
     turnaround_item_labels = []
+    added_count = 0
+    removed_count = 0
     rental_days = (date.fromisoformat(end_date) - date.fromisoformat(start_date)).days + 1
     pricing_by_category = {}
 
-    for category_rows in rows_by_category.values():
-        category_id = category_rows[0]["category_id"]
-        display_name = category_rows[0]["display_name"]
-        current_item_ids = {row["item_id"] for row in category_rows}
+    def row_preservation_priority(row):
+        return (
+            0 if row["custom_total_price"] is not None else 1,
+            0 if row["custom_price_note"] else 1,
+            0 if row["line_note"] else 1,
+            row["item_id"],
+        )
+
+    for category_id, desired_qty in sorted(desired_category_quantities.items()):
+        current_rows = rows_by_category.get(category_id, [])
+        category_context = category_context_by_id.get(category_id)
+        if not category_context:
+            raise ValueError(f"Selected category {category_id} was not found.")
+
+        display_name = (
+            current_rows[0]["display_name"]
+            if current_rows
+            else category_context["display_name"]
+        )
+        rows_to_keep = sorted(current_rows, key=row_preservation_priority)[:desired_qty]
+        removed_count += max(len(current_rows) - len(rows_to_keep), 0)
+        current_item_ids = {row["item_id"] for row in current_rows}
 
         cur.execute(SQL_FIND_CATEGORY_RENTAL_PRICING, (category_id, rental_days))
         pricing_by_category[category_id] = cur.fetchone()
@@ -1201,11 +1406,10 @@ def _reallocate_booking_items_for_dates(
             )
         )
 
-        needed_count = len(category_rows)
-        chosen_candidates = candidates[:needed_count]
-        if len(chosen_candidates) < needed_count:
+        chosen_candidates = candidates[:desired_qty]
+        if len(chosen_candidates) < desired_qty:
             raise ValueError(
-                f'Cannot move booking to these dates because only {len(chosen_candidates)} of {needed_count} items are available in "{display_name}".'
+                f'Cannot update "{display_name}" because only {len(chosen_candidates)} of {desired_qty} items are available for the selected dates.'
             )
 
         candidate_by_item_id = {candidate["item_id"]: candidate for candidate in chosen_candidates}
@@ -1213,26 +1417,33 @@ def _reallocate_booking_items_for_dates(
         kept_ids = set()
         pending_rows = []
 
-        for row in category_rows:
+        for row in rows_to_keep:
             if row["item_id"] in chosen_ids and row["item_id"] not in kept_ids:
-                reassigned_rows.append((row, row["item_id"], candidate_by_item_id[row["item_id"]]))
+                reassigned_existing_rows.append(
+                    (row, row["item_id"], candidate_by_item_id[row["item_id"]])
+                )
                 kept_ids.add(row["item_id"])
             else:
                 pending_rows.append(row)
 
-        remaining_ids = [
-            candidate["item_id"]
+        remaining_candidates = [
+            candidate
             for candidate in chosen_candidates
             if candidate["item_id"] not in kept_ids
         ]
 
-        for row, new_item_id in zip(pending_rows, remaining_ids):
-            reassigned_rows.append((row, new_item_id, candidate_by_item_id[new_item_id]))
+        for row, candidate in zip(pending_rows, remaining_candidates):
+            reassigned_existing_rows.append((row, candidate["item_id"], candidate))
+
+        remaining_candidates = remaining_candidates[len(pending_rows):]
+        added_count += len(remaining_candidates)
+        for candidate in remaining_candidates:
+            added_rows.append((category_id, candidate))
 
     cur.execute(SQL_DELETE_BOOKING_ITEMS_FOR_BOOKING, (booking_id,))
 
     reallocated_count = 0
-    for row, new_item_id, candidate in reassigned_rows:
+    for row, new_item_id, candidate in reassigned_existing_rows:
         pricing_row = pricing_by_category[row["category_id"]]
 
         if pricing_row:
@@ -1280,7 +1491,55 @@ def _reallocate_booking_items_for_dates(
             ):
                 moved_rows_with_metadata += 1
 
-    return reallocated_count, moved_rows_with_metadata, turnaround_item_labels
+    for category_id, candidate in added_rows:
+        category_context = category_context_by_id[category_id]
+        pricing_row = pricing_by_category[category_id]
+
+        if pricing_row:
+            rental_period_id = pricing_row["rental_period_id"]
+            quoted_period_label = pricing_row["period_label"]
+            quoted_period_price = pricing_row["period_price"]
+        else:
+            if not booking_has_total_override:
+                raise ValueError(
+                    f'Cannot add "{category_context["display_name"]}" because no standard price is configured for {rental_days} day{"s" if rental_days != 1 else ""}.'
+                )
+            rental_period_id = None
+            quoted_period_label = None
+            quoted_period_price = None
+
+        setup_service_fee = (
+            category_context["setup_service_fee"]
+            if include_setup_service and category_context["is_tent"]
+            else None
+        )
+
+        cur.execute(
+            SQL_INSERT_BOOKING_ITEM,
+            (
+                booking_id,
+                candidate["item_id"],
+                rental_period_id,
+                quoted_period_label,
+                quoted_period_price,
+                setup_service_fee,
+                None,
+                None,
+                None,
+            ),
+        )
+        if candidate["is_turnaround"]:
+            turnaround_item_labels.append(
+                f'{category_context["display_name"]} ({candidate["sku"]})'
+            )
+
+    return (
+        reallocated_count,
+        moved_rows_with_metadata,
+        turnaround_item_labels,
+        added_count,
+        removed_count,
+    )
 
 
 def _collect_category_period_prices_from_form():
@@ -1585,66 +1844,15 @@ def home():
 def guest_delivery_quote():
     payload = request.get_json(silent=True) or {}
     address = (payload.get("address") or "").strip()
-    current_app.logger.info(
-        "guest_delivery_quote_requested address=%r",
-        address,
-    )
+    return _delivery_quote_json_response(address, log_prefix="guest_delivery_quote")
 
-    try:
-        quote = resolve_delivery_quote(address)
-    except DeliveryAddressValidationError as exc:
-        current_app.logger.info(
-            "guest_delivery_quote_validation_failed address=%r error_code=%s",
-            address,
-            exc.code,
-        )
-        return (
-            jsonify(
-                {
-                    "ok": False,
-                    "error": _delivery_validation_error_message(exc.code),
-                    "error_code": exc.code,
-                }
-            ),
-            422,
-        )
-    except DeliveryServiceError as exc:
-        current_app.logger.warning(
-            "guest_delivery_quote_service_failed address=%r error_code=%s",
-            address,
-            exc.code,
-        )
-        return (
-            jsonify(
-                {
-                    "ok": False,
-                    "error": _delivery_service_error_message(exc.code),
-                    "error_code": exc.code,
-                }
-            ),
-            503,
-        )
 
-    delivery_fee = _calculate_delivery_fee_from_distance(str(quote["distance_km"]))
-    current_app.logger.info(
-        "guest_delivery_quote_succeeded address=%r formatted=%r distance_km=%s delivery_fee=%s confidence=%s result_type=%r",
-        address,
-        quote["formatted_address"],
-        str(quote["distance_km"]),
-        str(delivery_fee),
-        str(quote["confidence"]),
-        quote["result_type"],
-    )
-    return jsonify(
-        {
-            "ok": True,
-            "formatted_address": quote["formatted_address"],
-            "distance_km": str(quote["distance_km"]),
-            "delivery_fee": str(delivery_fee),
-            "confidence": str(quote["confidence"]),
-            "result_type": quote["result_type"],
-        }
-    )
+@bp.post("/admin/delivery-quote")
+def admin_delivery_quote():
+    require_admin()
+    payload = request.get_json(silent=True) or {}
+    address = (payload.get("address") or "").strip()
+    return _delivery_quote_json_response(address, log_prefix="admin_delivery_quote")
 
 @bp.post("/guest/bookings/create")
 def guest_booking_create():
@@ -1891,6 +2099,7 @@ def booking_create_from_home():
         new_phone = _to_str_or_none(request.form.get("new_customer_phone"))
         new_address = _to_str_or_none(request.form.get("new_customer_address"))
         new_postal_city = _sanitize_postal_city(request.form.get("new_customer_postal_city"))
+        selected_existing_customer = None
 
         if create_new_customer:
             if not new_full_name:
@@ -1899,6 +2108,11 @@ def booking_create_from_home():
         elif not customer_id:
             flash("Select a customer or create a new customer.", "error")
             return redirect(url_for("routes.home", start_date=start, end_date=end))
+        else:
+            selected_existing_customer = query(SQL_GET_CUSTOMER, (customer_id,), one=True)
+            if not selected_existing_customer:
+                flash("Selected customer was not found.", "error")
+                return redirect(url_for("routes.home", start_date=start, end_date=end))
     else:
         cust = query(SQL_GET_CUSTOMER_BY_USER_ID, (uid,), one=True)
         if not cust:
@@ -1920,22 +2134,38 @@ def booking_create_from_home():
     booking_delivery_full_address = None
     delivery_distance_km = None
     if include_delivery:
+        admin_delivery_override = role == "admin" and _to_bool(
+            request.form.get("delivery_fee_override_enabled")
+        )
+
         if role == "admin":
-            booking_delivery_address = _to_str_or_none(request.form.get("booking_delivery_address"))
-            booking_delivery_postal_city = _sanitize_postal_city(
-                request.form.get("booking_delivery_postal_city")
-            )
+            if create_new_customer:
+                booking_delivery_address = _to_str_or_none(request.form.get("booking_delivery_address"))
+                booking_delivery_postal_city = _sanitize_postal_city(
+                    request.form.get("booking_delivery_postal_city")
+                )
+            else:
+                booking_delivery_address = _to_str_or_none(
+                    selected_existing_customer["address"] if selected_existing_customer else None
+                )
+                booking_delivery_postal_city = _sanitize_postal_city(
+                    selected_existing_customer["postal_city"] if selected_existing_customer else None
+                )
             booking_delivery_full_address = _build_full_delivery_address(
                 booking_delivery_address,
                 booking_delivery_postal_city,
             )
             if not booking_delivery_full_address:
-                flash("Enter the delivery address for this booking.", "error")
+                flash(
+                    (
+                        "Enter the delivery address for this booking."
+                        if create_new_customer
+                        else "The selected customer needs a saved address before delivery can be added."
+                    ),
+                    "error",
+                )
                 return redirect(url_for("routes.home", start_date=start, end_date=end))
 
-        admin_delivery_override = role == "admin" and _to_bool(
-            request.form.get("delivery_fee_override_enabled")
-        )
         if admin_delivery_override:
             try:
                 delivery_fee = str(
@@ -1948,6 +2178,18 @@ def booking_create_from_home():
                     "negative_delivery_fee_override": "Custom delivery fee must be 0 kr or more.",
                 }
                 flash(error_map.get(str(exc), "Could not use the custom delivery fee."), "error")
+                return redirect(url_for("routes.home", start_date=start, end_date=end))
+        elif role == "admin" and not create_new_customer:
+            try:
+                quote = resolve_delivery_quote(booking_delivery_full_address)
+                delivery_fee = str(_calculate_delivery_fee_from_distance(str(quote["distance_km"])))
+                delivery_distance_km = str(quote["distance_km"])
+                booking_delivery_full_address = quote["formatted_address"]
+            except DeliveryAddressValidationError as exc:
+                flash(_delivery_validation_error_message(exc.code), "error")
+                return redirect(url_for("routes.home", start_date=start, end_date=end))
+            except DeliveryServiceError as exc:
+                flash(_delivery_service_error_message(exc.code), "error")
                 return redirect(url_for("routes.home", start_date=start, end_date=end))
         else:
             try:
@@ -3299,6 +3541,13 @@ def admin_booking_edit_form(booking_id: int):
 
     customers = query(SQL_LIST_CUSTOMERS)
     items = query(SQL_BOOKING_ITEMS, (booking_id,))
+    all_categories = query(SQL_LIST_CATEGORIES_FOR_DROPDOWN)
+    available_categories = _query_available_categories(booking["start_date"], booking["end_date"])
+    category_rows = _build_booking_edit_category_rows(
+        items,
+        all_categories,
+        available_categories,
+    )
     total = query(SQL_BOOKING_TOTAL, (booking_id,), one=True)
 
     return render_template(
@@ -3306,6 +3555,7 @@ def admin_booking_edit_form(booking_id: int):
         booking=booking,
         customers=customers,
         items=items,
+        category_rows=category_rows,
         total=total,
         role="admin",
     )
@@ -3320,6 +3570,7 @@ def admin_booking_edit_save(booking_id: int):
         flash("Booking not found.", "error")
         return redirect(url_for("routes.admin_bookings"))
 
+    existing_items = query(SQL_BOOKING_ITEMS, (booking_id,))
     customer_id = request.form.get("customer_id", "").strip()
     start_date = request.form.get("start_date", "").strip()
     end_date = request.form.get("end_date", "").strip()
@@ -3333,6 +3584,7 @@ def admin_booking_edit_save(booking_id: int):
     custom_price_note = _to_str_or_none(request.form.get("custom_price_note"))
     booking_note = _to_str_or_none(request.form.get("booking_note"))
     admin_note = _to_str_or_none(request.form.get("admin_note"))
+    requested_category_quantities = _collect_booking_category_quantities_from_form()
 
     if not customer_id or not start_date or not end_date or not status:
         flash("Customer, dates, and status are required.", "error")
@@ -3347,6 +3599,23 @@ def admin_booking_edit_save(booking_id: int):
         return redirect(url_for("routes.admin_booking_edit_form", booking_id=booking_id))
 
     try:
+        category_context_by_id = {
+            row["id"]: row
+            for row in _query_available_categories(start_date, end_date)
+        }
+        current_category_quantities = _normalize_category_quantity_map(
+            _count_booking_items_by_category(existing_items)
+        )
+        requested_category_quantities = _normalize_category_quantity_map(
+            requested_category_quantities
+        )
+        dates_changed = (
+            start_date != str(booking["start_date"])
+            or end_date != str(booking["end_date"])
+        )
+        quantities_changed = requested_category_quantities != current_category_quantities
+        should_rebuild_booking_items = dates_changed or quantities_changed
+
         def work(cur):
             cur.execute(SQL_GET_CUSTOMER, (customer_id,))
             selected_customer = cur.fetchone()
@@ -3385,7 +3654,10 @@ def admin_booking_edit_save(booking_id: int):
             )
 
             if status == "cancelled":
-                return 0, 0, []
+                return 0, 0, [], 0, 0
+
+            if not should_rebuild_booking_items:
+                return 0, 0, [], 0, 0
 
             return _reallocate_booking_items_for_dates(
                 cur,
@@ -3394,11 +3666,25 @@ def admin_booking_edit_save(booking_id: int):
                 end_date,
                 include_setup_service=include_setup_service,
                 booking_has_total_override=custom_total_price is not None,
+                category_context_by_id=category_context_by_id,
+                requested_category_quantities=requested_category_quantities,
             )
 
-        reallocated_count, metadata_warning_count, turnaround_item_labels = tx(work)
+        (
+            reallocated_count,
+            metadata_warning_count,
+            turnaround_item_labels,
+            added_count,
+            removed_count,
+        ) = tx(work)
 
-        if reallocated_count or metadata_warning_count or turnaround_item_labels:
+        if (
+            reallocated_count
+            or metadata_warning_count
+            or turnaround_item_labels
+            or added_count
+            or removed_count
+        ):
             print(
                 "[booking-reallocation]",
                 {
@@ -3408,14 +3694,29 @@ def admin_booking_edit_save(booking_id: int):
                     "reallocated_count": reallocated_count,
                     "metadata_warning_count": metadata_warning_count,
                     "turnaround_item_labels": turnaround_item_labels,
+                    "added_count": added_count,
+                    "removed_count": removed_count,
                 },
             )
 
-        if reallocated_count:
-            flash(
-                f"Booking updated. {reallocated_count} item{'s' if reallocated_count != 1 else ''} {'were' if reallocated_count != 1 else 'was'} reallocated to match the new dates.",
-                "success",
+        change_bits = []
+        if added_count:
+            change_bits.append(
+                f'{added_count} item{"s" if added_count != 1 else ""} added'
             )
+        if removed_count:
+            change_bits.append(
+                f'{removed_count} item{"s" if removed_count != 1 else ""} removed'
+            )
+        if reallocated_count:
+            change_bits.append(
+                f'{reallocated_count} item{"s" if reallocated_count != 1 else ""} reallocated'
+            )
+
+        if change_bits:
+            flash(f'Booking updated. {", ".join(change_bits)}.', "success")
+        elif should_rebuild_booking_items:
+            flash("Booking updated. Prices were recalculated from the current category pricing.", "success")
         else:
             flash("Booking updated.", "success")
         if metadata_warning_count:

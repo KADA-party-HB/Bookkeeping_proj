@@ -205,13 +205,86 @@
   {% endcall %}
 
   <aside class="space-y-6">
-    {% call ui.content_panel(title="Assigned items", subtitle="Saving date changes may reassign these to other available items in the same category. Admin warnings will call out any same-day turnaround items that are used.", wrapper_class='mt-0') %}
+    {% call ui.content_panel(title="Item quantities", subtitle="Adjust category quantities here. Standard-priced booking lines recalculate from the current rental-period pricing when you save.", wrapper_class='mt-0') %}
+        <div data-client-list>
+          <div class="space-y-3">
+            {% for row in category_rows %}
+              <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4" data-client-list-item>
+                <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div class="space-y-2">
+                    <div>
+                      <div class="font-medium text-slate-900">{{ row.display_name }}</div>
+                      <div class="mt-1 text-xs text-slate-500">{{ row.type_label }}</div>
+                    </div>
+                    <div class="flex flex-wrap gap-2 text-xs">
+                      <span class="rounded-full bg-white px-3 py-1 text-slate-600">
+                        Current: {{ row.current_qty }}
+                      </span>
+                      <span class="rounded-full bg-white px-3 py-1 text-slate-600">
+                        Extra available: {{ row.available_extra_qty }}
+                      </span>
+                      {% if row.custom_qty %}
+                        <span class="rounded-full bg-amber-100 px-3 py-1 text-amber-800">
+                          {{ row.custom_qty }} custom-priced
+                        </span>
+                      {% endif %}
+                    </div>
+                    <div class="text-xs text-slate-500">
+                      {% if row.has_standard_price %}
+                        {{ row.rental_period_label or "Standard period" }} price: {{ row.quoted_period_price }} kr per item
+                      {% else %}
+                        No standard price for the current date range. This category can only be kept or added safely when a booking total override is active.
+                      {% endif %}
+                    </div>
+                  </div>
+
+                  <div class="w-full lg:max-w-[9rem]">
+                    <label class="text-sm font-medium text-slate-700" for="category_qty_{{ row.id }}">Quantity</label>
+                    <input
+                      id="category_qty_{{ row.id }}"
+                      type="number"
+                      min="0"
+                      max="{{ row.max_editable_qty }}"
+                      step="1"
+                      name="category_qty_{{ row.id }}"
+                      value="{{ row.current_qty }}"
+                      class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-right shadow-sm transition focus:border-sky-400 focus:outline-none focus:ring-4 focus:ring-sky-100"
+                    >
+                    <div class="mt-2 text-right text-xs text-slate-500">
+                      Current-date max without moving dates: {{ row.max_editable_qty }}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            {% else %}
+              {{ ui.empty_state("No editable categories available for this booking.", class_name='not-italic') }}
+            {% endfor %}
+          </div>
+          {{ ui.client_pager(class_name='mt-4', default_per_page=8) }}
+        </div>
+    {% endcall %}
+
+    {% call ui.content_panel(title="Assigned items", subtitle="Saving date or quantity changes may swap specific SKUs within the same category. Custom-priced rows stay as-is unless the row is removed.", wrapper_class='mt-0') %}
         <div data-client-list>
         <div class="space-y-3">
           {% for item in items %}
             <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3" data-client-list-item>
-              <div class="font-medium text-slate-900">{{ item.display_name }}</div>
-              <div class="mt-1 text-xs text-slate-500">{{ item.sku }}</div>
+              <div class="flex items-start justify-between gap-4">
+                <div>
+                  <div class="font-medium text-slate-900">{{ item.display_name }}</div>
+                  <div class="mt-1 text-xs text-slate-500">{{ item.sku }}</div>
+                </div>
+                <div class="text-right text-xs text-slate-500">
+                  {% if item.custom_total_price is not none %}
+                    <div class="font-medium text-amber-700">Custom {{ item.custom_total_price }} kr</div>
+                  {% elif item.quoted_period_price is not none %}
+                    <div>{{ item.quoted_period_price }} kr</div>
+                  {% endif %}
+                  {% if item.effective_setup_fee %}
+                    <div>Setup {{ item.effective_setup_fee }} kr</div>
+                  {% endif %}
+                </div>
+              </div>
             </div>
           {% else %}
             {{ ui.empty_state("No items on this booking.", class_name='not-italic') }}
@@ -242,12 +315,42 @@
   document.addEventListener("DOMContentLoaded", () => {
     const customerSelect = document.getElementById("customer_id");
     const phoneInput = document.getElementById("customer_phone");
+    const quantityInputs = Array.from(document.querySelectorAll('input[name^="category_qty_"]'));
+
+    const clampQuantityInput = (input) => {
+      if (!input) {
+        return;
+      }
+
+      const min = Math.max(0, Number.parseInt(input.min || "0", 10) || 0);
+      const rawMax = Number.parseInt(input.max || "", 10);
+      const max = Number.isFinite(rawMax) ? Math.max(min, rawMax) : Number.MAX_SAFE_INTEGER;
+      const rawValue = (input.value || "").trim();
+
+      if (rawValue === "") {
+        return;
+      }
+
+      const parsed = Number.parseInt(rawValue, 10);
+      const normalized = Number.isFinite(parsed) ? parsed : min;
+      const clamped = Math.min(Math.max(normalized, min), max);
+
+      if (String(clamped) !== rawValue) {
+        input.value = String(clamped);
+      }
+    };
 
     customerSelect?.addEventListener("change", () => {
       const selected = customerSelect.selectedOptions[0];
       if (phoneInput && selected) {
         phoneInput.value = selected.dataset.phone || "";
       }
+    });
+
+    quantityInputs.forEach((input) => {
+      input.addEventListener("input", () => clampQuantityInput(input));
+      input.addEventListener("change", () => clampQuantityInput(input));
+      clampQuantityInput(input);
     });
   });
 </script>

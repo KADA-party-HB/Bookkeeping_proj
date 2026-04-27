@@ -741,7 +741,7 @@ SELECT
         )
   END AS total_cost
 FROM bookings b
-JOIN booking_items bi ON bi.booking_id = b.id
+LEFT JOIN booking_items bi ON bi.booking_id = b.id
 WHERE b.id = %s
 GROUP BY
   b.id,

@@ -159,6 +159,7 @@
               class="space-y-6"
               id="booking-create-form"
               data-customer-fallback="{{ ((customers[0].full_name if customers and customers[0] else 'Your account') if role != 'admin' else 'No customer selected')|e }}"
+              data-delivery-quote-url="{{ url_for('routes.admin_delivery_quote' if role == 'admin' else 'routes.guest_delivery_quote') }}"
             >
               <input type="hidden" name="start_date" value="{{ start_date }}">
               <input type="hidden" name="end_date" value="{{ end_date }}">
@@ -680,9 +681,19 @@
                           >
                             <option value="">-- select --</option>
                             {% for cu in customers %}
-                              <option value="{{ cu.id }}" data-customer-name="{{ cu.full_name }}">{{ cu.full_name }} ({{ cu.email }})</option>
+                              <option
+                                value="{{ cu.id }}"
+                                data-customer-name="{{ cu.full_name }}"
+                                data-customer-address="{{ cu.address or '' }}"
+                                data-customer-postal-city="{{ cu.postal_city or '' }}"
+                              >
+                                {{ cu.full_name }} ({{ cu.email }})
+                              </option>
                             {% endfor %}
                           </select>
+                          <p id="existing-customer-delivery-address-note" class="mt-2 text-xs text-slate-300">
+                            Delivery uses the selected customer's saved address.
+                          </p>
                           <p class="mt-2 hidden text-xs font-medium text-rose-300" data-field-error-for="customer_id"></p>
                         </div>
 
@@ -961,8 +972,10 @@
       const deliveryFeeOverrideInput = document.getElementById("delivery_fee_override");
       const deliveryFeePreview = document.getElementById("delivery-fee-preview");
       const bookingDeliveryAddress = document.getElementById("booking_delivery_address");
+      const bookingDeliveryPostalCity = document.getElementById("booking_delivery_postal_city");
       const customerSelect = document.getElementById("customer_id");
       const existingCustomerFields = document.getElementById("existing-customer-fields");
+      const existingCustomerDeliveryAddressNote = document.getElementById("existing-customer-delivery-address-note");
       const newCustomerFields = document.getElementById("new-customer-fields");
 
       const DELIVERY_BASE_FEE = 449;
@@ -1038,6 +1051,189 @@
         setGeneralError("");
       };
 
+      let selectedCustomerDeliveryQuote = null;
+      let selectedCustomerDeliveryQuoteError = "";
+      let selectedCustomerDeliveryQuoteInFlight = false;
+      let activeSelectedCustomerDeliveryQuotePromise = null;
+      let activeSelectedCustomerDeliveryQuoteKey = null;
+
+      const getSelectedExistingCustomer = () => {
+        if (!customerSelect || !customerSelect.value || !customerSelect.selectedOptions.length) {
+          return null;
+        }
+
+        return customerSelect.selectedOptions[0];
+      };
+
+      const getSelectedExistingCustomerAddressText = () => {
+        const selectedCustomer = getSelectedExistingCustomer();
+        if (!selectedCustomer) {
+          return "";
+        }
+
+        return [
+          selectedCustomer.dataset.customerAddress?.trim() || "",
+          selectedCustomer.dataset.customerPostalCity?.trim() || "",
+        ].filter(Boolean).join(", ");
+      };
+
+      const shouldUseSelectedCustomerQuote = () => (
+        Boolean(includeDeliveryToggle?.checked)
+        && !Boolean(newCustomerToggle?.checked)
+        && !Boolean(deliveryFeeOverrideToggle?.checked)
+      );
+
+      const getSelectedCustomerQuoteKey = () => {
+        if (!shouldUseSelectedCustomerQuote()) {
+          return "";
+        }
+
+        const addressText = getSelectedExistingCustomerAddressText();
+        return addressText && customerSelect?.value
+          ? `${customerSelect.value}::${addressText}`
+          : "";
+      };
+
+      const resetSelectedCustomerDeliveryQuoteState = () => {
+        selectedCustomerDeliveryQuote = null;
+        selectedCustomerDeliveryQuoteError = "";
+        selectedCustomerDeliveryQuoteInFlight = false;
+        activeSelectedCustomerDeliveryQuotePromise = null;
+        activeSelectedCustomerDeliveryQuoteKey = null;
+      };
+
+      const requestSelectedCustomerDeliveryQuote = async () => {
+        const quoteKey = getSelectedCustomerQuoteKey();
+        if (!quoteKey) {
+          resetSelectedCustomerDeliveryQuoteState();
+          renderSummary();
+          return false;
+        }
+
+        if (selectedCustomerDeliveryQuote?.key === quoteKey) {
+          return true;
+        }
+
+        if (
+          activeSelectedCustomerDeliveryQuotePromise
+          && activeSelectedCustomerDeliveryQuoteKey === quoteKey
+        ) {
+          return activeSelectedCustomerDeliveryQuotePromise;
+        }
+
+        selectedCustomerDeliveryQuoteInFlight = true;
+        selectedCustomerDeliveryQuoteError = "";
+        activeSelectedCustomerDeliveryQuoteKey = quoteKey;
+        renderSummary();
+
+        const addressText = getSelectedExistingCustomerAddressText();
+        const requestKey = quoteKey;
+        activeSelectedCustomerDeliveryQuotePromise = (async () => {
+          try {
+            const response = await fetch(form.dataset.deliveryQuoteUrl, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ address: addressText }),
+            });
+            const payload = await response.json();
+
+            if (requestKey !== getSelectedCustomerQuoteKey()) {
+              return false;
+            }
+
+            if (!response.ok || !payload.ok) {
+              selectedCustomerDeliveryQuote = null;
+              selectedCustomerDeliveryQuoteError = payload.error || "Could not calculate delivery for the selected customer's address.";
+              return false;
+            }
+
+            selectedCustomerDeliveryQuote = {
+              key: requestKey,
+              formattedAddress: payload.formatted_address || addressText,
+              distanceKm: parseDistanceKm(payload.distance_km),
+              deliveryFee: parseMoney(payload.delivery_fee),
+            };
+            selectedCustomerDeliveryQuoteError = "";
+            return true;
+          } catch (_error) {
+            if (requestKey === getSelectedCustomerQuoteKey()) {
+              selectedCustomerDeliveryQuote = null;
+              selectedCustomerDeliveryQuoteError = "Could not reach the delivery service right now.";
+            }
+            return false;
+          } finally {
+            if (requestKey === activeSelectedCustomerDeliveryQuoteKey) {
+              selectedCustomerDeliveryQuoteInFlight = false;
+              activeSelectedCustomerDeliveryQuotePromise = null;
+              activeSelectedCustomerDeliveryQuoteKey = null;
+            }
+            renderSummary();
+          }
+        })();
+
+        return activeSelectedCustomerDeliveryQuotePromise;
+      };
+
+      const queueSelectedCustomerDeliveryQuote = () => {
+        if (!shouldUseSelectedCustomerQuote()) {
+          resetSelectedCustomerDeliveryQuoteState();
+          renderSummary();
+          return;
+        }
+
+        const quoteKey = getSelectedCustomerQuoteKey();
+        if (!quoteKey) {
+          resetSelectedCustomerDeliveryQuoteState();
+          renderSummary();
+          return;
+        }
+
+        if (
+          selectedCustomerDeliveryQuote?.key === quoteKey
+          || (
+            activeSelectedCustomerDeliveryQuotePromise
+            && activeSelectedCustomerDeliveryQuoteKey === quoteKey
+          )
+        ) {
+          renderSummary();
+          return;
+        }
+
+        selectedCustomerDeliveryQuote = null;
+        selectedCustomerDeliveryQuoteError = "";
+        void requestSelectedCustomerDeliveryQuote();
+      };
+
+      const syncExistingCustomerDeliveryAddress = () => {
+        const usesExistingCustomer = !Boolean(newCustomerToggle?.checked);
+        const selectedCustomer = usesExistingCustomer ? getSelectedExistingCustomer() : null;
+        const addressValue = selectedCustomer?.dataset.customerAddress?.trim() || "";
+        const postalCityValue = selectedCustomer?.dataset.customerPostalCity?.trim() || "";
+
+        if (bookingDeliveryAddress) {
+          bookingDeliveryAddress.value = usesExistingCustomer ? addressValue : "";
+        }
+
+        if (bookingDeliveryPostalCity) {
+          bookingDeliveryPostalCity.value = usesExistingCustomer ? postalCityValue : "";
+        }
+
+        if (existingCustomerDeliveryAddressNote) {
+          if (!usesExistingCustomer) {
+            existingCustomerDeliveryAddressNote.classList.add("hidden");
+          } else if (!selectedCustomer) {
+            existingCustomerDeliveryAddressNote.classList.remove("hidden");
+            existingCustomerDeliveryAddressNote.textContent = "Select a customer to calculate delivery from their saved address.";
+          } else if (addressValue || postalCityValue) {
+            existingCustomerDeliveryAddressNote.classList.remove("hidden");
+            existingCustomerDeliveryAddressNote.textContent = "Delivery price is calculated from the selected customer's saved address.";
+          } else {
+            existingCustomerDeliveryAddressNote.classList.remove("hidden");
+            existingCustomerDeliveryAddressNote.textContent = "This customer has no saved delivery address yet.";
+          }
+        }
+      };
+
       const syncCustomerMode = () => {
         const checked = Boolean(newCustomerToggle?.checked);
 
@@ -1074,15 +1270,19 @@
             clearFieldError(field);
           }
         });
+
+        syncExistingCustomerDeliveryAddress();
       };
 
       const syncDeliveryMode = () => {
         const checked = Boolean(includeDeliveryToggle?.checked);
         const hasOverride = checked && Boolean(deliveryFeeOverrideToggle?.checked);
+        const useSelectedCustomerAddress = checked && !Boolean(newCustomerToggle?.checked);
+        const useSelectedCustomerAddressForQuote = useSelectedCustomerAddress && !hasOverride;
 
         if (deliveryDistanceInput) {
-          deliveryDistanceInput.disabled = !checked || hasOverride;
-          if (!checked || hasOverride) {
+          deliveryDistanceInput.disabled = !checked || hasOverride || useSelectedCustomerAddressForQuote;
+          if (!checked || hasOverride || useSelectedCustomerAddressForQuote) {
             clearFieldError(deliveryDistanceInput);
           }
         }
@@ -1106,12 +1306,18 @@
         }
 
         form.querySelectorAll("[data-delivery-address-field]").forEach((field) => {
-          field.disabled = !checked;
+          field.disabled = !checked || useSelectedCustomerAddress;
           if (!checked) {
             field.value = "";
             clearFieldError(field);
           }
         });
+
+        if (!checked || hasOverride || useSelectedCustomerAddressForQuote) {
+          if (deliveryDistanceInput) {
+            deliveryDistanceInput.value = "";
+          }
+        }
       };
 
       const getSelectedItems = () => {
@@ -1152,15 +1358,39 @@
         const includeSetup = form.querySelector('input[name="include_setup_service"]')?.checked || false;
         const includeDelivery = form.querySelector('input[name="include_delivery"]')?.checked || false;
         const manualDeliveryOverride = includeDelivery && Boolean(deliveryFeeOverrideToggle?.checked);
-        const deliveryDistanceRaw = deliveryDistanceInput?.value.trim() || "";
-        const deliveryDistanceKm = includeDelivery ? parseDistanceKm(deliveryDistanceRaw) : null;
+        const useSelectedCustomerQuote = includeDelivery && !manualDeliveryOverride && !Boolean(newCustomerToggle?.checked);
+        const deliveryDistanceRaw = useSelectedCustomerQuote
+          ? (
+              selectedCustomerDeliveryQuote
+              && selectedCustomerDeliveryQuote.key === getSelectedCustomerQuoteKey()
+              && Number.isFinite(selectedCustomerDeliveryQuote.distanceKm)
+                ? String(selectedCustomerDeliveryQuote.distanceKm)
+                : ""
+            )
+          : (deliveryDistanceInput?.value.trim() || "");
+        const deliveryDistanceKm = useSelectedCustomerQuote
+          ? (
+              selectedCustomerDeliveryQuote
+              && selectedCustomerDeliveryQuote.key === getSelectedCustomerQuoteKey()
+                ? selectedCustomerDeliveryQuote.distanceKm
+                : null
+            )
+          : (includeDelivery ? parseDistanceKm(deliveryDistanceRaw) : null);
         const hasDeliveryDistance = includeDelivery && Number.isFinite(deliveryDistanceKm) && deliveryDistanceKm >= 0;
         const deliveryOverrideRaw = deliveryFeeOverrideInput?.value.trim() || "";
         const deliveryOverrideValue = manualDeliveryOverride ? parseMoney(deliveryOverrideRaw) : 0;
         const hasDeliveryOverride = manualDeliveryOverride && deliveryOverrideRaw !== "";
         const deliveryFee = hasDeliveryOverride
           ? deliveryOverrideValue
-          : (hasDeliveryDistance ? calculateDeliveryFee(deliveryDistanceKm) : 0);
+          : (
+              hasDeliveryDistance
+                ? (
+                    useSelectedCustomerQuote
+                      ? selectedCustomerDeliveryQuote?.deliveryFee || 0
+                      : calculateDeliveryFee(deliveryDistanceKm)
+                  )
+                : 0
+            );
         const bookingOverrideInput = form.querySelector('input[name="booking_custom_total_price"]');
         const hasBookingOverride = bookingOverrideInput && bookingOverrideInput.value.trim() !== "";
         const bookingOverride = hasBookingOverride ? parseMoney(bookingOverrideInput.value) : 0;
@@ -1201,6 +1431,9 @@
           includeDelivery,
           hasBookingOverride,
           bookingOverride,
+          useSelectedCustomerQuote,
+          selectedCustomerDeliveryQuoteError,
+          selectedCustomerDeliveryQuoteInFlight,
           customerCollision,
           turnaroundSelections,
         };
@@ -1240,6 +1473,30 @@
             if (deliveryFeePreview) {
               deliveryFeePreview.textContent = "Enter a custom delivery fee.";
             }
+          } else if (state.useSelectedCustomerQuote && state.hasDeliveryDistance) {
+            const deliveryLabel = `${formatMoney(state.delivery)} (${formatDistanceKm(state.deliveryDistanceKm)} km)`;
+            summaryDelivery.textContent = deliveryLabel;
+            if (deliveryFeePreview) {
+              deliveryFeePreview.textContent = `Calculated from saved customer address: ${deliveryLabel}`;
+            }
+          } else if (state.useSelectedCustomerQuote && state.selectedCustomerDeliveryQuoteInFlight) {
+            summaryDelivery.textContent = "Calculating...";
+            if (deliveryFeePreview) {
+              deliveryFeePreview.textContent = "Calculating delivery from the selected customer's saved address.";
+            }
+          } else if (state.useSelectedCustomerQuote && state.selectedCustomerDeliveryQuoteError) {
+            summaryDelivery.textContent = "Could not calculate";
+            if (deliveryFeePreview) {
+              deliveryFeePreview.textContent = state.selectedCustomerDeliveryQuoteError;
+            }
+          } else if (state.useSelectedCustomerQuote) {
+            const selectedCustomerAddress = getSelectedExistingCustomerAddressText();
+            summaryDelivery.textContent = selectedCustomerAddress ? "Calculating..." : "Saved address missing";
+            if (deliveryFeePreview) {
+              deliveryFeePreview.textContent = selectedCustomerAddress
+                ? "Calculating delivery from the selected customer's saved address."
+                : "The selected customer needs a saved address before delivery can be added.";
+            }
           } else if (state.hasDeliveryDistance) {
             const deliveryLabel = `${formatMoney(state.delivery)} (${formatDistanceKm(state.deliveryDistanceKm)} km)`;
             summaryDelivery.textContent = deliveryLabel;
@@ -1270,10 +1527,10 @@
         }
       };
 
-      const validateBeforeConfirm = () => {
+      const validateBeforeConfirm = async () => {
         clearValidationErrors();
 
-        const state = getSummaryState();
+        let state = getSummaryState();
         const itemCount = state.selectedItems.reduce((sum, item) => sum + item.qty, 0);
         let firstInvalidField = null;
 
@@ -1282,15 +1539,38 @@
         }
 
         if (state.includeDelivery) {
-          if (bookingDeliveryAddress && !bookingDeliveryAddress.value.trim()) {
-            setFieldError(bookingDeliveryAddress, "Enter the delivery address for this booking.");
-            firstInvalidField ||= bookingDeliveryAddress;
+          const deliveryAddressSummary = [
+            bookingDeliveryAddress?.value.trim() || "",
+            bookingDeliveryPostalCity?.value.trim() || "",
+          ].filter(Boolean).join(", ");
+
+          if (!deliveryAddressSummary) {
+            const usesExistingCustomerAddress = !Boolean(newCustomerToggle?.checked);
+            const deliveryAddressErrorField = usesExistingCustomerAddress ? customerSelect : bookingDeliveryAddress;
+            setFieldError(
+              deliveryAddressErrorField,
+              usesExistingCustomerAddress
+                ? "The selected customer needs a saved address before delivery can be added."
+                : "Enter the delivery address for this booking.",
+            );
+            firstInvalidField ||= deliveryAddressErrorField;
           }
 
           if (state.manualDeliveryOverride) {
             if (!state.deliveryOverrideRaw) {
               setFieldError(deliveryFeeOverrideInput, "Enter a custom delivery fee.");
               firstInvalidField ||= deliveryFeeOverrideInput;
+            }
+          } else if (state.useSelectedCustomerQuote) {
+            const quoteOk = await requestSelectedCustomerDeliveryQuote();
+            state = getSummaryState();
+
+            if (!quoteOk) {
+              setFieldError(
+                customerSelect,
+                state.selectedCustomerDeliveryQuoteError || "Could not calculate delivery for the selected customer's address.",
+              );
+              firstInvalidField ||= customerSelect;
             }
           } else if (!state.deliveryDistanceRaw) {
             setFieldError(deliveryDistanceInput, "Enter a delivery distance in km to calculate the fee.");
@@ -1328,8 +1608,8 @@
         return !generalError.textContent && !firstInvalidField ? state : null;
       };
 
-      const openModal = () => {
-        const state = validateBeforeConfirm();
+      const openModal = async () => {
+        const state = await validateBeforeConfirm();
         if (!state) {
           return;
         }
@@ -1417,18 +1697,31 @@
       includeDeliveryToggle?.addEventListener("change", () => {
         syncDeliveryMode();
         clearValidationErrors();
+        queueSelectedCustomerDeliveryQuote();
         renderSummary();
       });
       deliveryFeeOverrideToggle?.addEventListener("change", () => {
         syncDeliveryMode();
         clearValidationErrors();
+        queueSelectedCustomerDeliveryQuote();
         renderSummary();
       });
       newCustomerToggle?.addEventListener("change", () => {
         syncCustomerMode();
+        syncDeliveryMode();
         clearValidationErrors();
+        queueSelectedCustomerDeliveryQuote();
+        renderSummary();
       });
-      openModalButton?.addEventListener("click", openModal);
+      customerSelect?.addEventListener("change", () => {
+        syncExistingCustomerDeliveryAddress();
+        clearValidationErrors();
+        queueSelectedCustomerDeliveryQuote();
+        renderSummary();
+      });
+      openModalButton?.addEventListener("click", () => {
+        void openModal();
+      });
       modal?.querySelectorAll("[data-booking-modal-close]").forEach((button) => {
         button.addEventListener("click", closeModal);
       });
@@ -1439,7 +1732,9 @@
       });
 
       syncCustomerMode();
+      syncExistingCustomerDeliveryAddress();
       syncDeliveryMode();
+      queueSelectedCustomerDeliveryQuote();
       renderSummary();
     })();
 
