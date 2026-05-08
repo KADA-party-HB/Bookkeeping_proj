@@ -166,6 +166,7 @@
     const setupServiceHelp = form.querySelector("#setup-service-help");
     const addressField = form.querySelector("#address");
     const postalCityField = form.querySelector("#postal_city");
+    const rentalTermsCheckbox = form.querySelector("#accept_rental_terms");
     const deliveryPanel = form.querySelector("#delivery-panel");
     const deliveryError = form.querySelector("#delivery-address-error");
     const formError = form.querySelector("#form-error");
@@ -745,6 +746,10 @@
     postalCityField?.addEventListener("blur", handleDeliveryFieldBlur);
     addressField?.addEventListener("keydown", handleDeliveryFieldEnter);
     postalCityField?.addEventListener("keydown", handleDeliveryFieldEnter);
+    rentalTermsCheckbox?.addEventListener("change", () => {
+      rentalTermsCheckbox.setCustomValidity("");
+      setFormError("");
+    });
 
     form.addEventListener("submit", async (event) => {
       setFormError("");
@@ -753,6 +758,14 @@
       if (!state.itemCount) {
         event.preventDefault();
         setFormError("Välj minst en artikel innan du skickar bokningen.");
+        return;
+      }
+
+      if (rentalTermsCheckbox && !rentalTermsCheckbox.checked) {
+        event.preventDefault();
+        rentalTermsCheckbox.setCustomValidity("GodkÃ¤nn hyresvillkoren innan du skickar bokningen.");
+        rentalTermsCheckbox.reportValidity();
+        setFormError("GodkÃ¤nn hyresvillkoren innan du skickar bokningen.");
         return;
       }
 

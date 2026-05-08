@@ -1899,7 +1899,12 @@ def guest_booking_create():
 
     include_delivery = _to_bool(request.form.get("include_delivery"))
     include_setup_service = _to_bool(request.form.get("include_setup_service"))
+    accepted_rental_terms = _to_bool(request.form.get("accept_rental_terms"))
     booking_note = _to_str_or_none(request.form.get("booking_note"))
+
+    if not accepted_rental_terms:
+        flash("Du mÃ¥ste godkÃ¤nna hyresvillkoren innan bokningen kan skickas.", "error")
+        return redirect(url_for("routes.home", start_date=start, end_date=end))
 
     if include_setup_service and not include_delivery:
         flash("Montering kräver leverans i bokningsformuläret.", "error")
