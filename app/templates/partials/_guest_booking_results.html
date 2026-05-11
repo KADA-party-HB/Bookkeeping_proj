@@ -83,9 +83,26 @@
                     </div>
                   </div>
 
-                  <span class="inline-flex rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700">
-                    {{ c.available_items }} lediga
-                  </span>
+                  <div class="inline-flex items-center gap-1.5 text-xs font-medium">
+                    <span class="inline-flex rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700" data-availability-strict-for="{{ c.id }}">
+                      {{ c.available_items }} lediga
+                    </span>
+                    <div class="hidden inline-flex items-center" data-shared-stock-notice-for="{{ c.id }}">
+                      <button
+                        type="button"
+                        class="inline-flex h-6 w-6 items-center justify-center rounded-full border border-sky-200 bg-sky-50 text-[11px] font-bold text-sky-700 transition hover:border-sky-300 hover:bg-sky-100 hover:text-sky-800 focus:outline-none focus:ring-4 focus:ring-sky-200"
+                        data-shared-stock-toggle
+                        aria-expanded="false"
+                        aria-label="Information om delat lager"
+                      >
+                        i
+                      </button>
+                      <div class="fixed z-[60] hidden w-64 max-w-[calc(100vw-2rem)] rounded-2xl border border-sky-200 bg-white p-3 text-left text-xs font-medium text-slate-700 shadow-xl" data-shared-stock-popover>
+                        <div class="text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-700">Delat lager</div>
+                        <div class="mt-1 leading-5" data-shared-stock-message-for="{{ c.id }}"></div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 <div class="mt-4 grid gap-3 text-sm text-slate-600">
@@ -122,9 +139,12 @@
                       inputmode="numeric"
                       {% if disabled %}disabled{% endif %}
                       data-booking-qty
+                      data-category-id="{{ c.id }}"
+                      data-category-name="{{ c.display_name }}"
                       data-unit-price="{{ c.quoted_period_price if c.has_standard_price else 0 }}"
                       data-setup-fee="{{ c.setup_service_fee if c.is_tent else 0 }}"
                       data-is-tent="{{ 'true' if c.is_tent else 'false' }}"
+                      data-available-item-ids='{{ c.available_item_ids|tojson }}'
                       class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 shadow-sm transition focus:border-pink-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-pink-100"
                     >
                   </div>
@@ -199,7 +219,24 @@
 
                       <td class="p-3">
                         {% if c.available_items > 0 %}
-                          <span class="font-medium text-slate-900">{{ c.available_items }}</span>
+                          <div class="inline-flex items-center gap-1.5 text-xs font-medium">
+                            <span class="font-medium text-slate-900" data-availability-strict-for="{{ c.id }}">{{ c.available_items }}</span>
+                            <div class="hidden inline-flex items-center" data-shared-stock-notice-for="{{ c.id }}">
+                              <button
+                                type="button"
+                                class="inline-flex h-6 w-6 items-center justify-center rounded-full border border-sky-200 bg-sky-50 text-[11px] font-bold text-sky-700 transition hover:border-sky-300 hover:bg-sky-100 hover:text-sky-800 focus:outline-none focus:ring-4 focus:ring-sky-200"
+                                data-shared-stock-toggle
+                                aria-expanded="false"
+                                aria-label="Information om delat lager"
+                              >
+                                i
+                              </button>
+                              <div class="fixed z-[60] hidden w-64 max-w-[calc(100vw-2rem)] rounded-2xl border border-sky-200 bg-white p-3 text-left text-xs font-medium text-slate-700 shadow-xl" data-shared-stock-popover>
+                                <div class="text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-700">Delat lager</div>
+                                <div class="mt-1 leading-5" data-shared-stock-message-for="{{ c.id }}"></div>
+                              </div>
+                            </div>
+                          </div>
                         {% else %}
                           <span class="font-medium text-rose-600">0</span>
                         {% endif %}
@@ -227,9 +264,12 @@
                           inputmode="numeric"
                           {% if disabled %}disabled{% endif %}
                           data-booking-qty
+                          data-category-id="{{ c.id }}"
+                          data-category-name="{{ c.display_name }}"
                           data-unit-price="{{ c.quoted_period_price if c.has_standard_price else 0 }}"
                           data-setup-fee="{{ c.setup_service_fee if c.is_tent else 0 }}"
                           data-is-tent="{{ 'true' if c.is_tent else 'false' }}"
+                          data-available-item-ids='{{ c.available_item_ids|tojson }}'
                           class="w-24 rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 shadow-sm transition focus:border-pink-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-pink-100"
                         >
                       </td>
@@ -526,6 +566,11 @@
 
   <script>
     document.addEventListener("DOMContentLoaded", () => {
+      if (window.initGuestBookingForm) {
+        window.initGuestBookingForm(document);
+      }
+      return;
+
       const form = document.getElementById("guest-booking-form");
       if (!form) return;
 
@@ -538,6 +583,31 @@
       const summarySetup = document.getElementById("summary-setup");
       const summaryDelivery = document.getElementById("summary-delivery");
       const summaryTotal = document.getElementById("summary-total");
+
+      function getRepresentativeQtyInputs() {
+        const seenCategoryIds = new Set();
+        return qtyInputs.filter((input) => {
+          const categoryId = String(input.dataset.categoryId || "");
+          if (!categoryId || seenCategoryIds.has(categoryId)) {
+            return false;
+          }
+          seenCategoryIds.add(categoryId);
+          return true;
+        });
+      }
+
+      function syncMirroredQtyInputs(sourceInput) {
+        const categoryId = String(sourceInput?.dataset.categoryId || "");
+        if (!categoryId) {
+          return;
+        }
+
+        qtyInputs.forEach((input) => {
+          if (input !== sourceInput && String(input.dataset.categoryId || "") === categoryId) {
+            input.value = sourceInput.value;
+          }
+        });
+      }
 
       function safeNumber(value) {
         const n = Number(value);
@@ -567,12 +637,346 @@
         return clamped;
       }
 
+      function parseItemIdList(value) {
+        try {
+          const parsed = JSON.parse(value || "[]");
+          return Array.isArray(parsed)
+            ? parsed
+                .map((itemId) => parseInt(itemId, 10))
+                .filter((itemId) => Number.isFinite(itemId))
+            : [];
+        } catch (_error) {
+          return [];
+        }
+      }
+
+      function buildRequestedQtyMap() {
+        const quantities = {};
+        getRepresentativeQtyInputs().forEach((input) => {
+          const categoryId = String(input.dataset.categoryId || "");
+          const qty = parseInt(input.value || "0", 10);
+          if (categoryId) {
+            quantities[categoryId] = Number.isFinite(qty) && qty > 0 ? qty : 0;
+          }
+        });
+        return quantities;
+      }
+
+      function canAllocateDistinctItems(candidateItemIdsByCategory, requestedQtyByCategory) {
+        const demandSlots = [];
+
+        Object.entries(requestedQtyByCategory).forEach(([categoryId, qty]) => {
+          const normalizedQty = Number.isFinite(qty) ? qty : 0;
+          if (normalizedQty <= 0) {
+            return;
+          }
+
+          const candidateItemIds = candidateItemIdsByCategory[categoryId] || [];
+          if (candidateItemIds.length < normalizedQty) {
+            demandSlots.push(...Array.from({ length: normalizedQty }, () => ({ candidateItemIds: [] })));
+            return;
+          }
+
+          for (let i = 0; i < normalizedQty; i += 1) {
+            demandSlots.push({ candidateItemIds });
+          }
+        });
+
+        demandSlots.sort((a, b) => a.candidateItemIds.length - b.candidateItemIds.length);
+        const itemToSlotIndex = new Map();
+
+        function tryAssign(slotIndex, seenItemIds) {
+          const slot = demandSlots[slotIndex];
+          for (const itemId of slot.candidateItemIds) {
+            if (seenItemIds.has(itemId)) {
+              continue;
+            }
+
+            seenItemIds.add(itemId);
+            const assignedSlotIndex = itemToSlotIndex.get(itemId);
+            if (assignedSlotIndex === undefined || tryAssign(assignedSlotIndex, seenItemIds)) {
+              itemToSlotIndex.set(itemId, slotIndex);
+              return true;
+            }
+          }
+
+          return false;
+        }
+
+        for (let slotIndex = 0; slotIndex < demandSlots.length; slotIndex += 1) {
+          if (!tryAssign(slotIndex, new Set())) {
+            return false;
+          }
+        }
+
+        return true;
+      }
+
+      function computeMaxFeasibleQty(targetInput, requestedQtyByCategory) {
+        const categoryId = String(targetInput.dataset.categoryId || "");
+        const candidateItemIdsByCategory = {};
+
+        getRepresentativeQtyInputs().forEach((input) => {
+          candidateItemIdsByCategory[String(input.dataset.categoryId || "")] = parseItemIdList(
+            input.dataset.availableItemIds || "[]",
+          );
+        });
+
+        const currentQty = requestedQtyByCategory[categoryId] || 0;
+        let low = currentQty;
+        let high = candidateItemIdsByCategory[categoryId]?.length || 0;
+        let best = currentQty;
+
+        while (low <= high) {
+          const mid = Math.floor((low + high) / 2);
+          const trialQtyMap = { ...requestedQtyByCategory, [categoryId]: mid };
+
+          if (canAllocateDistinctItems(candidateItemIdsByCategory, trialQtyMap)) {
+            best = mid;
+            low = mid + 1;
+          } else {
+            high = mid - 1;
+          }
+        }
+
+        return best;
+      }
+
+      function intersectItemIds(leftIds, rightIds) {
+        if (!leftIds.length || !rightIds.length) {
+          return false;
+        }
+
+        const rightIdSet = new Set(rightIds);
+        return leftIds.some((itemId) => rightIdSet.has(itemId));
+      }
+
+      function formatSwedishList(names) {
+        if (!names.length) {
+          return "";
+        }
+        if (names.length === 1) {
+          return names[0];
+        }
+        if (names.length === 2) {
+          return `${names[0]} och ${names[1]}`;
+        }
+        return `${names.slice(0, -1).join(", ")} och ${names[names.length - 1]}`;
+      }
+
+      function getSharedStockImpactDetails(targetInput, requestedQtyByCategory) {
+        const categoryId = String(targetInput.dataset.categoryId || "");
+        const categoryName = targetInput.dataset.categoryName || `Kategori ${categoryId}`;
+        const targetCandidateIds = parseItemIdList(targetInput.dataset.availableItemIds || "[]");
+        const currentQty = requestedQtyByCategory[categoryId] || 0;
+        const maxFeasibleQty = computeMaxFeasibleQty(targetInput, requestedQtyByCategory);
+        const baselineRemaining = Math.max(targetCandidateIds.length - currentQty, 0);
+        const actualRemaining = Math.max(maxFeasibleQty - currentQty, 0);
+
+        if (actualRemaining >= baselineRemaining) {
+          return { overlappingNames: [], sharedCategoryNames: [] };
+        }
+
+        const sharedCategoryNames = [categoryName];
+
+        getRepresentativeQtyInputs()
+          .filter((otherInput) => String(otherInput.dataset.categoryId || "") !== categoryId)
+          .filter((otherInput) => intersectItemIds(
+            targetCandidateIds,
+            parseItemIdList(otherInput.dataset.availableItemIds || "[]"),
+          ))
+          .map((otherInput) => otherInput.dataset.categoryName || `Kategori ${otherInput.dataset.categoryId || ""}`)
+          .forEach((name) => {
+            if (!sharedCategoryNames.includes(name)) {
+              sharedCategoryNames.push(name);
+            }
+          });
+
+        const overlappingNames = getRepresentativeQtyInputs()
+          .filter((otherInput) => String(otherInput.dataset.categoryId || "") !== categoryId)
+          .filter((otherInput) => (requestedQtyByCategory[String(otherInput.dataset.categoryId || "")] || 0) > 0)
+          .filter((otherInput) => intersectItemIds(
+            targetCandidateIds,
+            parseItemIdList(otherInput.dataset.availableItemIds || "[]"),
+          ))
+          .map((otherInput) => otherInput.dataset.categoryName || `Kategori ${otherInput.dataset.categoryId || ""}`)
+          .filter((name, index, names) => names.indexOf(name) === index);
+
+        return { overlappingNames, sharedCategoryNames };
+      }
+
+      function positionSharedStockPopover(toggle, popover) {
+        if (!toggle || !popover) {
+          return;
+        }
+
+        const viewportPadding = 12;
+        const toggleRect = toggle.getBoundingClientRect();
+        popover.style.left = "0px";
+        popover.style.top = "0px";
+        popover.classList.remove("hidden");
+
+        const popoverRect = popover.getBoundingClientRect();
+        let left = toggleRect.right + 10;
+        let top = toggleRect.top + (toggleRect.height / 2) - (popoverRect.height / 2);
+
+        if (left + popoverRect.width > window.innerWidth - viewportPadding) {
+          left = toggleRect.left - popoverRect.width - 10;
+        }
+
+        if (left < viewportPadding) {
+          left = Math.max(viewportPadding, window.innerWidth - popoverRect.width - viewportPadding);
+        }
+
+        if (top + popoverRect.height > window.innerHeight - viewportPadding) {
+          top = window.innerHeight - popoverRect.height - viewportPadding;
+        }
+
+        if (top < viewportPadding) {
+          top = viewportPadding;
+        }
+
+        popover.style.left = `${Math.round(left)}px`;
+        popover.style.top = `${Math.round(top)}px`;
+      }
+
+      function closeSharedStockPopovers(exceptNotice = null) {
+        form.querySelectorAll("[data-shared-stock-popover]").forEach((popover) => {
+          const notice = popover.closest("[data-shared-stock-notice-for]");
+          const shouldKeepOpen = exceptNotice !== null && notice === exceptNotice;
+          popover.classList.toggle("hidden", !shouldKeepOpen);
+          if (!shouldKeepOpen) {
+            popover.style.left = "";
+            popover.style.top = "";
+          }
+        });
+
+        form.querySelectorAll("[data-shared-stock-toggle]").forEach((toggle) => {
+          const notice = toggle.closest("[data-shared-stock-notice-for]");
+          toggle.setAttribute(
+            "aria-expanded",
+            exceptNotice !== null && notice === exceptNotice ? "true" : "false",
+          );
+        });
+      }
+
+      function updateSharedStockNoticeSwedish(categoryId, overlappingNames, sharedCategoryNames) {
+        const normalizedCategoryId = String(categoryId || "");
+        const hasImpact = overlappingNames.length > 0;
+        const message = hasImpact
+          ? `Detta \u00e4r ett kombinationst\u00e4lt som tillh\u00f6r kategorierna ${formatSwedishList(sharedCategoryNames)}. D\u00e4rf\u00f6r har tillg\u00e4ngligheten i den h\u00e4r kategorin minskat.`
+          : "";
+
+        form.querySelectorAll(`[data-shared-stock-notice-for="${normalizedCategoryId}"]`).forEach((element) => {
+          element.classList.toggle("hidden", !hasImpact);
+        });
+
+        form.querySelectorAll(`[data-shared-stock-message-for="${normalizedCategoryId}"]`).forEach((element) => {
+          element.textContent = message;
+        });
+
+        if (!hasImpact) {
+          closeSharedStockPopovers();
+        }
+      }
+
+      function updateSharedStockNotice(categoryId, overlappingNames) {
+        const normalizedCategoryId = String(categoryId || "");
+        const hasImpact = overlappingNames.length > 0;
+        const message = hasImpact
+          ? `Tillgängligheten här påverkas också av samma artikel som: ${overlappingNames.join(", ")}.`
+          : "";
+
+        form.querySelectorAll(`[data-shared-stock-notice-for="${normalizedCategoryId}"]`).forEach((element) => {
+          element.classList.toggle("hidden", !hasImpact);
+        });
+
+        form.querySelectorAll(`[data-shared-stock-message-for="${normalizedCategoryId}"]`).forEach((element) => {
+          element.textContent = message;
+        });
+
+        if (!hasImpact) {
+          closeSharedStockPopovers();
+        }
+      }
+
+      form.querySelectorAll("[data-shared-stock-toggle]").forEach((toggle) => {
+        toggle.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+
+          const notice = toggle.closest("[data-shared-stock-notice-for]");
+          const popover = notice?.querySelector("[data-shared-stock-popover]");
+          if (!popover) {
+            return;
+          }
+
+          const willOpen = popover.classList.contains("hidden");
+          closeSharedStockPopovers(willOpen ? notice : null);
+          if (willOpen) {
+            positionSharedStockPopover(toggle, popover);
+          }
+          toggle.setAttribute("aria-expanded", willOpen ? "true" : "false");
+        });
+      });
+
+      document.addEventListener("click", (event) => {
+        if (event.target.closest("[data-shared-stock-notice-for]")) {
+          return;
+        }
+        closeSharedStockPopovers();
+      });
+
+      function syncSharedCategoryAvailability() {
+        let changed = false;
+
+        do {
+          changed = false;
+          const requestedQtyByCategory = buildRequestedQtyMap();
+
+          getRepresentativeQtyInputs().forEach((input) => {
+            const maxFeasibleQty = computeMaxFeasibleQty(input, requestedQtyByCategory);
+            const currentQty = parseInt(input.value || "0", 10) || 0;
+            if (currentQty > maxFeasibleQty) {
+              input.value = String(maxFeasibleQty);
+              syncMirroredQtyInputs(input);
+              changed = true;
+            }
+          });
+        } while (changed);
+
+        const requestedQtyByCategory = buildRequestedQtyMap();
+        qtyInputs.forEach((input) => {
+          const categoryId = String(input.dataset.categoryId || "");
+          const currentQty = requestedQtyByCategory[categoryId] || 0;
+          const maxFeasibleQty = computeMaxFeasibleQty(input, requestedQtyByCategory);
+          const remainingQty = Math.max(maxFeasibleQty - currentQty, 0);
+
+          input.max = String(maxFeasibleQty);
+          document.querySelectorAll(`[data-availability-strict-for="${categoryId}"]`).forEach((element) => {
+            if (element.textContent.includes("lediga")) {
+              element.textContent = `${remainingQty} lediga`;
+            } else {
+              element.textContent = String(remainingQty);
+            }
+          });
+
+          const sharedImpact = getSharedStockImpactDetails(input, requestedQtyByCategory);
+          updateSharedStockNoticeSwedish(
+            categoryId,
+            sharedImpact.overlappingNames,
+            sharedImpact.sharedCategoryNames,
+          );
+        });
+      }
+
       function updateTotalColor(total) {
         summaryTotal.classList.remove("text-rose-600", "text-emerald-600");
         summaryTotal.classList.add(total > 0 ? "text-emerald-600" : "text-rose-600");
       }
 
       function updateSummary() {
+        syncSharedCategoryAvailability();
         let selectedItems = 0;
         let rentalTotal = 0;
         let setupTotal = 0;
@@ -628,16 +1032,18 @@
         }
       }
 
-      qtyInputs.forEach((input) => {
-        input.addEventListener("input", () => {
-          clampQtyInput(input);
-          updateSummary();
+        qtyInputs.forEach((input) => {
+          input.addEventListener("input", () => {
+            clampQtyInput(input);
+            syncMirroredQtyInputs(input);
+            updateSummary();
+          });
+          input.addEventListener("change", () => {
+            clampQtyInput(input);
+            syncMirroredQtyInputs(input);
+            updateSummary();
+          });
         });
-        input.addEventListener("change", () => {
-          clampQtyInput(input);
-          updateSummary();
-        });
-      });
 
       if (deliveryCheckbox) {
         deliveryCheckbox.addEventListener("change", updateSummary);

@@ -236,12 +236,21 @@ def insert_items(conn, category_id: int, sku_prefix: str, count: int):
             sku = f"{sku_prefix}-{n:02d}"
             cur.execute(
                 """
-                INSERT INTO items (category_id, sku, is_active)
-                VALUES (%s, %s, TRUE)
+                INSERT INTO items (sku, is_active)
+                VALUES (%s, TRUE)
                 ON CONFLICT (sku)
                 DO UPDATE SET
-                  category_id = EXCLUDED.category_id,
                   is_active = TRUE;
+                """,
+                (sku,),
+            )
+            cur.execute(
+                """
+                INSERT INTO item_category_memberships (item_id, category_id)
+                SELECT id, %s
+                FROM items
+                WHERE sku = %s
+                ON CONFLICT (item_id, category_id) DO NOTHING;
                 """,
                 (category_id, sku),
             )

@@ -127,33 +127,55 @@ WITH request_window AS (
 ),
 item_overlap AS (
   SELECT
-    i.id,
-    i.category_id,
-    COUNT(b.id) AS overlap_count,
-    COUNT(*) FILTER (
+    icm.item_id AS id,
+    icm.category_id,
+    COUNT(DISTINCT b.id) AS overlap_count,
+    COUNT(DISTINCT b.id) FILTER (
       WHERE b.id IS NOT NULL
         AND b.end_date <> rw.requested_start
     ) AS blocking_overlap_count
-  FROM items i
+  FROM item_category_memberships icm
+  JOIN items i ON i.id = icm.item_id
   CROSS JOIN request_window rw
   LEFT JOIN booking_items bi
-    ON bi.item_id = i.id
+    ON bi.item_id = icm.item_id
   LEFT JOIN bookings b
     ON b.id = bi.booking_id
    AND b.status <> 'cancelled'
    AND rw.requested_start <= b.end_date
    AND rw.requested_end >= b.start_date
   WHERE i.is_active = TRUE
-  GROUP BY i.id, i.category_id
+  GROUP BY icm.item_id, icm.category_id
 ),
 availability AS (
   SELECT
     category_id,
     COUNT(*) FILTER (WHERE overlap_count = 0) AS available_items,
+    COALESCE(
+      ARRAY_AGG(id ORDER BY id) FILTER (WHERE overlap_count = 0),
+      ARRAY[]::INT[]
+    ) AS available_item_ids,
     COUNT(*) FILTER (
       WHERE overlap_count > 0
         AND blocking_overlap_count = 0
-    ) AS same_day_turnaround_items
+    ) AS same_day_turnaround_items,
+    COALESCE(
+      ARRAY_AGG(id ORDER BY id) FILTER (
+        WHERE overlap_count > 0
+          AND blocking_overlap_count = 0
+      ),
+      ARRAY[]::INT[]
+    ) AS same_day_turnaround_item_ids,
+    COALESCE(
+      ARRAY_AGG(id ORDER BY id) FILTER (
+        WHERE overlap_count = 0
+           OR (
+             overlap_count > 0
+             AND blocking_overlap_count = 0
+           )
+      ),
+      ARRAY[]::INT[]
+    ) AS bookable_item_ids
   FROM item_overlap
   GROUP BY category_id
 ),
@@ -200,7 +222,10 @@ SELECT
   fc.notes,
 
   COALESCE(a.available_items, 0) AS available_items,
+  COALESCE(a.available_item_ids, ARRAY[]::INT[]) AS available_item_ids,
   COALESCE(a.same_day_turnaround_items, 0) AS same_day_turnaround_items,
+  COALESCE(a.same_day_turnaround_item_ids, ARRAY[]::INT[]) AS same_day_turnaround_item_ids,
+  COALESCE(a.bookable_item_ids, ARRAY[]::INT[]) AS bookable_item_ids,
   COALESCE(a.available_items, 0) + COALESCE(a.same_day_turnaround_items, 0) AS admin_available_items
 FROM categories c
 LEFT JOIN availability a ON a.category_id = c.id
@@ -242,27 +267,28 @@ SELECT
   i.sku,
   i.is_active,
   i.created_at,
-
-  c.id AS category_id,
-  c.display_name,
-
-  (tc.category_id IS NOT NULL) AS is_tent,
-  tc.capacity,
-  tc.season_rating,
-  tc.estimated_build_time_minutes,
-  tc.setup_service_fee,
-  tc.packed_weight_kg,
-  tc.floor_area_m2,
-
-  (fc.category_id IS NOT NULL) AS is_furnishing,
-  fc.furnishing_kind,
-  fc.weight_kg,
-  fc.notes
+  MIN(c.id) AS category_id,
+  STRING_AGG(DISTINCT c.display_name, ', ' ORDER BY c.display_name) AS display_name,
+  COALESCE(ARRAY_AGG(DISTINCT c.id ORDER BY c.id), ARRAY[]::INT[]) AS category_ids,
+  COUNT(DISTINCT c.id) AS category_count,
+  BOOL_OR(tc.category_id IS NOT NULL) AS is_tent,
+  BOOL_OR(fc.category_id IS NOT NULL) AS is_furnishing,
+  COALESCE(
+    STRING_AGG(DISTINCT fc.furnishing_kind, ', ' ORDER BY fc.furnishing_kind)
+      FILTER (WHERE fc.furnishing_kind IS NOT NULL),
+    ''
+  ) AS furnishing_kind
 FROM items i
-JOIN categories c ON c.id = i.category_id
+JOIN item_category_memberships icm ON icm.item_id = i.id
+JOIN categories c ON c.id = icm.category_id
 LEFT JOIN tent_categories tc ON tc.category_id = c.id
 LEFT JOIN furnishing_categories fc ON fc.category_id = c.id
-ORDER BY c.display_name, i.id;
+GROUP BY
+  i.id,
+  i.sku,
+  i.is_active,
+  i.created_at
+ORDER BY display_name, i.id;
 """
 
 SQL_LIST_CATEGORIES_FOR_DROPDOWN = """
@@ -285,25 +311,41 @@ SELECT
   i.id,
   i.sku,
   i.is_active,
-  i.created_at,
-  i.category_id,
-  c.display_name
+  i.created_at
 FROM items i
-JOIN categories c ON c.id = i.category_id
 WHERE i.id = %s;
+"""
+
+SQL_LIST_ITEM_CATEGORY_IDS = """
+SELECT category_id
+FROM item_category_memberships
+WHERE item_id = %s
+ORDER BY category_id;
 """
 
 SQL_UPDATE_ITEM = """
 UPDATE items
-SET category_id = %s,
-    sku = %s,
+SET sku = %s,
     is_active = %s
 WHERE id = %s;
 """
 
 # Item create
 SQL_CREATE_ITEM = """
-SELECT add_item_unit(%s, %s, %s) AS new_item_id;
+INSERT INTO items (sku, is_active)
+VALUES (%s, %s)
+RETURNING id AS new_item_id;
+"""
+
+SQL_DELETE_ITEM_CATEGORY_MEMBERSHIPS = """
+DELETE FROM item_category_memberships
+WHERE item_id = %s;
+"""
+
+SQL_INSERT_ITEM_CATEGORY_MEMBERSHIP = """
+INSERT INTO item_category_memberships (item_id, category_id)
+VALUES (%s, %s)
+ON CONFLICT (item_id, category_id) DO NOTHING;
 """
 
 # Item delete safety
@@ -347,10 +389,11 @@ SELECT
   fc.weight_kg,
   fc.notes,
 
-  COUNT(i.id) AS total_items,
-  COALESCE(SUM(CASE WHEN i.is_active THEN 1 ELSE 0 END), 0) AS active_items
+  COUNT(DISTINCT icm.item_id) AS total_items,
+  COUNT(DISTINCT icm.item_id) FILTER (WHERE i.is_active) AS active_items
 FROM categories c
-LEFT JOIN items i ON i.category_id = c.id
+LEFT JOIN item_category_memberships icm ON icm.category_id = c.id
+LEFT JOIN items i ON i.id = icm.item_id
 LEFT JOIN tent_categories tc ON tc.category_id = c.id
 LEFT JOIN furnishing_categories fc ON fc.category_id = c.id
 GROUP BY
@@ -638,7 +681,7 @@ SELECT
 FROM booking_items bi
 JOIN bookings b ON b.id = bi.booking_id
 JOIN items i ON i.id = bi.item_id
-JOIN categories c ON c.id = i.category_id
+JOIN categories c ON c.id = bi.category_id
 LEFT JOIN tent_categories tc ON tc.category_id = c.id
 LEFT JOIN furnishing_categories fc ON fc.category_id = c.id
 WHERE bi.booking_id = %s
@@ -684,7 +727,7 @@ SELECT
 FROM booking_items bi
 JOIN bookings b ON b.id = bi.booking_id
 JOIN items i ON i.id = bi.item_id
-JOIN categories c ON c.id = i.category_id
+JOIN categories c ON c.id = bi.category_id
 LEFT JOIN tent_categories tc ON tc.category_id = c.id
 LEFT JOIN furnishing_categories fc ON fc.category_id = c.id
 WHERE bi.booking_id = ANY(%s)
@@ -788,9 +831,8 @@ WITH booking_rollup AS (
     COALESCE(SUM(COALESCE(bi.custom_total_price, bi.quoted_period_price)), 0) AS rental_sum,
     COALESCE(SUM(COALESCE(bi.setup_service_fee, 0)), 0) AS setup_sum
   FROM booking_items bi
-  JOIN items i ON i.id = bi.item_id
-  JOIN categories c ON c.id = i.category_id
-  LEFT JOIN tent_categories tc ON tc.category_id = c.id
+  JOIN categories c ON c.id = bi.category_id
+  LEFT JOIN tent_categories tc ON tc.category_id = bi.category_id
   GROUP BY bi.booking_id
 )
 SELECT
@@ -840,9 +882,7 @@ WITH booking_rollup AS (
     COALESCE(SUM(COALESCE(bi.custom_total_price, bi.quoted_period_price)), 0) AS rental_sum,
     COALESCE(SUM(COALESCE(bi.setup_service_fee, 0)), 0) AS setup_sum
   FROM booking_items bi
-  JOIN items i ON i.id = bi.item_id
-  JOIN categories c ON c.id = i.category_id
-  LEFT JOIN tent_categories tc ON tc.category_id = c.id
+  LEFT JOIN tent_categories tc ON tc.category_id = bi.category_id
   GROUP BY bi.booking_id
 ),
 booking_totals AS (
@@ -903,6 +943,8 @@ SELECT
   i.sku,
   COALESCE(ov.has_overlap, FALSE) AS is_turnaround
 FROM items i
+JOIN item_category_memberships icm
+  ON icm.item_id = i.id
 CROSS JOIN request_window rw
 LEFT JOIN LATERAL (
   SELECT
@@ -916,7 +958,7 @@ LEFT JOIN LATERAL (
     AND rw.requested_start <= b.end_date
     AND rw.requested_end >= b.start_date
 ) ov ON TRUE
-WHERE i.category_id = %s
+WHERE icm.category_id = %s
   AND (
     i.is_active = TRUE
     OR EXISTS (
@@ -941,7 +983,7 @@ SELECT
   b2.end_date
 FROM booking_items current_bi
 JOIN items i ON i.id = current_bi.item_id
-JOIN categories c ON c.id = i.category_id
+JOIN categories c ON c.id = current_bi.category_id
 JOIN booking_items other_bi ON other_bi.item_id = current_bi.item_id
 JOIN bookings b2 ON b2.id = other_bi.booking_id
 WHERE current_bi.booking_id = %s
@@ -961,6 +1003,7 @@ SQL_INSERT_BOOKING_ITEM = """
 INSERT INTO booking_items (
   booking_id,
   item_id,
+  category_id,
   rental_period_id,
   quoted_period_label,
   quoted_period_price,
@@ -969,7 +1012,7 @@ INSERT INTO booking_items (
   custom_price_note,
   line_note
 )
-VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s);
+VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
 """
 
 # Optional booking item edits / overrides

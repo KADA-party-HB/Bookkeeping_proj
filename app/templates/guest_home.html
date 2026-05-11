@@ -209,6 +209,367 @@
       return Number.isFinite(parsed) ? parsed : 0;
     };
 
+    const parseItemIdList = (value) => {
+      try {
+        const parsed = JSON.parse(value || "[]");
+        return Array.isArray(parsed)
+          ? parsed
+              .map((itemId) => parseInt(itemId, 10))
+              .filter((itemId) => Number.isFinite(itemId))
+          : [];
+      } catch (_error) {
+        return [];
+      }
+    };
+
+    const getRepresentativeQtyInputs = () => {
+      const seenCategoryIds = new Set();
+      return qtyInputs.filter((input) => {
+        const categoryId = String(input.dataset.categoryId || "");
+        if (!categoryId || seenCategoryIds.has(categoryId)) {
+          return false;
+        }
+        seenCategoryIds.add(categoryId);
+        return true;
+      });
+    };
+
+    const syncMirroredQtyInputs = (sourceInput) => {
+      const categoryId = String(sourceInput?.dataset.categoryId || "");
+      if (!categoryId) {
+        return;
+      }
+
+      qtyInputs.forEach((input) => {
+        if (input !== sourceInput && String(input.dataset.categoryId || "") === categoryId) {
+          input.value = sourceInput.value;
+        }
+      });
+    };
+
+    const buildRequestedQtyMap = () => {
+      const quantities = {};
+      getRepresentativeQtyInputs().forEach((input) => {
+        const categoryId = String(input.dataset.categoryId || "");
+        const qty = parseInt(input.value || "0", 10);
+        quantities[categoryId] = Number.isFinite(qty) && qty > 0 ? qty : 0;
+      });
+      return quantities;
+    };
+
+    const canAllocateDistinctItems = (candidateItemIdsByCategory, requestedQtyByCategory) => {
+      const demandSlots = [];
+
+      Object.entries(requestedQtyByCategory).forEach(([categoryId, qty]) => {
+        const normalizedQty = Number.isFinite(qty) ? qty : 0;
+        if (normalizedQty <= 0) {
+          return;
+        }
+
+        const candidateItemIds = candidateItemIdsByCategory[categoryId] || [];
+        if (candidateItemIds.length < normalizedQty) {
+          demandSlots.push(...Array.from({ length: normalizedQty }, () => ({ candidateItemIds: [] })));
+          return;
+        }
+
+        for (let i = 0; i < normalizedQty; i += 1) {
+          demandSlots.push({ candidateItemIds });
+        }
+      });
+
+      demandSlots.sort((a, b) => a.candidateItemIds.length - b.candidateItemIds.length);
+      const itemToSlotIndex = new Map();
+
+      const tryAssign = (slotIndex, seenItemIds) => {
+        const slot = demandSlots[slotIndex];
+        for (const itemId of slot.candidateItemIds) {
+          if (seenItemIds.has(itemId)) {
+            continue;
+          }
+
+          seenItemIds.add(itemId);
+          const assignedSlotIndex = itemToSlotIndex.get(itemId);
+          if (assignedSlotIndex === undefined || tryAssign(assignedSlotIndex, seenItemIds)) {
+            itemToSlotIndex.set(itemId, slotIndex);
+            return true;
+          }
+        }
+
+        return false;
+      };
+
+      for (let slotIndex = 0; slotIndex < demandSlots.length; slotIndex += 1) {
+        if (!tryAssign(slotIndex, new Set())) {
+          return false;
+        }
+      }
+
+      return true;
+    };
+
+    const computeMaxFeasibleQty = (targetInput, requestedQtyByCategory) => {
+      const categoryId = String(targetInput.dataset.categoryId || "");
+      const candidateItemIdsByCategory = {};
+
+      getRepresentativeQtyInputs().forEach((input) => {
+        candidateItemIdsByCategory[String(input.dataset.categoryId || "")] = parseItemIdList(
+          input.dataset.availableItemIds || "[]",
+        );
+      });
+
+      const currentQty = requestedQtyByCategory[categoryId] || 0;
+      let low = currentQty;
+      let high = candidateItemIdsByCategory[categoryId]?.length || 0;
+      let best = currentQty;
+
+      while (low <= high) {
+        const mid = Math.floor((low + high) / 2);
+        const trialQtyMap = { ...requestedQtyByCategory, [categoryId]: mid };
+
+        if (canAllocateDistinctItems(candidateItemIdsByCategory, trialQtyMap)) {
+          best = mid;
+          low = mid + 1;
+        } else {
+          high = mid - 1;
+        }
+      }
+
+      return best;
+    };
+
+    const intersectItemIds = (leftIds, rightIds) => {
+      if (!leftIds.length || !rightIds.length) {
+        return false;
+      }
+
+      const rightIdSet = new Set(rightIds);
+      return leftIds.some((itemId) => rightIdSet.has(itemId));
+    };
+
+    const formatSwedishList = (names) => {
+      if (!names.length) {
+        return "";
+      }
+      if (names.length === 1) {
+        return names[0];
+      }
+      if (names.length === 2) {
+        return `${names[0]} och ${names[1]}`;
+      }
+      return `${names.slice(0, -1).join(", ")} och ${names[names.length - 1]}`;
+    };
+
+    const getSharedStockImpactDetails = (targetInput, requestedQtyByCategory) => {
+      const categoryId = String(targetInput.dataset.categoryId || "");
+      const categoryName = targetInput.dataset.categoryName || `Kategori ${categoryId}`;
+      const targetCandidateIds = parseItemIdList(targetInput.dataset.availableItemIds || "[]");
+      const currentQty = requestedQtyByCategory[categoryId] || 0;
+      const maxFeasibleQty = computeMaxFeasibleQty(targetInput, requestedQtyByCategory);
+      const baselineRemaining = Math.max(targetCandidateIds.length - currentQty, 0);
+      const actualRemaining = Math.max(maxFeasibleQty - currentQty, 0);
+
+      if (actualRemaining >= baselineRemaining) {
+        return { overlappingNames: [], sharedCategoryNames: [] };
+      }
+
+      const sharedCategoryNames = [categoryName];
+
+      getRepresentativeQtyInputs()
+        .filter((otherInput) => String(otherInput.dataset.categoryId || "") !== categoryId)
+        .filter((otherInput) => intersectItemIds(
+          targetCandidateIds,
+          parseItemIdList(otherInput.dataset.availableItemIds || "[]"),
+        ))
+        .map((otherInput) => otherInput.dataset.categoryName || `Kategori ${otherInput.dataset.categoryId || ""}`)
+        .forEach((name) => {
+          if (!sharedCategoryNames.includes(name)) {
+            sharedCategoryNames.push(name);
+          }
+        });
+
+      const overlappingNames = getRepresentativeQtyInputs()
+        .filter((otherInput) => String(otherInput.dataset.categoryId || "") !== categoryId)
+        .filter((otherInput) => (requestedQtyByCategory[String(otherInput.dataset.categoryId || "")] || 0) > 0)
+        .filter((otherInput) => intersectItemIds(
+          targetCandidateIds,
+          parseItemIdList(otherInput.dataset.availableItemIds || "[]"),
+        ))
+        .map((otherInput) => otherInput.dataset.categoryName || `Kategori ${otherInput.dataset.categoryId || ""}`)
+        .filter((name, index, names) => names.indexOf(name) === index);
+
+      return { overlappingNames, sharedCategoryNames };
+    };
+
+    const positionSharedStockPopover = (toggle, popover) => {
+      if (!toggle || !popover) {
+        return;
+      }
+
+      const viewportPadding = 12;
+      const toggleRect = toggle.getBoundingClientRect();
+      popover.style.left = "0px";
+      popover.style.top = "0px";
+      popover.classList.remove("hidden");
+
+      const popoverRect = popover.getBoundingClientRect();
+      let left = toggleRect.right + 10;
+      let top = toggleRect.top + (toggleRect.height / 2) - (popoverRect.height / 2);
+
+      if (left + popoverRect.width > window.innerWidth - viewportPadding) {
+        left = toggleRect.left - popoverRect.width - 10;
+      }
+
+      if (left < viewportPadding) {
+        left = Math.max(viewportPadding, window.innerWidth - popoverRect.width - viewportPadding);
+      }
+
+      if (top + popoverRect.height > window.innerHeight - viewportPadding) {
+        top = window.innerHeight - popoverRect.height - viewportPadding;
+      }
+
+      if (top < viewportPadding) {
+        top = viewportPadding;
+      }
+
+      popover.style.left = `${Math.round(left)}px`;
+      popover.style.top = `${Math.round(top)}px`;
+    };
+
+    const closeSharedStockPopovers = (exceptNotice = null) => {
+      form.querySelectorAll("[data-shared-stock-popover]").forEach((popover) => {
+        const notice = popover.closest("[data-shared-stock-notice-for]");
+        const shouldKeepOpen = exceptNotice !== null && notice === exceptNotice;
+        popover.classList.toggle("hidden", !shouldKeepOpen);
+        if (!shouldKeepOpen) {
+          popover.style.left = "";
+          popover.style.top = "";
+        }
+      });
+
+      form.querySelectorAll("[data-shared-stock-toggle]").forEach((toggle) => {
+        const notice = toggle.closest("[data-shared-stock-notice-for]");
+        toggle.setAttribute(
+          "aria-expanded",
+          exceptNotice !== null && notice === exceptNotice ? "true" : "false",
+        );
+      });
+    };
+
+    const updateSharedStockNoticeSwedish = (categoryId, overlappingNames, sharedCategoryNames) => {
+      const normalizedCategoryId = String(categoryId || "");
+      const hasImpact = overlappingNames.length > 0;
+      const message = hasImpact
+        ? `Detta \u00e4r ett kombinationst\u00e4lt som tillh\u00f6r kategorierna ${formatSwedishList(sharedCategoryNames)}. D\u00e4rf\u00f6r har tillg\u00e4ngligheten i den h\u00e4r kategorin minskat.`
+        : "";
+
+      form.querySelectorAll(`[data-shared-stock-notice-for="${normalizedCategoryId}"]`).forEach((element) => {
+        element.classList.toggle("hidden", !hasImpact);
+      });
+
+      form.querySelectorAll(`[data-shared-stock-message-for="${normalizedCategoryId}"]`).forEach((element) => {
+        element.textContent = message;
+      });
+
+      if (!hasImpact) {
+        closeSharedStockPopovers();
+      }
+    };
+
+    const updateSharedStockNotice = (categoryId, overlappingNames) => {
+      const normalizedCategoryId = String(categoryId || "");
+      const hasImpact = overlappingNames.length > 0;
+      const message = hasImpact
+        ? `Tillgängligheten här påverkas också av samma artikel som: ${overlappingNames.join(", ")}.`
+        : "";
+
+      form.querySelectorAll(`[data-shared-stock-notice-for="${normalizedCategoryId}"]`).forEach((element) => {
+        element.classList.toggle("hidden", !hasImpact);
+      });
+
+      form.querySelectorAll(`[data-shared-stock-message-for="${normalizedCategoryId}"]`).forEach((element) => {
+        element.textContent = message;
+      });
+
+      if (!hasImpact) {
+        closeSharedStockPopovers();
+      }
+    };
+
+    form.querySelectorAll("[data-shared-stock-toggle]").forEach((toggle) => {
+      toggle.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        const notice = toggle.closest("[data-shared-stock-notice-for]");
+        const popover = notice?.querySelector("[data-shared-stock-popover]");
+        if (!popover) {
+          return;
+        }
+
+        const willOpen = popover.classList.contains("hidden");
+        closeSharedStockPopovers(willOpen ? notice : null);
+        if (willOpen) {
+          positionSharedStockPopover(toggle, popover);
+        }
+        toggle.setAttribute("aria-expanded", willOpen ? "true" : "false");
+      });
+    });
+
+    document.addEventListener("click", (event) => {
+      if (event.target.closest("[data-shared-stock-notice-for]")) {
+        return;
+      }
+      closeSharedStockPopovers();
+    });
+
+    const syncSharedCategoryAvailability = () => {
+      let changed = false;
+
+      do {
+        changed = false;
+        const requestedQtyByCategory = buildRequestedQtyMap();
+
+        getRepresentativeQtyInputs().forEach((input) => {
+          const maxFeasibleQty = computeMaxFeasibleQty(input, requestedQtyByCategory);
+          const currentQty = parseInt(input.value || "0", 10) || 0;
+          if (currentQty > maxFeasibleQty) {
+            input.value = String(maxFeasibleQty);
+            syncMirroredQtyInputs(input);
+            changed = true;
+          }
+        });
+      } while (changed);
+
+      const requestedQtyByCategory = buildRequestedQtyMap();
+      getRepresentativeQtyInputs().forEach((input) => {
+        const categoryId = String(input.dataset.categoryId || "");
+        const currentQty = requestedQtyByCategory[categoryId] || 0;
+        const maxFeasibleQty = computeMaxFeasibleQty(input, requestedQtyByCategory);
+        const remainingQty = Math.max(maxFeasibleQty - currentQty, 0);
+
+        qtyInputs
+          .filter((candidate) => String(candidate.dataset.categoryId || "") === categoryId)
+          .forEach((candidate) => {
+            candidate.max = String(maxFeasibleQty);
+          });
+
+        form.querySelectorAll(`[data-availability-strict-for="${categoryId}"]`).forEach((element) => {
+          if (element.textContent.includes("lediga")) {
+            element.textContent = `${remainingQty} lediga`;
+          } else {
+            element.textContent = String(remainingQty);
+          }
+        });
+
+        const sharedImpact = getSharedStockImpactDetails(input, requestedQtyByCategory);
+        updateSharedStockNoticeSwedish(
+          categoryId,
+          sharedImpact.overlappingNames,
+          sharedImpact.sharedCategoryNames,
+        );
+      });
+    };
+
     const formatMoney = (value) => `${value.toFixed(2)} kr`;
     const normalizeAddress = (value) => String(value || "").trim().replace(/\s+/g, " ");
     const normalizeSearchText = (value) => normalizeAddress((value || "").toLowerCase());
@@ -383,7 +744,8 @@
     };
 
     const getState = () => {
-      const selected = qtyInputs
+      syncSharedCategoryAvailability();
+      const selected = getRepresentativeQtyInputs()
         .filter((input) => !input.disabled)
         .map((input) => {
           const qty = clampQtyInput(input);
@@ -681,10 +1043,12 @@
     qtyInputs.forEach((input) => {
       input.addEventListener("input", () => {
         clampQtyInput(input);
+        syncMirroredQtyInputs(input);
         renderSummary();
       });
       input.addEventListener("change", () => {
         clampQtyInput(input);
+        syncMirroredQtyInputs(input);
         renderSummary();
       });
     });
@@ -875,6 +1239,8 @@
 
     initGuestBookingForm(document);
   }
+
+  window.initGuestBookingForm = initGuestBookingForm;
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", bootGuestBookingPage);

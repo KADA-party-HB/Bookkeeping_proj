@@ -73,8 +73,11 @@ from .sql import (
     SQL_LIST_ITEMS,
     SQL_LIST_CATEGORIES_FOR_DROPDOWN,
     SQL_GET_ITEM_FOR_EDIT,
+    SQL_LIST_ITEM_CATEGORY_IDS,
     SQL_UPDATE_ITEM,
     SQL_CREATE_ITEM,
+    SQL_DELETE_ITEM_CATEGORY_MEMBERSHIPS,
+    SQL_INSERT_ITEM_CATEGORY_MEMBERSHIP,
     SQL_ITEM_HAS_ACTIVE_OR_FUTURE_BOOKING,
     SQL_DELETE_BOOKING_ITEMS_FOR_ITEM,
     SQL_DELETE_ITEM,
@@ -1157,6 +1160,116 @@ def _load_booking_allocation_candidates(
     return cur.fetchall()
 
 
+def _category_candidate_item_ids(category_row, *, include_turnaround: bool):
+    if not category_row:
+        return []
+
+    item_ids = (
+        category_row.get("bookable_item_ids")
+        if include_turnaround
+        else category_row.get("available_item_ids")
+    ) or []
+
+    seen = set()
+    normalized = []
+    for item_id in item_ids:
+        if item_id in seen:
+            continue
+        seen.add(item_id)
+        normalized.append(int(item_id))
+    return normalized
+
+
+def _can_allocate_distinct_items(candidate_item_ids_by_category, requested_category_quantities):
+    demand_slots = []
+
+    for category_id, qty in requested_category_quantities.items():
+        if qty <= 0:
+            continue
+
+        candidate_item_ids = candidate_item_ids_by_category.get(category_id, [])
+        if len(candidate_item_ids) < qty:
+            return False
+
+        for _ in range(qty):
+            demand_slots.append(
+                {
+                    "category_id": category_id,
+                    "candidate_item_ids": candidate_item_ids,
+                }
+            )
+
+    demand_slots.sort(key=lambda slot: (len(slot["candidate_item_ids"]), slot["category_id"]))
+    item_to_slot_index = {}
+
+    def try_assign(slot_index, seen_item_ids):
+        for item_id in demand_slots[slot_index]["candidate_item_ids"]:
+            if item_id in seen_item_ids:
+                continue
+
+            seen_item_ids.add(item_id)
+            assigned_slot_index = item_to_slot_index.get(item_id)
+            if assigned_slot_index is None or try_assign(assigned_slot_index, seen_item_ids):
+                item_to_slot_index[item_id] = slot_index
+                return True
+
+        return False
+
+    for slot_index in range(len(demand_slots)):
+        if not try_assign(slot_index, set()):
+            return False
+
+    return True
+
+
+def _validate_shared_item_selection(category_rows_by_id, requested_category_quantities, *, allow_turnaround: bool):
+    normalized_quantities = _normalize_category_quantity_map(requested_category_quantities)
+    if len(normalized_quantities) <= 1:
+        return
+
+    candidate_item_ids_by_category = {
+        category_id: _category_candidate_item_ids(
+            category_rows_by_id.get(category_id),
+            include_turnaround=allow_turnaround,
+        )
+        for category_id in normalized_quantities
+    }
+
+    if _can_allocate_distinct_items(candidate_item_ids_by_category, normalized_quantities):
+        return
+
+    overlapping_names = []
+    selected_category_ids = list(normalized_quantities)
+    for category_id in selected_category_ids:
+        current_candidates = set(candidate_item_ids_by_category.get(category_id, []))
+        if not current_candidates:
+            continue
+
+        for other_category_id in selected_category_ids:
+            if other_category_id == category_id:
+                continue
+
+            other_candidates = set(candidate_item_ids_by_category.get(other_category_id, []))
+            if current_candidates & other_candidates:
+                category_row = category_rows_by_id.get(category_id) or {}
+                name = category_row.get("display_name") or f"Category {category_id}"
+                if name not in overlapping_names:
+                    overlapping_names.append(name)
+                break
+
+    if not overlapping_names:
+        overlapping_names = [
+            (category_rows_by_id.get(category_id) or {}).get("display_name") or f"Category {category_id}"
+            for category_id in selected_category_ids
+        ]
+
+    raise ValueError(
+        "The selected categories share the same physical item stock, so this combination cannot be booked together: "
+        + ", ".join(overlapping_names)
+        + "."
+    )
+
+
 def _format_turnaround_item_labels(item_labels):
     labels = [label for label in dict.fromkeys(item_labels) if label]
     return ", ".join(labels)
@@ -1194,6 +1307,29 @@ def _collect_booking_category_quantities_from_form():
         quantities[category_id] = qty
 
     return quantities
+
+
+def _collect_item_category_ids_from_form():
+    category_ids = []
+    seen = set()
+
+    for raw_value in request.form.getlist("category_ids"):
+        value = (raw_value or "").strip()
+        if not value:
+            continue
+
+        try:
+            category_id = int(value)
+        except ValueError as exc:
+            raise ValueError("Categories must be valid category ids.") from exc
+
+        if category_id in seen:
+            continue
+
+        seen.add(category_id)
+        category_ids.append(category_id)
+
+    return category_ids
 
 def _build_full_delivery_address(address, postal_city):
     parts = []
@@ -1310,6 +1446,7 @@ def _create_admin_booking_with_allocations(
                 (
                     booking_id,
                     candidate["item_id"],
+                    category_id,
                     rental_period_id,
                     quoted_period_label,
                     quoted_period_price,
@@ -1362,6 +1499,7 @@ def _reallocate_booking_items_for_dates(
     turnaround_item_labels = []
     added_count = 0
     removed_count = 0
+    reserved_item_ids = set()
     rental_days = (date.fromisoformat(end_date) - date.fromisoformat(start_date)).days + 1
     pricing_by_category = {}
 
@@ -1406,11 +1544,20 @@ def _reallocate_booking_items_for_dates(
             )
         )
 
-        chosen_candidates = candidates[:desired_qty]
+        chosen_candidates = []
+        for candidate in candidates:
+            if candidate["item_id"] in reserved_item_ids:
+                continue
+            chosen_candidates.append(candidate)
+            if len(chosen_candidates) == desired_qty:
+                break
+
         if len(chosen_candidates) < desired_qty:
             raise ValueError(
                 f'Cannot update "{display_name}" because only {len(chosen_candidates)} of {desired_qty} items are available for the selected dates.'
             )
+
+        reserved_item_ids.update(candidate["item_id"] for candidate in chosen_candidates)
 
         candidate_by_item_id = {candidate["item_id"]: candidate for candidate in chosen_candidates}
         chosen_ids = set(candidate_by_item_id)
@@ -1471,6 +1618,7 @@ def _reallocate_booking_items_for_dates(
             (
                 booking_id,
                 new_item_id,
+                row["category_id"],
                 rental_period_id,
                 quoted_period_label,
                 quoted_period_price,
@@ -1519,6 +1667,7 @@ def _reallocate_booking_items_for_dates(
             (
                 booking_id,
                 candidate["item_id"],
+                category_id,
                 rental_period_id,
                 quoted_period_label,
                 quoted_period_price,
@@ -1977,6 +2126,16 @@ def guest_booking_create():
             )
             return redirect(url_for("routes.home", start_date=start, end_date=end))
 
+    try:
+        _validate_shared_item_selection(
+            visible_by_id,
+            dict(selections),
+            allow_turnaround=False,
+        )
+    except ValueError as exc:
+        flash(str(exc), "error")
+        return redirect(url_for("routes.home", start_date=start, end_date=end))
+
     if include_delivery and not delivery_lookup_address:
         flash("Ange leveransadressen innan du skickar bokningen.", "error")
         return redirect(url_for("routes.home", start_date=start, end_date=end))
@@ -2281,6 +2440,16 @@ def booking_create_from_home():
                     "error",
                 )
                 return redirect(url_for("routes.home", start_date=start, end_date=end))
+
+    try:
+        _validate_shared_item_selection(
+            visible_by_id,
+            dict(selections),
+            allow_turnaround=(role == "admin"),
+        )
+    except ValueError as exc:
+        flash(str(exc), "error")
+        return redirect(url_for("routes.home", start_date=start, end_date=end))
 
     try:
         if role == "admin":
@@ -2723,25 +2892,41 @@ def admin_items():
 def admin_item_new_form():
     require_admin()
     categories = query(SQL_LIST_CATEGORIES_FOR_DROPDOWN)
-    return render_template("admin_item_new.html", categories=categories, role="admin")
+    return render_template(
+        "admin_item_new.html",
+        categories=categories,
+        selected_category_ids=[],
+        role="admin",
+    )
 
 
 @bp.post("/admin/items/new")
 def admin_item_new():
     require_admin()
 
-    category_id = request.form.get("category_id", "").strip()
     sku = request.form.get("sku", "").strip()
     is_active = _to_bool(request.form.get("is_active"))
+    category_ids = _collect_item_category_ids_from_form()
 
-    if not category_id or not sku:
-        flash("Category and SKU are required.", "error")
+    if not category_ids or not sku:
+        flash("At least one category and a SKU are required.", "error")
         return redirect(url_for("routes.admin_item_new_form"))
 
     try:
-        cat_id_int = int(category_id)
-        row = query(SQL_CREATE_ITEM, (cat_id_int, sku, is_active), one=True, commit=True)
-        flash(f"Item created (item_id={row['new_item_id']}).", "success")
+        def work(cur):
+            cur.execute(SQL_CREATE_ITEM, (sku, is_active))
+            item_id = cur.fetchone()["new_item_id"]
+
+            for category_id in category_ids:
+                cur.execute(
+                    SQL_INSERT_ITEM_CATEGORY_MEMBERSHIP,
+                    (item_id, category_id),
+                )
+
+            return item_id
+
+        item_id = tx(work)
+        flash(f"Item created (item_id={item_id}).", "success")
         return redirect(url_for("routes.admin_items"))
     except Exception as e:
         flash(f"Failed: {str(e)}", "error")
@@ -2758,24 +2943,45 @@ def admin_item_edit_form(item_id: int):
         return redirect(url_for("routes.admin_items"))
 
     categories = query(SQL_LIST_CATEGORIES_FOR_DROPDOWN)
-    return render_template("admin_item_edit.html", item=item, categories=categories, role="admin")
+    selected_category_ids = [
+        row["category_id"]
+        for row in query(SQL_LIST_ITEM_CATEGORY_IDS, (item_id,))
+    ]
+    return render_template(
+        "admin_item_edit.html",
+        item=item,
+        categories=categories,
+        selected_category_ids=selected_category_ids,
+        role="admin",
+    )
 
 
 @bp.post("/admin/items/<int:item_id>/edit")
 def admin_item_edit_save(item_id: int):
     require_admin()
 
-    category_id = request.form.get("category_id", "").strip()
     sku = request.form.get("sku", "").strip()
     is_active = _to_bool(request.form.get("is_active"))
+    category_ids = _collect_item_category_ids_from_form()
 
-    if not category_id or not sku:
-        flash("Category and SKU are required.", "error")
+    if not category_ids or not sku:
+        flash("At least one category and a SKU are required.", "error")
         return redirect(url_for("routes.admin_item_edit_form", item_id=item_id))
 
     try:
-        cat_id_int = int(category_id)
-        query(SQL_UPDATE_ITEM, (cat_id_int, sku, is_active, item_id), commit=True)
+        def work(cur):
+            cur.execute(SQL_DELETE_ITEM_CATEGORY_MEMBERSHIPS, (item_id,))
+            cur.execute(SQL_UPDATE_ITEM, (sku, is_active, item_id))
+
+            for category_id in category_ids:
+                cur.execute(
+                    SQL_INSERT_ITEM_CATEGORY_MEMBERSHIP,
+                    (item_id, category_id),
+                )
+
+            return True
+
+        tx(work)
         flash("Item updated.", "success")
         return redirect(url_for("routes.admin_items"))
     except Exception as e:
@@ -3851,27 +4057,24 @@ def admin_bookings_calendar():
         for row in calendar_items:
             items_by_booking_id.setdefault(row["booking_id"], []).append(row)
 
-    for item in query(SQL_LIST_ITEMS):
-        if not item["is_active"]:
+    for category in query(SQL_LIST_CATEGORIES):
+        if not category["active_items"]:
             continue
 
-        category_id = item["category_id"]
-        if item["is_tent"]:
+        category_id = category["id"]
+        if category["is_tent"]:
             type_label = "Tent"
-        elif item["is_furnishing"]:
+        elif category["is_furnishing"]:
             type_label = "Furnishing"
         else:
             type_label = "Item"
 
-        if category_id not in category_inventory:
-            category_inventory[category_id] = {
-                "category_id": category_id,
-                "display_name": item["display_name"],
-                "type_label": type_label,
-                "total_active": 0,
-            }
-
-        category_inventory[category_id]["total_active"] += 1
+        category_inventory[category_id] = {
+            "category_id": category_id,
+            "display_name": category["display_name"],
+            "type_label": type_label,
+            "total_active": category["active_items"],
+        }
 
     for b in bookings:
         booking_items = items_by_booking_id.get(b["id"], [])

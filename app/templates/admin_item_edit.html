@@ -5,21 +5,45 @@
   {{ ui.admin_page_hero(
     "Inventory Control",
     "Edit item #" ~ item.id,
-    "Update this physical item without changing the underlying category definition.",
+    "Update this physical item and the categories it belongs to.",
     title_class='mt-4 text-3xl font-semibold tracking-tight text-slate-900'
   ) }}
 
   {% call ui.content_panel(wrapper_class='mt-6', body_class='') %}
     <form method="post" class="grid gap-6 px-6 py-6 md:px-8">
       <div>
-        <label class="text-sm font-medium text-slate-700" for="category_id">Category</label>
-        <select id="category_id" name="category_id" required class="mt-1 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 shadow-sm transition focus:border-sky-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-sky-100">
+        <div class="flex items-center justify-between gap-3">
+          <label class="text-sm font-medium text-slate-700">Categories</label>
+          <span class="text-xs text-slate-500">Select every category this same physical item belongs to.</span>
+        </div>
+        <div class="mt-3 inline-flex rounded-2xl border border-slate-300 bg-white p-1" data-category-filter-group>
+          <button type="button" class="rounded-xl bg-slate-900 px-3 py-2 text-sm font-medium text-white transition" data-category-filter="all">
+            All
+          </button>
+          <button type="button" class="rounded-xl px-3 py-2 text-sm font-medium text-slate-600 transition" data-category-filter="tent">
+            Tents
+          </button>
+          <button type="button" class="rounded-xl px-3 py-2 text-sm font-medium text-slate-600 transition" data-category-filter="furnishing">
+            Furnishings
+          </button>
+        </div>
+        <div class="mt-2 grid max-h-64 gap-2 overflow-y-auto rounded-2xl border border-slate-300 bg-slate-50 p-3" data-category-filter-list>
           {% for c in categories %}
-            <option value="{{ c.id }}" {% if c.id == item.category_id %}selected{% endif %}>
-              {{ c.display_name }}{% if c.is_tent %} - Tent{% endif %}{% if c.is_tent and c.capacity %} (cap {{ c.capacity }}){% endif %}{% if c.is_furnishing and c.furnishing_kind %} - {{ c.furnishing_kind }}{% endif %}
-            </option>
+            <label class="flex items-start gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700" data-category-type="{% if c.is_tent %}tent{% elif c.is_furnishing %}furnishing{% else %}other{% endif %}">
+              <input
+                type="checkbox"
+                name="category_ids"
+                value="{{ c.id }}"
+                class="mt-0.5 h-4 w-4"
+                {% if c.id in selected_category_ids %}checked{% endif %}
+              >
+              <span>
+                {{ c.display_name }}{% if c.is_tent %} - Tent{% endif %}{% if c.is_tent and c.capacity %} (cap {{ c.capacity }}){% endif %}{% if c.is_furnishing and c.furnishing_kind %} - {{ c.furnishing_kind }}{% endif %}
+              </span>
+            </label>
           {% endfor %}
-        </select>
+        </div>
+        <p class="mt-2 text-xs text-slate-500">The database will reject incompatible mixed-type combinations, such as linking the same item to both tent and furnishing categories.</p>
       </div>
 
       <div>
@@ -38,4 +62,36 @@
     </form>
   {% endcall %}
 </section>
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const filterGroup = document.querySelector("[data-category-filter-group]");
+    const categoryCards = Array.from(document.querySelectorAll("[data-category-type]"));
+
+    if (!filterGroup || !categoryCards.length) {
+      return;
+    }
+
+    const filterButtons = Array.from(filterGroup.querySelectorAll("[data-category-filter]"));
+
+    const applyFilter = (filterValue) => {
+      filterButtons.forEach((button) => {
+        const active = button.dataset.categoryFilter === filterValue;
+        button.classList.toggle("bg-slate-900", active);
+        button.classList.toggle("text-white", active);
+        button.classList.toggle("text-slate-600", !active);
+      });
+
+      categoryCards.forEach((card) => {
+        const matches = filterValue === "all" || card.dataset.categoryType === filterValue;
+        card.classList.toggle("hidden", !matches);
+      });
+    };
+
+    filterButtons.forEach((button) => {
+      button.addEventListener("click", () => applyFilter(button.dataset.categoryFilter || "all"));
+    });
+
+    applyFilter("all");
+  });
+</script>
 {% endblock %}

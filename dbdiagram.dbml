@@ -1,0 +1,161 @@
+Enum user_role {
+  customer
+  admin
+}
+
+Enum booking_status {
+  pending
+  confirmed
+  cancelled
+}
+
+Table users {
+  id serial [pk]
+  email varchar(255) [not null, unique]
+  password_hash varchar(255) [not null]
+  role user_role [not null, default: 'customer']
+  created_at timestamp [not null]
+
+  Note: 'Application users. Admin/customer role is enforced in the app and DB.'
+}
+
+Table customers {
+  id serial [pk]
+  full_name varchar(200) [not null]
+  email varchar(255)
+  phone varchar(50)
+  address text
+  postal_city text
+  user_id int [unique, ref: > users.id]
+  created_at timestamp [not null]
+
+  Note: 'Customer profile. May exist without a linked user account.'
+}
+
+Table categories {
+  id serial [pk]
+  display_name varchar(200) [not null, unique]
+  created_at timestamp [not null]
+
+  Note: 'Bookable category/model. Each category must be exactly one subtype: tent or furnishing.'
+}
+
+Table rental_periods {
+  id serial [pk]
+  label varchar(100) [not null, unique]
+  min_days int [not null]
+  max_days int [not null]
+  created_at timestamp [not null]
+
+  Note: 'Reusable rental duration ranges.'
+}
+
+Table category_rental_period_prices {
+  category_id int [not null, ref: > categories.id]
+  rental_period_id int [not null, ref: > rental_periods.id]
+  price numeric(10,2) [not null]
+  sort_order int [not null, default: 0]
+  created_at timestamp [not null]
+
+  indexes {
+    (category_id, rental_period_id) [pk]
+    (category_id)
+    (rental_period_id)
+  }
+
+  Note: 'Pricing is defined per category and rental period.'
+}
+
+Table items {
+  id serial [pk]
+  sku varchar(100) [not null, unique]
+  is_active boolean [not null, default: true]
+  created_at timestamp [not null]
+
+  indexes {
+    (is_active)
+  }
+
+  Note: 'Physical inventory item. Must belong to at least one category through item_category_memberships.'
+}
+
+Table item_category_memberships {
+  item_id int [not null, ref: > items.id]
+  category_id int [not null, ref: > categories.id]
+  created_at timestamp [not null]
+
+  indexes {
+    (item_id, category_id) [pk]
+    (category_id)
+  }
+
+  Note: 'Many-to-many link between physical items and categories. All linked categories share the same stock for that item.'
+}
+
+Table tent_categories {
+  category_id int [pk, ref: > categories.id]
+  capacity int [not null]
+  season_rating int [not null]
+  packed_weight_kg numeric(5,2)
+  floor_area_m2 numeric(5,2)
+  estimated_build_time_minutes int [not null, default: 10]
+  setup_service_fee numeric(10,2) [not null, default: 0.00]
+
+  Note: 'Tent-only category details.'
+}
+
+Table furnishing_categories {
+  category_id int [pk, ref: > categories.id]
+  furnishing_kind varchar(100) [not null]
+  weight_kg numeric(5,2)
+  notes text
+
+  Note: 'Furnishing-only category details.'
+}
+
+Table bookings {
+  id serial [pk]
+  customer_id int [not null, ref: > customers.id]
+  start_date date [not null]
+  end_date date [not null]
+  status booking_status [not null, default: 'pending']
+  include_delivery boolean [not null, default: false]
+  include_setup_service boolean [not null, default: false]
+  delivery_fee numeric(10,2)
+  delivery_address text
+  delivery_distance_km numeric(10,2)
+  custom_total_price numeric(10,2)
+  custom_price_note text
+  booking_note text
+  admin_note text
+  created_at timestamp [not null]
+
+  indexes {
+    (customer_id, created_at)
+    (status)
+    (start_date, end_date)
+  }
+
+  Note: 'Booking header. Delivery, setup, and manual price overrides are stored here as snapshots.'
+}
+
+Table booking_items {
+  booking_id int [not null, ref: > bookings.id]
+  item_id int [not null, ref: > items.id]
+  category_id int [not null, ref: > categories.id]
+  rental_period_id int [ref: > rental_periods.id]
+  quoted_period_label varchar(100)
+  quoted_period_price numeric(10,2)
+  setup_service_fee numeric(10,2)
+  custom_total_price numeric(10,2)
+  custom_price_note text
+  line_note varchar(255)
+
+  indexes {
+    (booking_id, item_id) [pk]
+    (item_id, booking_id)
+    (category_id)
+  }
+
+  Note: 'Booking line for a physical item. category_id snapshots the category the customer/admin actually selected, even if the item belongs to several categories.'
+}

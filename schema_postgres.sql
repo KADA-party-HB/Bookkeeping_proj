@@ -1,5 +1,6 @@
 -- Tent Rental Schema
 
+DROP TABLE IF EXISTS item_category_memberships;
 DROP TABLE IF EXISTS booking_items;
 DROP TABLE IF EXISTS bookings;
 DROP TABLE IF EXISTS category_rental_period_prices;
@@ -124,14 +125,22 @@ FOR EACH ROW EXECUTE FUNCTION trg_prevent_overlapping_category_periods();
 -- ITEMS (physical items)
 CREATE TABLE items (
   id SERIAL PRIMARY KEY,
-  category_id INT NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
   sku VARCHAR(100) NOT NULL UNIQUE,
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX idx_items_active ON items(is_active);
-CREATE INDEX idx_items_category ON items(category_id);
+
+CREATE TABLE item_category_memberships (
+  item_id INT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+  category_id INT NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (item_id, category_id)
+);
+
+CREATE INDEX idx_item_category_memberships_category
+  ON item_category_memberships(category_id);
 
 -- TENT_CATEGORIES (derived subtype of category)
 -- setup_service_fee = construction + deconstruction together
@@ -212,6 +221,95 @@ AFTER INSERT ON categories
 DEFERRABLE INITIALLY DEFERRED
 FOR EACH ROW EXECUTE FUNCTION trg_category_must_have_exactly_one_subtype();
 
+CREATE OR REPLACE FUNCTION trg_validate_item_category_membership()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+DECLARE
+  v_target_is_tent BOOLEAN;
+  v_target_is_furnishing BOOLEAN;
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM items i
+    WHERE i.id = NEW.item_id
+  ) THEN
+    RAISE EXCEPTION 'Item % does not exist', NEW.item_id;
+  END IF;
+
+  SELECT
+    EXISTS (SELECT 1 FROM tent_categories WHERE category_id = NEW.category_id),
+    EXISTS (SELECT 1 FROM furnishing_categories WHERE category_id = NEW.category_id)
+  INTO
+    v_target_is_tent,
+    v_target_is_furnishing;
+
+  IF EXISTS (
+    SELECT 1
+    FROM item_category_memberships icm
+    WHERE icm.item_id = NEW.item_id
+      AND (TG_OP <> 'UPDATE' OR icm.category_id <> OLD.category_id)
+      AND NOT EXISTS (
+        SELECT 1
+        FROM tent_categories tc
+        WHERE tc.category_id = icm.category_id
+          AND v_target_is_tent
+      )
+      AND NOT EXISTS (
+        SELECT 1
+        FROM furnishing_categories fc
+        WHERE fc.category_id = icm.category_id
+          AND v_target_is_furnishing
+      )
+  ) THEN
+    RAISE EXCEPTION
+      'Item % can only be linked to categories of the same type',
+      NEW.item_id;
+  END IF;
+
+  RETURN NEW;
+END$$;
+
+DROP TRIGGER IF EXISTS validate_item_category_membership ON item_category_memberships;
+CREATE TRIGGER validate_item_category_membership
+BEFORE INSERT OR UPDATE ON item_category_memberships
+FOR EACH ROW EXECUTE FUNCTION trg_validate_item_category_membership();
+
+CREATE OR REPLACE FUNCTION trg_item_must_have_membership()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+  IF TG_TABLE_NAME = 'items' THEN
+    IF NOT EXISTS (
+      SELECT 1
+      FROM item_category_memberships icm
+      WHERE icm.item_id = NEW.id
+    ) THEN
+      RAISE EXCEPTION 'Item % must belong to at least one category', NEW.id;
+    END IF;
+    RETURN NULL;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM item_category_memberships icm
+    WHERE icm.item_id = OLD.item_id
+  ) THEN
+    RAISE EXCEPTION 'Item % must belong to at least one category', OLD.item_id;
+  END IF;
+
+  RETURN NULL;
+END$$;
+
+DROP TRIGGER IF EXISTS item_membership_required_on_items ON items;
+CREATE CONSTRAINT TRIGGER item_membership_required_on_items
+AFTER INSERT ON items
+DEFERRABLE INITIALLY DEFERRED
+FOR EACH ROW EXECUTE FUNCTION trg_item_must_have_membership();
+
+DROP TRIGGER IF EXISTS item_membership_required_on_memberships ON item_category_memberships;
+CREATE CONSTRAINT TRIGGER item_membership_required_on_memberships
+AFTER DELETE OR UPDATE ON item_category_memberships
+DEFERRABLE INITIALLY DEFERRED
+FOR EACH ROW EXECUTE FUNCTION trg_item_must_have_membership();
+
 -- BOOKINGS
 -- include_delivery = whether delivery is part of booking
 -- include_setup_service = whether setup/teardown is included
@@ -253,6 +351,7 @@ CREATE INDEX idx_bookings_dates ON bookings(start_date, end_date);
 CREATE TABLE booking_items (
   booking_id INT NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
   item_id INT NOT NULL REFERENCES items(id) ON DELETE RESTRICT,
+  category_id INT NOT NULL REFERENCES categories(id) ON DELETE RESTRICT,
 
   rental_period_id INT REFERENCES rental_periods(id) ON DELETE SET NULL,
   quoted_period_label VARCHAR(100),
@@ -272,6 +371,7 @@ CREATE TABLE booking_items (
 );
 
 CREATE INDEX idx_booking_items_item_booking ON booking_items(item_id, booking_id);
+CREATE INDEX idx_booking_items_category ON booking_items(category_id);
 
 -- overlap prevention (per physical item)
 CREATE OR REPLACE FUNCTION trg_prevent_overlapping_item_booking()
@@ -378,13 +478,16 @@ BEGIN
     packed_weight_kg = EXCLUDED.packed_weight_kg,
     floor_area_m2 = EXCLUDED.floor_area_m2;
 
-  INSERT INTO items (category_id, sku, is_active)
-  VALUES (v_category_id, p_sku, TRUE)
+  INSERT INTO items (sku, is_active)
+  VALUES (p_sku, TRUE)
   ON CONFLICT (sku)
   DO UPDATE SET
-    category_id = EXCLUDED.category_id,
     is_active = TRUE
   RETURNING id INTO v_item_id;
+
+  INSERT INTO item_category_memberships (item_id, category_id)
+  VALUES (v_item_id, v_category_id)
+  ON CONFLICT (item_id, category_id) DO NOTHING;
 
   RETURN v_item_id;
 END$$;
@@ -414,13 +517,16 @@ BEGIN
     weight_kg = EXCLUDED.weight_kg,
     notes = EXCLUDED.notes;
 
-  INSERT INTO items (category_id, sku, is_active)
-  VALUES (v_category_id, p_sku, TRUE)
+  INSERT INTO items (sku, is_active)
+  VALUES (p_sku, TRUE)
   ON CONFLICT (sku)
   DO UPDATE SET
-    category_id = EXCLUDED.category_id,
     is_active = TRUE
   RETURNING id INTO v_item_id;
+
+  INSERT INTO item_category_memberships (item_id, category_id)
+  VALUES (v_item_id, v_category_id)
+  ON CONFLICT (item_id, category_id) DO NOTHING;
 
   RETURN v_item_id;
 END$$;
@@ -599,8 +705,10 @@ BEGIN
     WITH picked AS (
       SELECT i.id
       FROM items i
-      WHERE i.category_id = v_cat
-        AND i.is_active = TRUE
+      JOIN item_category_memberships icm
+        ON icm.item_id = i.id
+       AND icm.category_id = v_cat
+      WHERE i.is_active = TRUE
         AND NOT EXISTS (
           SELECT 1
           FROM booking_items bi
@@ -618,6 +726,7 @@ BEGIN
       INSERT INTO booking_items (
         booking_id,
         item_id,
+        category_id,
         rental_period_id,
         quoted_period_label,
         quoted_period_price,
@@ -628,6 +737,7 @@ BEGIN
       SELECT
         v_booking_id,
         p.id,
+        v_cat,
         v_rental_period_id,
         v_period_label,
         v_period_price,
@@ -665,9 +775,12 @@ BEGIN
     RAISE EXCEPTION 'Category % does not exist', p_category_id;
   END IF;
 
-  INSERT INTO items (category_id, sku, is_active)
-  VALUES (p_category_id, p_sku, p_is_active)
+  INSERT INTO items (sku, is_active)
+  VALUES (p_sku, p_is_active)
   RETURNING id INTO v_item_id;
+
+  INSERT INTO item_category_memberships (item_id, category_id)
+  VALUES (v_item_id, p_category_id);
 
   RETURN v_item_id;
 END$$;
