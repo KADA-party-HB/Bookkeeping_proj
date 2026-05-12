@@ -2,7 +2,7 @@
 
 Flask and PostgreSQL application for managing tent and furnishing rentals, inventory allocation, customer bookings, rental-period pricing, and delivery/setup add-ons.
 
-![Database diagram](docs/db-diagram.svg)
+![Database diagram](docs/DBdiagram.png)
 
 ## Overview
 
