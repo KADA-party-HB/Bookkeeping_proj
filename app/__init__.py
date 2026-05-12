@@ -75,7 +75,7 @@ def create_app():
     if delivery_address_min_confidence < 0 or delivery_address_min_confidence > 1:
         raise RuntimeError("DELIVERY_ADDRESS_MIN_CONFIDENCE must be between 0 and 1.")
 
-    max_content_length = _env_int("MAX_CONTENT_LENGTH", 1_048_576)
+    max_content_length = _env_int("MAX_CONTENT_LENGTH", 20 * 1024 * 1024)
     if max_content_length <= 0:
         raise RuntimeError("MAX_CONTENT_LENGTH must be greater than 0.")
 

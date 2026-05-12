@@ -126,6 +126,7 @@ FOR EACH ROW EXECUTE FUNCTION trg_prevent_overlapping_category_periods();
 CREATE TABLE items (
   id SERIAL PRIMARY KEY,
   sku VARCHAR(100) NOT NULL UNIQUE,
+  manual_pdf_path VARCHAR(255),
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

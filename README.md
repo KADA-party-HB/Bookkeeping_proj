@@ -36,6 +36,7 @@ Current database highlights:
 Optional environment variables:
 
 - `MAP_API_KEY` and `DELIVERY_ORIGIN_ADDRESS` for delivery quotes
+- `MAX_CONTENT_LENGTH` to control the maximum upload size in bytes. Default is `20971520` (20 MiB).
 - `MAIL_ENABLED=1`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, and `SMTP_FROM_EMAIL` for booking emails
 
 ## Docker

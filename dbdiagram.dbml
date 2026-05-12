@@ -69,6 +69,7 @@ Table category_rental_period_prices {
 Table items {
   id serial [pk]
   sku varchar(100) [not null, unique]
+  manual_pdf_path varchar(255)
   is_active boolean [not null, default: true]
   created_at timestamp [not null]
 

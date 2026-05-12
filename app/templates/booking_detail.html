@@ -203,6 +203,28 @@
     </div>
   {% endif %}
 
+  {% set tent_items = items | selectattr('is_tent') | list %}
+  {% if tent_items %}
+    <div class="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
+      <h4 class="text-sm font-semibold text-slate-900">Tent manuals</h4>
+      <div class="mt-3 grid gap-3 md:grid-cols-2">
+        {% for it in tent_items %}
+          <div class="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm">
+            <div class="font-medium text-slate-900">{{ it.display_name }}</div>
+            <div class="mt-1 text-xs text-slate-500">{{ it.sku }}</div>
+            {% if it.manual_pdf_path %}
+              <a class="mt-3 inline-flex text-sm font-medium text-sky-700 underline underline-offset-4" href="{{ url_for('static', filename=it.manual_pdf_path) }}" target="_blank" rel="noopener">
+                Open manual PDF
+              </a>
+            {% else %}
+              <div class="mt-3 text-xs text-amber-700">No manual uploaded for this tent.</div>
+            {% endif %}
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  {% endif %}
+
   <details class="mt-4 rounded-lg border border-slate-200 bg-white group" data-client-list>
     <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-medium text-slate-900">
       <span>Detailed item list</span>
@@ -229,6 +251,15 @@
               <td class="p-3" data-sort-value="{{ it.display_name }}">
                 <div class="font-medium">{{ it.display_name }}</div>
                 <div class="text-xs text-slate-500">{{ it.sku }}</div>
+                {% if it.is_tent and it.manual_pdf_path %}
+                  <div class="mt-1">
+                    <a class="text-xs font-medium text-sky-700 underline underline-offset-4" href="{{ url_for('static', filename=it.manual_pdf_path) }}" target="_blank" rel="noopener">
+                      Open manual PDF
+                    </a>
+                  </div>
+                {% elif it.is_tent %}
+                  <div class="mt-1 text-xs text-amber-700">No manual uploaded for this tent.</div>
+                {% endif %}
                 {% if it.line_note %}
                   <div class="text-xs text-slate-500 mt-1">{{ it.line_note }}</div>
                 {% endif %}
@@ -484,7 +515,7 @@
       <div class="overflow-hidden rounded-[1.5rem] border border-slate-200">
         <div class="border-b border-pink-100 bg-pink-50/55 px-4 py-3">
           <h3 class="text-sm font-semibold text-slate-900">Sammanfattning</h3>
-          <p class="mt-1 text-sm text-slate-600">Grupperad vy över matchande bokade artiklar.</p>
+          <p class="mt-1 text-sm text-slate-600">Vy över bokade artiklar.</p>
         </div>
 
         <div class="overflow-x-auto">
@@ -549,6 +580,28 @@
     {% if booking.custom_total_price is not none %}
       <div class="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
         Den här bokningen använder en total prisjustering, så hyra, montering och leverans avgör inte slutpriset.
+      </div>
+    {% endif %}
+
+    {% set tent_items = items | selectattr('is_tent') | list %}
+    {% if tent_items %}
+      <div class="mt-4 rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4">
+        <h3 class="text-sm font-semibold text-slate-900">Tältmanualer</h3>
+        <div class="mt-3 grid gap-3 md:grid-cols-2">
+          {% for it in tent_items %}
+            <div class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm">
+              <div class="font-medium text-slate-900">{{ it.display_name }}</div>
+              <div class="mt-1 text-xs text-slate-500">{{ it.sku }}</div>
+              {% if it.manual_pdf_path %}
+                <a class="mt-3 inline-flex text-sm font-medium text-sky-700 underline underline-offset-4" href="{{ url_for('static', filename=it.manual_pdf_path) }}" target="_blank" rel="noopener">
+                  Öppna manual (PDF)
+                </a>
+              {% else %}
+                <div class="mt-3 text-xs text-amber-700">Ingen manual uppladdad för detta tält.</div>
+              {% endif %}
+            </div>
+          {% endfor %}
+        </div>
       </div>
     {% endif %}
 

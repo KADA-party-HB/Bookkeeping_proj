@@ -10,7 +10,7 @@
   ) }}
 
   {% call ui.content_panel(wrapper_class='mt-6', body_class='') %}
-    <form method="post" class="grid gap-6 px-6 py-6 md:px-8">
+    <form method="post" enctype="multipart/form-data" class="grid gap-6 px-6 py-6 md:px-8">
       <div>
         <div class="flex items-center justify-between gap-3">
           <label class="text-sm font-medium text-slate-700">Categories</label>
@@ -50,6 +50,12 @@
         <label class="text-sm font-medium text-slate-700" for="sku">SKU</label>
         <input id="sku" name="sku" required placeholder="e.g. FURN-CHAIR-07" class="mt-1 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 shadow-sm transition focus:border-sky-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-sky-100">
         <p class="mt-2 text-xs text-slate-500">Must be unique for each physical item.</p>
+      </div>
+
+      <div>
+        <label class="text-sm font-medium text-slate-700" for="manual_pdf">Manual PDF</label>
+        <input id="manual_pdf" name="manual_pdf" type="file" accept=".pdf,application/pdf" class="mt-1 block w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-700 shadow-sm transition file:mr-4 file:rounded-full file:border-0 file:bg-slate-900 file:px-4 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-slate-800 focus:border-sky-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-sky-100">
+        <p class="mt-2 text-xs text-slate-500">Optional. Upload the PDF manual for this physical tent item.</p>
       </div>
 
       <label class="rounded-2xl border border-slate-200 bg-slate-50 p-4">

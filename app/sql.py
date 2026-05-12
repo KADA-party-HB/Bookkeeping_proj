@@ -278,6 +278,7 @@ SQL_LIST_ITEMS = """
 SELECT
   i.id,
   i.sku,
+  i.manual_pdf_path,
   i.is_active,
   i.created_at,
   MIN(c.id) AS category_id,
@@ -299,6 +300,7 @@ LEFT JOIN furnishing_categories fc ON fc.category_id = c.id
 GROUP BY
   i.id,
   i.sku,
+  i.manual_pdf_path,
   i.is_active,
   i.created_at
 ORDER BY display_name, i.id;
@@ -323,6 +325,7 @@ SQL_GET_ITEM_FOR_EDIT = """
 SELECT
   i.id,
   i.sku,
+  i.manual_pdf_path,
   i.is_active,
   i.created_at
 FROM items i
@@ -339,26 +342,39 @@ ORDER BY category_id;
 SQL_UPDATE_ITEM = """
 UPDATE items
 SET sku = %s,
-    is_active = %s
+    is_active = %s,
+    manual_pdf_path = %s
 WHERE id = %s;
 """
 
 # Item create
 SQL_CREATE_ITEM = """
-INSERT INTO items (sku, is_active)
-VALUES (%s, %s)
+INSERT INTO items (sku, is_active, manual_pdf_path)
+VALUES (%s, %s, %s)
 RETURNING id AS new_item_id;
 """
 
-SQL_DELETE_ITEM_CATEGORY_MEMBERSHIPS = """
+SQL_DELETE_ITEM_CATEGORY_MEMBERSHIP = """
 DELETE FROM item_category_memberships
-WHERE item_id = %s;
+WHERE item_id = %s
+  AND category_id = %s;
 """
 
 SQL_INSERT_ITEM_CATEGORY_MEMBERSHIP = """
 INSERT INTO item_category_memberships (item_id, category_id)
 VALUES (%s, %s)
 ON CONFLICT (item_id, category_id) DO NOTHING;
+"""
+
+SQL_LIST_BOOKING_REFERENCED_ITEM_CATEGORIES = """
+SELECT DISTINCT
+  c.id AS category_id,
+  c.display_name
+FROM booking_items bi
+JOIN categories c ON c.id = bi.category_id
+WHERE bi.item_id = %s
+  AND bi.category_id = ANY(%s)
+ORDER BY c.display_name, c.id;
 """
 
 # Item delete safety
@@ -660,6 +676,7 @@ SQL_BOOKING_ITEMS = """
 SELECT
   i.id AS item_id,
   i.sku,
+  i.manual_pdf_path,
   c.id AS category_id,
   c.display_name,
 
@@ -706,6 +723,7 @@ SELECT
   bi.booking_id,
   i.id AS item_id,
   i.sku,
+  i.manual_pdf_path,
   c.id AS category_id,
   c.display_name,
 

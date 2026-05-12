@@ -26,6 +26,15 @@
               <div>{{ it.category_count }} linked furnishing categories</div>
               {% if it.furnishing_kind %}<div>{{ it.furnishing_kind }}</div>{% endif %}
             {% endif %}
+            {% if it.manual_pdf_path %}
+              <div>
+                <a class="text-sky-700 underline underline-offset-4" href="{{ url_for('static', filename=it.manual_pdf_path) }}" target="_blank" rel="noopener">
+                  Open manual PDF
+                </a>
+              </div>
+            {% elif it.is_tent %}
+              <div class="text-amber-700">No manual uploaded</div>
+            {% endif %}
           </div>
           <div class="mt-4 flex flex-wrap items-center gap-2">
             <a class="rounded-full border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50" href="{{ url_for('routes.admin_item_edit_form', item_id=it.id) }}">
@@ -81,6 +90,15 @@
               {% else %}
                 <div>Shared across {{ it.category_count }} furnishing categories.</div>
                 {% if it.furnishing_kind %}<div>{{ it.furnishing_kind }}</div>{% endif %}
+              {% endif %}
+              {% if it.manual_pdf_path %}
+                <div class="mt-1">
+                  <a class="text-sky-700 underline underline-offset-4" href="{{ url_for('static', filename=it.manual_pdf_path) }}" target="_blank" rel="noopener">
+                    Open manual PDF
+                  </a>
+                </div>
+              {% elif it.is_tent %}
+                <div class="mt-1 text-amber-700">No manual uploaded.</div>
               {% endif %}
             </td>
             <td class="p-3">

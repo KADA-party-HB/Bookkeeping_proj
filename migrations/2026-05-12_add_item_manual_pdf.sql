@@ -1,0 +1,2 @@
+ALTER TABLE items
+ADD COLUMN IF NOT EXISTS manual_pdf_path VARCHAR(255);
