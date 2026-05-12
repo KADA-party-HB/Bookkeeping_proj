@@ -157,5 +157,7 @@ Table booking_items {
     (category_id)
   }
 
-  Note: 'Booking line for a physical item. category_id snapshots the category the customer/admin actually selected, even if the item belongs to several categories.'
+  Note: 'Booking line for a physical item. category_id snapshots the category the customer/admin actually selected, even if the item belongs to several categories. The (item_id, category_id) pair must exist in item_category_memberships.'
 }
+
+Ref: booking_items.(item_id, category_id) > item_category_memberships.(item_id, category_id)

@@ -364,6 +364,10 @@ CREATE TABLE booking_items (
   line_note VARCHAR(255),
 
   PRIMARY KEY (booking_id, item_id),
+  CONSTRAINT booking_items_item_category_membership_fkey
+    FOREIGN KEY (item_id, category_id)
+    REFERENCES item_category_memberships(item_id, category_id)
+    ON DELETE RESTRICT,
 
   CONSTRAINT chk_line_period_price CHECK (quoted_period_price IS NULL OR quoted_period_price >= 0),
   CONSTRAINT chk_line_setup_fee CHECK (setup_service_fee IS NULL OR setup_service_fee >= 0),

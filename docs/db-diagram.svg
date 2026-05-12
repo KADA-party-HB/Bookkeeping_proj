@@ -1,0 +1,236 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1720" height="980" viewBox="0 0 1720 980" role="img" aria-labelledby="title desc">
+  <title id="title">Kada database diagram</title>
+  <desc id="desc">Entity relationship diagram for the tent rental application database.</desc>
+  <defs>
+    <style>
+      .bg { fill: #f5f7fb; }
+      .table { fill: #ffffff; stroke: #d7dce5; stroke-width: 2; }
+      .header { fill: #245b8a; }
+      .header-text { fill: #ffffff; font: 700 18px 'Segoe UI', Arial, sans-serif; }
+      .body-text { fill: #25364a; font: 14px 'Consolas', 'Courier New', monospace; }
+      .muted { fill: #697a90; font: 13px 'Consolas', 'Courier New', monospace; }
+      .key { font-weight: 700; }
+      .line { fill: none; stroke: #8d99ab; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+      .note { fill: #203247; font: 600 15px 'Segoe UI', Arial, sans-serif; }
+    </style>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1720" height="980" rx="24"/>
+
+  <path class="line" d="M 250 180 L 300 180 L 300 110"/>
+  <path class="line" d="M 320 380 L 380 380 L 380 470"/>
+  <path class="line" d="M 320 390 L 380 390 L 380 680"/>
+  <path class="line" d="M 320 400 L 380 400 L 380 810"/>
+  <path class="line" d="M 680 835 L 730 835 L 730 735"/>
+  <path class="line" d="M 600 110 L 1100 110 L 1100 650"/>
+  <path class="line" d="M 1340 135 L 1410 135 L 1410 170"/>
+  <path class="line" d="M 1330 155 L 1380 155 L 1380 250 L 1410 250"/>
+  <path class="line" d="M 1330 315 L 1380 315 L 1380 285 L 1410 285"/>
+  <path class="line" d="M 1080 325 L 940 325 L 940 160 L 1100 160"/>
+  <path class="line" d="M 1080 350 L 320 350"/>
+  <path class="line" d="M 1080 375 L 730 375 L 730 715"/>
+  <path class="line" d="M 1330 625 L 1380 625 L 1380 330 L 1410 330"/>
+  <path class="line" d="M 1200 540 L 1200 405 L 1410 405"/>
+  <path class="line" d="M 1260 540 L 1260 425 L 730 425 L 730 715"/>
+
+  <g transform="translate(20 90)">
+    <rect class="table" width="250" height="215" rx="10"/>
+    <rect class="header" width="250" height="38" rx="10"/>
+    <rect class="header" y="28" width="250" height="10"/>
+    <text class="header-text" x="14" y="25">users</text>
+    <text class="body-text key" x="14" y="66">id</text>
+    <text class="muted" x="180" y="66">serial PK</text>
+    <text class="body-text" x="14" y="96">email</text>
+    <text class="muted" x="155" y="96">varchar(255) unique</text>
+    <text class="body-text" x="14" y="126">password_hash</text>
+    <text class="muted" x="156" y="126">varchar(255)</text>
+    <text class="body-text" x="14" y="156">role</text>
+    <text class="muted" x="182" y="156">user_role</text>
+    <text class="body-text" x="14" y="186">created_at</text>
+    <text class="muted" x="156" y="186">timestamp</text>
+  </g>
+
+  <g transform="translate(300 20)">
+    <rect class="table" width="300" height="290" rx="10"/>
+    <rect class="header" width="300" height="38" rx="10"/>
+    <rect class="header" y="28" width="300" height="10"/>
+    <text class="header-text" x="14" y="25">customers</text>
+    <text class="body-text key" x="14" y="66">id</text>
+    <text class="muted" x="214" y="66">serial PK</text>
+    <text class="body-text" x="14" y="96">full_name</text>
+    <text class="muted" x="175" y="96">varchar(200)</text>
+    <text class="body-text" x="14" y="126">email</text>
+    <text class="muted" x="196" y="126">varchar(255)</text>
+    <text class="body-text" x="14" y="156">phone</text>
+    <text class="muted" x="196" y="156">varchar(50)</text>
+    <text class="body-text" x="14" y="186">address</text>
+    <text class="muted" x="235" y="186">text</text>
+    <text class="body-text" x="14" y="216">postal_city</text>
+    <text class="muted" x="214" y="216">text</text>
+    <text class="body-text" x="14" y="246">user_id</text>
+    <text class="muted" x="214" y="246">int unique</text>
+    <text class="body-text" x="14" y="276">created_at</text>
+    <text class="muted" x="194" y="276">timestamp</text>
+  </g>
+
+  <g transform="translate(20 320)">
+    <rect class="table" width="300" height="150" rx="10"/>
+    <rect class="header" width="300" height="38" rx="10"/>
+    <rect class="header" y="28" width="300" height="10"/>
+    <text class="header-text" x="14" y="25">categories</text>
+    <text class="body-text key" x="14" y="66">id</text>
+    <text class="muted" x="236" y="66">serial PK</text>
+    <text class="body-text" x="14" y="96">display_name</text>
+    <text class="muted" x="175" y="96">varchar(200)</text>
+    <text class="body-text" x="14" y="126">created_at</text>
+    <text class="muted" x="194" y="126">timestamp</text>
+  </g>
+
+  <g transform="translate(400 440)">
+    <rect class="table" width="330" height="250" rx="10"/>
+    <rect class="header" width="330" height="38" rx="10"/>
+    <rect class="header" y="28" width="330" height="10"/>
+    <text class="header-text" x="14" y="25">tent_categories</text>
+    <text class="body-text key" x="14" y="66">category_id</text>
+    <text class="muted" x="226" y="66">int PK/FK</text>
+    <text class="body-text" x="14" y="96">capacity</text>
+    <text class="muted" x="246" y="96">int</text>
+    <text class="body-text" x="14" y="126">season_rating</text>
+    <text class="muted" x="226" y="126">int</text>
+    <text class="body-text" x="14" y="156">packed_weight_kg</text>
+    <text class="muted" x="174" y="156">numeric(5,2)</text>
+    <text class="body-text" x="14" y="186">floor_area_m2</text>
+    <text class="muted" x="194" y="186">numeric(5,2)</text>
+    <text class="body-text" x="14" y="216">estimated_build_time_minutes</text>
+    <text class="muted" x="236" y="216">int</text>
+    <text class="body-text" x="14" y="246">setup_service_fee</text>
+    <text class="muted" x="194" y="246">numeric(10,2)</text>
+  </g>
+
+  <g transform="translate(400 650)">
+    <rect class="table" width="330" height="190" rx="10"/>
+    <rect class="header" width="330" height="38" rx="10"/>
+    <rect class="header" y="28" width="330" height="10"/>
+    <text class="header-text" x="14" y="25">furnishing_categories</text>
+    <text class="body-text key" x="14" y="66">category_id</text>
+    <text class="muted" x="226" y="66">int PK/FK</text>
+    <text class="body-text" x="14" y="96">furnishing_kind</text>
+    <text class="muted" x="194" y="96">varchar(100)</text>
+    <text class="body-text" x="14" y="126">weight_kg</text>
+    <text class="muted" x="214" y="126">numeric(5,2)</text>
+    <text class="body-text" x="14" y="156">notes</text>
+    <text class="muted" x="255" y="156">text</text>
+  </g>
+
+  <g transform="translate(400 790)">
+    <rect class="table" width="330" height="170" rx="10"/>
+    <rect class="header" width="330" height="38" rx="10"/>
+    <rect class="header" y="28" width="330" height="10"/>
+    <text class="header-text" x="14" y="25">category_rental_period_prices</text>
+    <text class="body-text key" x="14" y="66">category_id</text>
+    <text class="muted" x="214" y="66">int PK/FK</text>
+    <text class="body-text key" x="14" y="96">rental_period_id</text>
+    <text class="muted" x="194" y="96">int PK/FK</text>
+    <text class="body-text" x="14" y="126">price</text>
+    <text class="muted" x="236" y="126">numeric(10,2)</text>
+    <text class="body-text" x="14" y="156">sort_order</text>
+    <text class="muted" x="214" y="156">int</text>
+  </g>
+
+  <g transform="translate(780 640)">
+    <rect class="table" width="240" height="190" rx="10"/>
+    <rect class="header" width="240" height="38" rx="10"/>
+    <rect class="header" y="28" width="240" height="10"/>
+    <text class="header-text" x="14" y="25">rental_periods</text>
+    <text class="body-text key" x="14" y="66">id</text>
+    <text class="muted" x="176" y="66">serial PK</text>
+    <text class="body-text" x="14" y="96">label</text>
+    <text class="muted" x="155" y="96">varchar(100)</text>
+    <text class="body-text" x="14" y="126">min_days</text>
+    <text class="muted" x="166" y="126">int</text>
+    <text class="body-text" x="14" y="156">max_days</text>
+    <text class="muted" x="166" y="156">int</text>
+  </g>
+
+  <g transform="translate(1100 20)">
+    <rect class="table" width="240" height="180" rx="10"/>
+    <rect class="header" width="240" height="38" rx="10"/>
+    <rect class="header" y="28" width="240" height="10"/>
+    <text class="header-text" x="14" y="25">items</text>
+    <text class="body-text key" x="14" y="66">id</text>
+    <text class="muted" x="176" y="66">serial PK</text>
+    <text class="body-text" x="14" y="96">sku</text>
+    <text class="muted" x="164" y="96">varchar(100)</text>
+    <text class="body-text" x="14" y="126">is_active</text>
+    <text class="muted" x="144" y="126">boolean</text>
+    <text class="body-text" x="14" y="156">created_at</text>
+    <text class="muted" x="144" y="156">timestamp</text>
+  </g>
+
+  <g transform="translate(1080 270)">
+    <rect class="table" width="250" height="160" rx="10"/>
+    <rect class="header" width="250" height="38" rx="10"/>
+    <rect class="header" y="28" width="250" height="10"/>
+    <text class="header-text" x="14" y="25">item_category_memberships</text>
+    <text class="body-text key" x="14" y="66">item_id</text>
+    <text class="muted" x="164" y="66">int PK/FK</text>
+    <text class="body-text key" x="14" y="96">category_id</text>
+    <text class="muted" x="144" y="96">int PK/FK</text>
+    <text class="body-text" x="14" y="126">created_at</text>
+    <text class="muted" x="144" y="126">timestamp</text>
+  </g>
+
+  <g transform="translate(1080 540)">
+    <rect class="table" width="300" height="320" rx="10"/>
+    <rect class="header" width="300" height="38" rx="10"/>
+    <rect class="header" y="28" width="300" height="10"/>
+    <text class="header-text" x="14" y="25">bookings</text>
+    <text class="body-text key" x="14" y="66">id</text>
+    <text class="muted" x="214" y="66">serial PK</text>
+    <text class="body-text" x="14" y="96">customer_id</text>
+    <text class="muted" x="184" y="96">int FK</text>
+    <text class="body-text" x="14" y="126">start_date</text>
+    <text class="muted" x="194" y="126">date</text>
+    <text class="body-text" x="14" y="156">end_date</text>
+    <text class="muted" x="194" y="156">date</text>
+    <text class="body-text" x="14" y="186">status</text>
+    <text class="muted" x="214" y="186">booking_status</text>
+    <text class="body-text" x="14" y="216">include_delivery</text>
+    <text class="muted" x="164" y="216">boolean</text>
+    <text class="body-text" x="14" y="246">include_setup_service</text>
+    <text class="muted" x="144" y="246">boolean</text>
+    <text class="body-text" x="14" y="276">delivery_fee</text>
+    <text class="muted" x="184" y="276">numeric(10,2)</text>
+    <text class="body-text" x="14" y="306">custom_total_price</text>
+    <text class="muted" x="154" y="306">numeric(10,2)</text>
+  </g>
+
+  <g transform="translate(1410 120)">
+    <rect class="table" width="290" height="370" rx="10"/>
+    <rect class="header" width="290" height="38" rx="10"/>
+    <rect class="header" y="28" width="290" height="10"/>
+    <text class="header-text" x="14" y="25">booking_items</text>
+    <text class="body-text key" x="14" y="66">booking_id</text>
+    <text class="muted" x="204" y="66">int PK/FK</text>
+    <text class="body-text key" x="14" y="96">item_id</text>
+    <text class="muted" x="214" y="96">int PK/FK</text>
+    <text class="body-text" x="14" y="126">category_id</text>
+    <text class="muted" x="194" y="126">int FK</text>
+    <text class="body-text" x="14" y="156">rental_period_id</text>
+    <text class="muted" x="174" y="156">int FK</text>
+    <text class="body-text" x="14" y="186">quoted_period_label</text>
+    <text class="muted" x="154" y="186">varchar(100)</text>
+    <text class="body-text" x="14" y="216">quoted_period_price</text>
+    <text class="muted" x="154" y="216">numeric(10,2)</text>
+    <text class="body-text" x="14" y="246">setup_service_fee</text>
+    <text class="muted" x="164" y="246">numeric(10,2)</text>
+    <text class="body-text" x="14" y="276">custom_total_price</text>
+    <text class="muted" x="154" y="276">numeric(10,2)</text>
+    <text class="body-text" x="14" y="306">custom_price_note</text>
+    <text class="muted" x="194" y="306">text</text>
+    <text class="body-text" x="14" y="336">line_note</text>
+    <text class="muted" x="204" y="336">varchar(255)</text>
+  </g>
+
+  <text class="note" x="1080" y="920">Integrity rule: booking_items (item_id, category_id) must exist in item_category_memberships.</text>
+</svg>

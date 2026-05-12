@@ -1,41 +1,89 @@
-# Tent Rental For Course DV1703
+# Kada Tent Rental
 
-Flask + PostgreSQL backend prepared to run as a standalone WSGI service on Railway.
+Flask and PostgreSQL application for managing tent and furnishing rentals, inventory allocation, customer bookings, rental-period pricing, and delivery/setup add-ons.
 
-## Local development
-1. Install the dependencies and make sure PostgreSQL is available.
-2. Copy `.env.example` to `.env` and set at least `DATABASE_URL` and `SECRET_KEY`.
-3. Create the database and apply `schema_postgres.sql` or the SQL files in `migrations/`.
-4. If you want guest delivery quotes, also set `MAP_API_KEY` and `DELIVERY_ORIGIN_ADDRESS` in `.env`.
-5. If you want booking notification emails, set `MAIL_ENABLED=1` together with `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, and `SMTP_FROM_EMAIL` in `.env`.
-6. Run the app with `flask --app run.py --debug run`.
+![Database diagram](docs/db-diagram.svg)
 
-## Local container smoke test
-Run `docker compose up --build` and open `http://localhost:8080`.
+## Overview
 
-## Railway deployment
-The production container now runs:
-- startup migrations through `docker/entrypoint.sh`
-- Gunicorn with WSGI through `wsgi.py`
-- Railway's injected `PORT` via `gunicorn.conf.py`
+The project models real inventory units rather than abstract stock counts. Each `item` is a physical rentable unit, categories define how that unit is offered, and bookings allocate actual items for a date range.
 
-Deployment details and Railway variables are in `DEPLOY.md`.
+Current database highlights:
 
-## Seeding demo data
-This project includes a small seed script that:
-- creates an admin account: `karl.wikell@gmail.com` (password: `DV1703`)
-- creates a customer for testing: `hej.hej@hej.hej` (password: `DV1703`)
-- inserts demo tents and furnishings into the inventory
+- category pricing is defined per rental period
+- categories are specialized into `tent_categories` or `furnishing_categories`
+- items can belong to multiple categories through `item_category_memberships`
+- booking lines store the selected category and validate the `(item_id, category_id)` pair against that membership table
+- overlapping rentals for the same physical item are blocked in the database
 
-Run it after you have applied the schema and set `DATABASE_URL`:
+## Stack
+
+- Python
+- Flask
+- PostgreSQL
+- Gunicorn
+- Docker Compose
+
+## Local Development
+
+1. Create and activate a virtual environment.
+2. Install dependencies with `pip install -r requirements.txt`.
+3. Copy `.env.example` to `.env`.
+4. Set at least `DATABASE_URL` and `SECRET_KEY`.
+5. Create the database and apply `schema_postgres.sql` or run the SQL files in `migrations/`.
+6. Start the app with `flask --app run.py --debug run`.
+
+Optional environment variables:
+
+- `MAP_API_KEY` and `DELIVERY_ORIGIN_ADDRESS` for delivery quotes
+- `MAIL_ENABLED=1`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, and `SMTP_FROM_EMAIL` for booking emails
+
+## Docker
+
+Run a local container smoke test with:
+
+```bash
+docker compose up --build
+```
+
+The app is exposed on `http://localhost:8080`.
+
+## Database
+
+The canonical schema lives in `schema_postgres.sql`. Incremental changes are tracked in `migrations/`.
+
+Main entities:
+
+- `users` and optional linked `customers`
+- `categories` with tent/furnishing subtype tables
+- `rental_periods` and `category_rental_period_prices`
+- `items` and `item_category_memberships`
+- `bookings` and `booking_items`
+
+The database diagram above reflects the current many-to-many item/category model and the booking validation rule:
+
+`booking_items(item_id, category_id) -> item_category_memberships(item_id, category_id)`
+
+## Seed Data
+
+After the schema is applied and `DATABASE_URL` is configured, load demo data with:
 
 ```bash
 python seed.py
 ```
 
-source .venv/bin/activate
-python3 docker/migrate
-flask --app run.py --debug run
+The seed script:
 
-karl.wikell@gmail.com
-DV1703
+- creates an admin user: `karl.wikell@gmail.com` / `DV1703`
+- creates a customer user: `hej.hej@hej.hej` / `DV1703`
+- inserts demo tents, furnishings, rental periods, and pricing data
+
+## Deployment
+
+Production deployment is container-based.
+
+- `docker/entrypoint.sh` runs startup migrations
+- `wsgi.py` exposes the WSGI entrypoint
+- `gunicorn.conf.py` reads the injected `PORT`
+
+Railway-specific deployment details are documented in `DEPLOY.md`.
