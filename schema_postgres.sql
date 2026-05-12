@@ -706,17 +706,20 @@ BEGIN
       v_setup_service_fee := NULL;
     END IF;
 
-    WITH picked AS (
+    WITH membership_stats AS (
+      SELECT
+        icm_count.item_id,
+        COUNT(*) AS membership_count
+      FROM item_category_memberships icm_count
+      GROUP BY icm_count.item_id
+    ),
+    picked AS (
       SELECT i.id
       FROM items i
       JOIN item_category_memberships icm
         ON icm.item_id = i.id
        AND icm.category_id = v_cat
-      JOIN LATERAL (
-        SELECT COUNT(*) AS membership_count
-        FROM item_category_memberships icm_count
-        WHERE icm_count.item_id = i.id
-      ) membership_stats ON TRUE
+      JOIN membership_stats ms ON ms.item_id = i.id
       WHERE i.is_active = TRUE
         AND NOT EXISTS (
           SELECT 1
@@ -727,8 +730,8 @@ BEGIN
             AND p_start <= b.end_date
             AND p_end >= b.start_date
         )
-      ORDER BY membership_stats.membership_count, i.id
-      FOR UPDATE SKIP LOCKED
+      ORDER BY ms.membership_count, i.id
+      FOR UPDATE OF i SKIP LOCKED
       LIMIT v_qty
     ),
     ins AS (

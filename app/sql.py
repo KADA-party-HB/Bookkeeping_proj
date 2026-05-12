@@ -937,32 +937,33 @@ WITH request_window AS (
     %s::int AS current_booking_id,
     %s::date AS requested_start,
     %s::date AS requested_end
+),
+membership_stats AS (
+  SELECT
+    icm_count.item_id,
+    COUNT(*) AS membership_count
+  FROM item_category_memberships icm_count
+  GROUP BY icm_count.item_id
 )
 SELECT
   i.id AS item_id,
   i.sku,
-  COALESCE(ov.has_overlap, FALSE) AS is_turnaround
+  EXISTS (
+    SELECT 1
+    FROM booking_items bi
+    JOIN bookings b ON b.id = bi.booking_id
+    WHERE bi.item_id = i.id
+      AND (rw.current_booking_id IS NULL OR bi.booking_id <> rw.current_booking_id)
+      AND b.status <> 'cancelled'
+      AND rw.requested_start <= b.end_date
+      AND rw.requested_end >= b.start_date
+  ) AS is_turnaround
 FROM items i
 JOIN item_category_memberships icm
   ON icm.item_id = i.id
+JOIN membership_stats ms
+  ON ms.item_id = i.id
 CROSS JOIN request_window rw
-JOIN LATERAL (
-  SELECT COUNT(*) AS membership_count
-  FROM item_category_memberships icm_count
-  WHERE icm_count.item_id = i.id
-) membership_stats ON TRUE
-LEFT JOIN LATERAL (
-  SELECT
-    COUNT(*) > 0 AS has_overlap,
-    COALESCE(BOOL_OR(b.end_date <> rw.requested_start), FALSE) AS has_blocking_overlap
-  FROM booking_items bi
-  JOIN bookings b ON b.id = bi.booking_id
-  WHERE bi.item_id = i.id
-    AND (rw.current_booking_id IS NULL OR bi.booking_id <> rw.current_booking_id)
-    AND b.status <> 'cancelled'
-    AND rw.requested_start <= b.end_date
-    AND rw.requested_end >= b.start_date
-) ov ON TRUE
 WHERE icm.category_id = %s
   AND (
     i.is_active = TRUE
@@ -973,8 +974,30 @@ WHERE icm.category_id = %s
         AND current_bi.item_id = i.id
     )
   )
-  AND COALESCE(ov.has_blocking_overlap, FALSE) = FALSE
-ORDER BY COALESCE(ov.has_overlap, FALSE), membership_stats.membership_count, i.id
+  AND NOT EXISTS (
+    SELECT 1
+    FROM booking_items bi
+    JOIN bookings b ON b.id = bi.booking_id
+    WHERE bi.item_id = i.id
+      AND (rw.current_booking_id IS NULL OR bi.booking_id <> rw.current_booking_id)
+      AND b.status <> 'cancelled'
+      AND rw.requested_start <= b.end_date
+      AND rw.requested_end >= b.start_date
+      AND b.end_date <> rw.requested_start
+  )
+ORDER BY
+  EXISTS (
+    SELECT 1
+    FROM booking_items bi
+    JOIN bookings b ON b.id = bi.booking_id
+    WHERE bi.item_id = i.id
+      AND (rw.current_booking_id IS NULL OR bi.booking_id <> rw.current_booking_id)
+      AND b.status <> 'cancelled'
+      AND rw.requested_start <= b.end_date
+      AND rw.requested_end >= b.start_date
+  ),
+  ms.membership_count,
+  i.id
 FOR UPDATE OF i SKIP LOCKED;
 """
 
