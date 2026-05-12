@@ -1,6 +1,7 @@
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from email.message import EmailMessage
 from email.utils import formataddr
+from math import ceil
 import smtplib
 import ssl
 
@@ -48,6 +49,88 @@ def _format_date(value) -> str:
 
 def _normalized_email(value) -> str:
     return (value or "").strip().lower()
+
+
+def _send_email_message(message: EmailMessage) -> None:
+    smtp_host = current_app.config["SMTP_HOST"]
+    smtp_port = current_app.config["SMTP_PORT"]
+    smtp_timeout = current_app.config["SMTP_TIMEOUT_SECONDS"]
+    smtp_username = current_app.config.get("SMTP_USERNAME") or ""
+    smtp_password = current_app.config.get("SMTP_PASSWORD") or ""
+    smtp_use_ssl = bool(current_app.config.get("SMTP_USE_SSL"))
+    smtp_use_starttls = bool(current_app.config.get("SMTP_USE_STARTTLS"))
+
+    smtp_class = smtplib.SMTP_SSL if smtp_use_ssl else smtplib.SMTP
+    ssl_context = ssl.create_default_context()
+
+    with smtp_class(smtp_host, smtp_port, timeout=smtp_timeout) as smtp:
+        if not smtp_use_ssl:
+            smtp.ehlo()
+        if smtp_use_starttls:
+            smtp.starttls(context=ssl_context)
+            smtp.ehlo()
+        if smtp_username:
+            smtp.login(smtp_username, smtp_password)
+        smtp.send_message(message)
+
+
+def send_password_reset_email(*, user, reset_url: str) -> bool:
+    recipient = (user.get("email") or "").strip()
+    if not recipient:
+        return False
+
+    site_name = current_app.config.get("BOOKING_EMAIL_SITE_NAME", "KADA PartyTillbehör")
+    max_age_seconds = int(current_app.config.get("PASSWORD_RESET_TOKEN_MAX_AGE_SECONDS") or 3600)
+    expires_in_minutes = max(1, ceil(max_age_seconds / 60))
+    contact_email = (
+        current_app.config.get("BOOKING_EMAIL_REPLY_TO")
+        or current_app.config.get("SMTP_FROM_EMAIL")
+    )
+
+    context = {
+        "site_name": site_name,
+        "reset_url": reset_url,
+        "recipient_email": recipient,
+        "expires_in_minutes": expires_in_minutes,
+        "contact_email": contact_email,
+    }
+
+    message = EmailMessage()
+    subject = f"{site_name} - återställ ditt lösenord"
+    message["Subject"] = subject
+    message["From"] = formataddr(
+        (
+            current_app.config.get("SMTP_FROM_NAME") or "",
+            current_app.config.get("SMTP_FROM_EMAIL") or "",
+        )
+    )
+    message["To"] = recipient
+
+    reply_to = current_app.config.get("BOOKING_EMAIL_REPLY_TO")
+    if reply_to:
+        message["Reply-To"] = reply_to
+
+    message.set_content(render_template("emails/password_reset.txt", **context))
+    message.add_alternative(
+        render_template("emails/password_reset.html", **context),
+        subtype="html",
+    )
+
+    if not current_app.config.get("MAIL_ENABLED"):
+        current_app.logger.info(
+            "password_reset_email_not_sent mail_disabled to=%s reset_url=%s",
+            recipient,
+            reset_url,
+        )
+        return False
+
+    _send_email_message(message)
+    current_app.logger.info(
+        "password_reset_email_sent to=%s subject=%s",
+        recipient,
+        subject,
+    )
+    return True
 
 
 def send_booking_event_email(
@@ -139,26 +222,7 @@ def send_booking_event_email(
         subtype="html",
     )
 
-    smtp_host = current_app.config["SMTP_HOST"]
-    smtp_port = current_app.config["SMTP_PORT"]
-    smtp_timeout = current_app.config["SMTP_TIMEOUT_SECONDS"]
-    smtp_username = current_app.config.get("SMTP_USERNAME") or ""
-    smtp_password = current_app.config.get("SMTP_PASSWORD") or ""
-    smtp_use_ssl = bool(current_app.config.get("SMTP_USE_SSL"))
-    smtp_use_starttls = bool(current_app.config.get("SMTP_USE_STARTTLS"))
-
-    smtp_class = smtplib.SMTP_SSL if smtp_use_ssl else smtplib.SMTP
-    ssl_context = ssl.create_default_context()
-
-    with smtp_class(smtp_host, smtp_port, timeout=smtp_timeout) as smtp:
-        if not smtp_use_ssl:
-            smtp.ehlo()
-        if smtp_use_starttls:
-            smtp.starttls(context=ssl_context)
-            smtp.ehlo()
-        if smtp_username:
-            smtp.login(smtp_username, smtp_password)
-        smtp.send_message(message)
+    _send_email_message(message)
 
     current_app.logger.info(
         "booking_email_sent booking_id=%s type=%s to=%s archive_copy=%s archive_recipient=%s subject=%s",

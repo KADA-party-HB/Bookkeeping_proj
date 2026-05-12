@@ -11,6 +11,19 @@ FROM users
 WHERE email = %s;
 """
 
+SQL_GET_USER_BY_ID = """
+SELECT id, email, password_hash, role, created_at
+FROM users
+WHERE id = %s;
+"""
+
+SQL_UPDATE_USER_PASSWORD = """
+UPDATE users
+SET password_hash = %s
+WHERE id = %s
+RETURNING id, email, role;
+"""
+
 # Customers
 SQL_GET_CUSTOMER_BY_EMAIL = """
 SELECT id, full_name, email, phone, address, postal_city, user_id, created_at

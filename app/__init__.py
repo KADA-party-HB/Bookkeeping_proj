@@ -155,6 +155,13 @@ def create_app():
     if smtp_timeout_seconds <= 0:
         raise RuntimeError("SMTP_TIMEOUT_SECONDS must be greater than 0.")
 
+    password_reset_token_max_age_seconds = _env_int(
+        "PASSWORD_RESET_TOKEN_MAX_AGE_SECONDS",
+        3600,
+    )
+    if password_reset_token_max_age_seconds <= 0:
+        raise RuntimeError("PASSWORD_RESET_TOKEN_MAX_AGE_SECONDS must be greater than 0.")
+
     smtp_from_email = (os.getenv("SMTP_FROM_EMAIL") or "").strip()
     if mail_enabled:
         if not smtp_host:
@@ -217,6 +224,7 @@ def create_app():
         SMTP_FROM_NAME=(os.getenv("SMTP_FROM_NAME") or "KADA PartyTillbehör").strip(),
         BOOKING_EMAIL_REPLY_TO=(os.getenv("BOOKING_EMAIL_REPLY_TO") or "").strip(),
         BOOKING_EMAIL_SITE_NAME=(os.getenv("BOOKING_EMAIL_SITE_NAME") or "KADA PartyTillbehör").strip(),
+        PASSWORD_RESET_TOKEN_MAX_AGE_SECONDS=password_reset_token_max_age_seconds,
     )
 
     if _env_flag("TRUST_PROXY_HEADERS", default=False):

@@ -6,6 +6,7 @@
     action="{{ url_for('routes.guest_booking_create') }}"
     class="mt-6 space-y-6"
     id="guest-booking-form"
+    novalidate
     data-delivery-quote-url="{{ url_for('routes.guest_delivery_quote') }}"
   >
     <input type="hidden" name="start_date" value="{{ start_date }}">
@@ -476,6 +477,17 @@
               <input
                 id="password"
                 name="password"
+                type="password"
+                required
+                autocomplete="new-password"
+                class="mt-1 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 shadow-sm transition focus:border-pink-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-pink-100"
+              >
+            </div>
+            <div>
+              <label class="text-sm font-medium text-slate-700" for="password_confirm">Upprepa l&ouml;senord</label>
+              <input
+                id="password_confirm"
+                name="password_confirm"
                 type="password"
                 required
                 autocomplete="new-password"

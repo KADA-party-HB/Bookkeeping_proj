@@ -461,6 +461,18 @@
   </div>
 </section>
 
+{% if role != "admin" %}
+<section class="mt-6 rounded-[2rem] border border-amber-200 bg-amber-50/80 px-6 py-5 text-sm text-amber-900 shadow-[0_20px_50px_-38px_rgba(180,83,9,0.28)]">
+  <div class="text-xs font-medium uppercase tracking-[0.18em] text-amber-700">Avbokning</div>
+  <p class="mt-2 leading-6">
+    Om du vill avboka, kontakta oss via
+    <a href="mailto:kadaparty@kadaparty.se" class="font-semibold underline underline-offset-4">kadaparty@kadaparty.se</a>
+    eller p&aring;
+    <a href="tel:0730813710" class="font-semibold underline underline-offset-4">0730813710</a>.
+  </p>
+</section>
+{% endif %}
+
 <section class="mt-6 rounded-[2rem] border border-slate-200 bg-white shadow-[0_24px_60px_-42px_rgba(15,23,42,0.16)]">
   <div class="border-b border-pink-100 bg-[linear-gradient(180deg,rgba(253,242,248,0.55),rgba(255,255,255,0.96))] px-6 py-5">
     <div class="text-xs font-medium uppercase tracking-[0.2em] text-rose-400">Artiklar</div>

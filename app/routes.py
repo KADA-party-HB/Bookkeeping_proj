@@ -238,6 +238,8 @@ NOINDEX_ENDPOINT_PREFIXES = (
 NOINDEX_ENDPOINTS = {
     "auth.login_form",
     "auth.register_form",
+    "auth.forgot_password_form",
+    "auth.reset_password_form",
     "routes.customers",
 }
 
@@ -712,6 +714,17 @@ def _route_meta_defaults():
             meta_description="Skapa ett konto för att boka tält och festutrustning hos KADA PartyTillbehör.",
             canonical_url=_site_url("auth.register_form"),
         )
+    elif endpoint == "auth.forgot_password_form":
+        metadata.update(
+            meta_title=f"Glömt Lösenord | {SITE_NAME}",
+            meta_description="Begär en länk för att återställa lösenordet till ditt kundkonto.",
+            canonical_url=_site_url("auth.forgot_password_form"),
+        )
+    elif endpoint == "auth.reset_password_form":
+        metadata.update(
+            meta_title=f"Återställ Lösenord | {SITE_NAME}",
+            meta_description="Välj ett nytt lösenord för ditt kundkonto.",
+        )
     elif endpoint == "routes.faq":
         metadata.update(
             meta_title=f"Vanliga frågor | {SITE_NAME}",
@@ -860,6 +873,20 @@ def apply_request_rate_limits():
         if not allowed:
             return _rate_limit_response(
                 message="Too many registration attempts. Try again later.",
+                retry_after_seconds=retry_after_seconds,
+            )
+
+    if endpoint == "auth.forgot_password":
+        email = _normalize_email(request.form.get("email"))
+        allowed, retry_after_seconds = _check_rate_limit(
+            "forgot_password",
+            key=f"{ip_address}|{email or 'unknown'}",
+            limit=current_app.config["REGISTRATION_RATE_LIMIT_ATTEMPTS"],
+            window_seconds=current_app.config["REGISTRATION_RATE_LIMIT_WINDOW_SECONDS"],
+        )
+        if not allowed:
+            return _rate_limit_response(
+                message="Too many password reset requests. Try again later.",
                 retry_after_seconds=retry_after_seconds,
             )
 
@@ -2065,6 +2092,7 @@ def guest_booking_create():
     account_address = _to_str_or_none(request.form.get("address"))
     account_postal_city = _sanitize_postal_city(request.form.get("postal_city"))
     account_password = request.form.get("password", "")
+    account_password_confirm = request.form.get("password_confirm", "")
 
     if customer:
         account_full_name = customer["full_name"]
@@ -2074,6 +2102,10 @@ def guest_booking_create():
     else:
         if not account_full_name or not account_email or not account_password:
             flash("Namn, e-post och lösenord krävs för att skapa ett konto.", "error")
+            return redirect(url_for("routes.home", start_date=start, end_date=end))
+
+        if account_password != account_password_confirm:
+            flash("Lösenorden matchar inte.", "error")
             return redirect(url_for("routes.home", start_date=start, end_date=end))
 
         if query(SQL_GET_USER_BY_EMAIL, (account_email,), one=True):

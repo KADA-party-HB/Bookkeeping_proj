@@ -164,8 +164,12 @@
     const includeSetup = form.querySelector("#include_setup_service");
     const includeDelivery = form.querySelector("#include_delivery");
     const setupServiceHelp = form.querySelector("#setup-service-help");
+    const fullNameField = form.querySelector("#full_name");
+    const emailField = form.querySelector("#email");
     const addressField = form.querySelector("#address");
     const postalCityField = form.querySelector("#postal_city");
+    const passwordField = form.querySelector("#password");
+    const passwordConfirmField = form.querySelector("#password_confirm");
     const rentalTermsCheckbox = form.querySelector("#accept_rental_terms");
     const deliveryPanel = form.querySelector("#delivery-panel");
     const deliveryError = form.querySelector("#delivery-address-error");
@@ -657,6 +661,43 @@
       formError.classList.toggle("hidden", !message);
     };
 
+    const showFormFieldError = (message, field, { select = false } = {}) => {
+      setFormError(message);
+      if (field && typeof field.focus === "function") {
+        field.focus();
+        if (select && typeof field.select === "function") {
+          field.select();
+        }
+      }
+    };
+
+    const getNativeFieldErrorMessage = (field) => {
+      if (field === fullNameField) {
+        return "Fyll i ditt fullständiga namn innan du skickar bokningen.";
+      }
+
+      if (field === emailField) {
+        const hasValue = Boolean(String(emailField.value || "").trim());
+        return hasValue
+          ? "Ange en giltig e-postadress innan du skickar bokningen."
+          : "Fyll i din e-postadress innan du skickar bokningen.";
+      }
+
+      if (field === passwordField) {
+        return "Fyll i ett lösenord innan du skickar bokningen.";
+      }
+
+      if (field === passwordConfirmField) {
+        return "Upprepa lösenordet innan du skickar bokningen.";
+      }
+
+      if (field === rentalTermsCheckbox) {
+        return "Godkänn hyresvillkoren innan du skickar bokningen.";
+      }
+
+      return field?.validationMessage || "Kontrollera formuläret innan du skickar bokningen.";
+    };
+
     const syncSubmitButtonState = () => {
       if (!submitButton) return;
       submitButton.disabled = validationInFlight;
@@ -1114,6 +1155,36 @@
       rentalTermsCheckbox.setCustomValidity("");
       setFormError("");
     });
+    form.addEventListener("invalid", (event) => {
+      const field = event.target;
+      if (!(field instanceof HTMLElement)) {
+        return;
+      }
+
+      event.preventDefault();
+      const select = field === emailField && Boolean(String(emailField?.value || "").trim());
+      showFormFieldError(getNativeFieldErrorMessage(field), field, { select });
+    }, true);
+    form.addEventListener("input", () => {
+      if (formError?.textContent) {
+        setFormError("");
+      }
+    });
+    form.addEventListener("change", () => {
+      if (formError?.textContent) {
+        setFormError("");
+      }
+    });
+    passwordField?.addEventListener("input", () => {
+      if (formError?.textContent) {
+        setFormError("");
+      }
+    });
+    passwordConfirmField?.addEventListener("input", () => {
+      if (formError?.textContent) {
+        setFormError("");
+      }
+    });
 
     form.addEventListener("submit", async (event) => {
       setFormError("");
@@ -1121,22 +1192,69 @@
       const state = getState();
       if (!state.itemCount) {
         event.preventDefault();
-        setFormError("Välj minst en artikel innan du skickar bokningen.");
+        showFormFieldError("Välj minst en artikel innan du skickar bokningen.");
+        return;
+      }
+
+      if (fullNameField && !String(fullNameField.value || "").trim()) {
+        event.preventDefault();
+        showFormFieldError("Fyll i ditt fullständiga namn innan du skickar bokningen.", fullNameField);
+        return;
+      }
+
+      if (emailField) {
+        if (!String(emailField.value || "").trim()) {
+          event.preventDefault();
+          showFormFieldError("Fyll i din e-postadress innan du skickar bokningen.", emailField);
+          return;
+        }
+
+        if (typeof emailField.checkValidity === "function" && !emailField.checkValidity()) {
+          event.preventDefault();
+          showFormFieldError("Ange en giltig e-postadress innan du skickar bokningen.", emailField, { select: true });
+          return;
+        }
+      }
+
+      if (passwordField && !passwordField.value) {
+        event.preventDefault();
+        showFormFieldError("Fyll i ett lösenord innan du skickar bokningen.", passwordField);
+        return;
+      }
+
+      if (passwordConfirmField && !passwordConfirmField.value) {
+        event.preventDefault();
+        showFormFieldError("Upprepa lösenordet innan du skickar bokningen.", passwordConfirmField);
+        return;
+      }
+
+      if (includeSetup?.checked && !includeDelivery?.checked) {
+        event.preventDefault();
+        showFormFieldError("Montering kräver leverans i bokningsformuläret.", includeDelivery);
+        return;
+      }
+
+      if (passwordField && passwordConfirmField && passwordField.value !== passwordConfirmField.value) {
+        event.preventDefault();
+        showFormFieldError("Lösenorden matchar inte.", passwordConfirmField, { select: true });
         return;
       }
 
       if (rentalTermsCheckbox && !rentalTermsCheckbox.checked) {
         event.preventDefault();
-        rentalTermsCheckbox.setCustomValidity("GodkÃ¤nn hyresvillkoren innan du skickar bokningen.");
+        rentalTermsCheckbox.setCustomValidity("Godkänn hyresvillkoren innan du skickar bokningen.");
         rentalTermsCheckbox.reportValidity();
-        setFormError("GodkÃ¤nn hyresvillkoren innan du skickar bokningen.");
+        showFormFieldError("Godkänn hyresvillkoren innan du skickar bokningen.", rentalTermsCheckbox);
         return;
       }
 
       if (includeDelivery?.checked) {
         if (!hasCompleteDeliveryAddress()) {
           event.preventDefault();
-          setFormError("Ange både adress och postort innan du skickar bokningen.");
+          showFormFieldError(
+            "Ange både adress och postort innan du skickar bokningen.",
+            getStreetAddress() ? postalCityField : addressField,
+          );
           return;
         }
 
@@ -1153,7 +1271,7 @@
           syncSubmitButtonState();
 
           if (!valid) {
-            setFormError("Kontrollera den markerade adressen innan du skickar bokningen.");
+            showFormFieldError("Kontrollera den markerade adressen innan du skickar bokningen.", addressField);
             return;
           }
 
