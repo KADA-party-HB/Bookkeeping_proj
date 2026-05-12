@@ -946,6 +946,11 @@ FROM items i
 JOIN item_category_memberships icm
   ON icm.item_id = i.id
 CROSS JOIN request_window rw
+JOIN LATERAL (
+  SELECT COUNT(*) AS membership_count
+  FROM item_category_memberships icm_count
+  WHERE icm_count.item_id = i.id
+) membership_stats ON TRUE
 LEFT JOIN LATERAL (
   SELECT
     COUNT(*) > 0 AS has_overlap,
@@ -969,7 +974,7 @@ WHERE icm.category_id = %s
     )
   )
   AND COALESCE(ov.has_blocking_overlap, FALSE) = FALSE
-ORDER BY COALESCE(ov.has_overlap, FALSE), i.id
+ORDER BY COALESCE(ov.has_overlap, FALSE), membership_stats.membership_count, i.id
 FOR UPDATE OF i SKIP LOCKED;
 """
 

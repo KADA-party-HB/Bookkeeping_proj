@@ -712,6 +712,11 @@ BEGIN
       JOIN item_category_memberships icm
         ON icm.item_id = i.id
        AND icm.category_id = v_cat
+      JOIN LATERAL (
+        SELECT COUNT(*) AS membership_count
+        FROM item_category_memberships icm_count
+        WHERE icm_count.item_id = i.id
+      ) membership_stats ON TRUE
       WHERE i.is_active = TRUE
         AND NOT EXISTS (
           SELECT 1
@@ -722,7 +727,7 @@ BEGIN
             AND p_start <= b.end_date
             AND p_end >= b.start_date
         )
-      ORDER BY i.id
+      ORDER BY membership_stats.membership_count, i.id
       FOR UPDATE SKIP LOCKED
       LIMIT v_qty
     ),
