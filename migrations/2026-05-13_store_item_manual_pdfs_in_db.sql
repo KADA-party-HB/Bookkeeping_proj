@@ -1,0 +1,3 @@
+ALTER TABLE items
+ADD COLUMN IF NOT EXISTS manual_pdf_filename VARCHAR(255),
+ADD COLUMN IF NOT EXISTS manual_pdf_data BYTEA;

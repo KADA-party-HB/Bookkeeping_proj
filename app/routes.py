@@ -1,4 +1,3 @@
-import os
 from flask import (
     Blueprint,
     Response,
@@ -12,10 +11,12 @@ from flask import (
     abort,
     jsonify,
     send_from_directory,
+    send_file,
 )
 
 from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+from io import BytesIO
 import json
 import secrets
 import re
@@ -76,6 +77,8 @@ from .sql import (
     SQL_LIST_ITEMS,
     SQL_LIST_CATEGORIES_FOR_DROPDOWN,
     SQL_GET_ITEM_FOR_EDIT,
+    SQL_GET_ITEM_MANUAL,
+    SQL_CUSTOMER_CAN_ACCESS_ITEM_MANUAL,
     SQL_LIST_ITEM_CATEGORY_IDS,
     SQL_UPDATE_ITEM,
     SQL_CREATE_ITEM,
@@ -119,8 +122,6 @@ from .sql import (
 )
 
 bp = Blueprint("routes", __name__)
-
-ITEM_MANUAL_UPLOAD_SUBDIR = "uploads/item-manuals"
 
 DEFAULT_META_KEYWORDS = (
     "kada, kada party, t\u00e4ltuthyrning, party, fest, fest utrustning, "
@@ -1365,37 +1366,7 @@ def _collect_item_category_ids_from_form():
     return category_ids
 
 
-def _item_manual_upload_directory():
-    return os.path.join(current_app.static_folder, "uploads", "item-manuals")
-
-
-def _delete_item_manual_file(stored_path):
-    if not stored_path:
-        return
-
-    normalized_path = (stored_path or "").replace("\\", "/").strip("/")
-    if not normalized_path:
-        return
-
-    static_root = os.path.abspath(current_app.static_folder)
-    absolute_path = os.path.abspath(
-        os.path.join(static_root, *normalized_path.split("/"))
-    )
-    if not absolute_path.startswith(static_root + os.sep):
-        return
-
-    if os.path.isfile(absolute_path):
-        try:
-            os.remove(absolute_path)
-        except OSError:
-            current_app.logger.warning(
-                "item_manual_delete_failed path=%s",
-                absolute_path,
-                exc_info=True,
-            )
-
-
-def _save_item_manual_pdf(file_storage, sku):
+def _read_item_manual_pdf(file_storage):
     if file_storage is None:
         return None
 
@@ -1408,20 +1379,17 @@ def _save_item_manual_pdf(file_storage, sku):
         raise ValueError("Manual file must be a PDF.")
 
     file_storage.stream.seek(0)
-    if file_storage.stream.read(4) != b"%PDF":
+    manual_data = file_storage.stream.read()
+    if not manual_data.startswith(b"%PDF"):
         file_storage.stream.seek(0)
         raise ValueError("Manual file must be a valid PDF.")
-    file_storage.stream.seek(0)
+    if not safe_name:
+        safe_name = f"manual-{secrets.token_hex(4)}.pdf"
 
-    upload_directory = _item_manual_upload_directory()
-    os.makedirs(upload_directory, exist_ok=True)
-
-    sku_slug = secure_filename(sku) or "item"
-    stored_filename = f"{sku_slug}-{secrets.token_hex(8)}.pdf"
-    absolute_path = os.path.join(upload_directory, stored_filename)
-    file_storage.save(absolute_path)
-
-    return f"{ITEM_MANUAL_UPLOAD_SUBDIR}/{stored_filename}"
+    return {
+        "filename": safe_name,
+        "data": manual_data,
+    }
 
 
 @bp.app_errorhandler(RequestEntityTooLarge)
@@ -1433,6 +1401,41 @@ def handle_request_entity_too_large(error):
         "error",
     )
     return redirect(request.referrer or url_for("routes.admin_items"))
+
+
+@bp.get("/items/<int:item_id>/manual")
+def item_manual_download(item_id: int):
+    uid, role = require_login()
+    if not uid:
+        return redirect(url_for("auth.login_form"))
+
+    item = query(SQL_GET_ITEM_MANUAL, (item_id,), one=True)
+    if not item or item["manual_pdf_data"] is None:
+        abort(404)
+
+    if role != "admin":
+        customer = query(SQL_GET_CUSTOMER_BY_USER_ID, (uid,), one=True)
+        if not customer:
+            abort(403)
+
+        access_row = query(
+            SQL_CUSTOMER_CAN_ACCESS_ITEM_MANUAL,
+            (item_id, customer["id"]),
+            one=True,
+        )
+        if not access_row:
+            abort(403)
+
+    manual_data = item["manual_pdf_data"]
+    if isinstance(manual_data, memoryview):
+        manual_data = manual_data.tobytes()
+
+    return send_file(
+        BytesIO(manual_data),
+        mimetype="application/pdf",
+        download_name=item["manual_pdf_filename"] or f"{item['sku']}.pdf",
+        as_attachment=False,
+    )
 
 def _build_full_delivery_address(address, postal_city):
     parts = []
@@ -3021,12 +3024,19 @@ def admin_item_new():
         flash("At least one category and a SKU are required.", "error")
         return redirect(url_for("routes.admin_item_new_form"))
 
-    saved_manual_path = None
     try:
-        saved_manual_path = _save_item_manual_pdf(manual_file, sku)
+        manual_payload = _read_item_manual_pdf(manual_file)
 
         def work(cur):
-            cur.execute(SQL_CREATE_ITEM, (sku, is_active, saved_manual_path))
+            cur.execute(
+                SQL_CREATE_ITEM,
+                (
+                    sku,
+                    is_active,
+                    manual_payload["filename"] if manual_payload else None,
+                    manual_payload["data"] if manual_payload else None,
+                ),
+            )
             item_id = cur.fetchone()["new_item_id"]
 
             for category_id in category_ids:
@@ -3041,8 +3051,6 @@ def admin_item_new():
         flash(f"Item created (item_id={item_id}).", "success")
         return redirect(url_for("routes.admin_items"))
     except Exception as e:
-        if saved_manual_path:
-            _delete_item_manual_file(saved_manual_path)
         flash(f"Failed: {str(e)}", "error")
         return redirect(url_for("routes.admin_item_new_form"))
 
@@ -3106,14 +3114,9 @@ def admin_item_edit_save(item_id: int):
         if category_id not in requested_category_id_set
     ]
 
-    existing_manual_path = item["manual_pdf_path"]
-    next_manual_path = None if remove_manual_pdf else existing_manual_path
-    saved_manual_path = None
-
     try:
-        saved_manual_path = _save_item_manual_pdf(manual_file, sku)
-        if saved_manual_path:
-            next_manual_path = saved_manual_path
+        manual_payload = _read_item_manual_pdf(manual_file)
+        should_clear_manual = remove_manual_pdf and manual_payload is None
 
         if category_ids_to_remove:
             referenced_categories = query(
@@ -3131,7 +3134,20 @@ def admin_item_edit_save(item_id: int):
                 )
 
         def work(cur):
-            cur.execute(SQL_UPDATE_ITEM, (sku, is_active, next_manual_path, item_id))
+            cur.execute(
+                SQL_UPDATE_ITEM,
+                (
+                    sku,
+                    is_active,
+                    should_clear_manual,
+                    manual_payload["filename"] if manual_payload else None,
+                    manual_payload["filename"] if manual_payload else None,
+                    should_clear_manual,
+                    manual_payload["data"] if manual_payload else None,
+                    manual_payload["data"] if manual_payload else None,
+                    item_id,
+                ),
+            )
 
             for category_id in category_ids_to_add:
                 cur.execute(
@@ -3148,15 +3164,9 @@ def admin_item_edit_save(item_id: int):
             return True
 
         tx(work)
-        if saved_manual_path and existing_manual_path:
-            _delete_item_manual_file(existing_manual_path)
-        elif remove_manual_pdf and existing_manual_path:
-            _delete_item_manual_file(existing_manual_path)
         flash("Item updated.", "success")
         return redirect(url_for("routes.admin_items"))
     except Exception as e:
-        if saved_manual_path:
-            _delete_item_manual_file(saved_manual_path)
         flash(f"Update failed: {str(e)}", "error")
         return redirect(url_for("routes.admin_item_edit_form", item_id=item_id))
 
@@ -3182,7 +3192,6 @@ def admin_item_delete(item_id: int):
 
     try:
         tx(work)
-        _delete_item_manual_file(item["manual_pdf_path"])
         flash("Item deleted.", "success")
     except Exception as e:
         flash(f"Delete failed: {str(e)}", "error")
@@ -3564,12 +3573,19 @@ def admin_item_new():
         flash("At least one category and a SKU are required.", "error")
         return redirect(url_for("routes.admin_item_new_form"))
 
-    saved_manual_path = None
     try:
-        saved_manual_path = _save_item_manual_pdf(manual_file, sku)
+        manual_payload = _read_item_manual_pdf(manual_file)
 
         def work(cur):
-            cur.execute(SQL_CREATE_ITEM, (sku, is_active, saved_manual_path))
+            cur.execute(
+                SQL_CREATE_ITEM,
+                (
+                    sku,
+                    is_active,
+                    manual_payload["filename"] if manual_payload else None,
+                    manual_payload["data"] if manual_payload else None,
+                ),
+            )
             item_id = cur.fetchone()["new_item_id"]
 
             for category_id in category_ids:
@@ -3584,8 +3600,6 @@ def admin_item_new():
         flash(f"Item created (item_id={item_id}).", "success")
         return redirect(url_for("routes.admin_items"))
     except Exception as e:
-        if saved_manual_path:
-            _delete_item_manual_file(saved_manual_path)
         flash(f"Failed: {str(e)}", "error")
         return redirect(url_for("routes.admin_item_new_form"))
 
@@ -3649,14 +3663,9 @@ def admin_item_edit_save(item_id: int):
         if category_id not in requested_category_id_set
     ]
 
-    existing_manual_path = item["manual_pdf_path"]
-    next_manual_path = None if remove_manual_pdf else existing_manual_path
-    saved_manual_path = None
-
     try:
-        saved_manual_path = _save_item_manual_pdf(manual_file, sku)
-        if saved_manual_path:
-            next_manual_path = saved_manual_path
+        manual_payload = _read_item_manual_pdf(manual_file)
+        should_clear_manual = remove_manual_pdf and manual_payload is None
 
         if category_ids_to_remove:
             referenced_categories = query(
@@ -3674,7 +3683,20 @@ def admin_item_edit_save(item_id: int):
                 )
 
         def work(cur):
-            cur.execute(SQL_UPDATE_ITEM, (sku, is_active, next_manual_path, item_id))
+            cur.execute(
+                SQL_UPDATE_ITEM,
+                (
+                    sku,
+                    is_active,
+                    should_clear_manual,
+                    manual_payload["filename"] if manual_payload else None,
+                    manual_payload["filename"] if manual_payload else None,
+                    should_clear_manual,
+                    manual_payload["data"] if manual_payload else None,
+                    manual_payload["data"] if manual_payload else None,
+                    item_id,
+                ),
+            )
 
             for category_id in category_ids_to_add:
                 cur.execute(
@@ -3691,15 +3713,9 @@ def admin_item_edit_save(item_id: int):
             return True
 
         tx(work)
-        if saved_manual_path and existing_manual_path:
-            _delete_item_manual_file(existing_manual_path)
-        elif remove_manual_pdf and existing_manual_path:
-            _delete_item_manual_file(existing_manual_path)
         flash("Item updated.", "success")
         return redirect(url_for("routes.admin_items"))
     except Exception as e:
-        if saved_manual_path:
-            _delete_item_manual_file(saved_manual_path)
         flash(f"Update failed: {str(e)}", "error")
         return redirect(url_for("routes.admin_item_edit_form", item_id=item_id))
 
@@ -3725,7 +3741,6 @@ def admin_item_delete(item_id: int):
 
     try:
         tx(work)
-        _delete_item_manual_file(item["manual_pdf_path"])
         flash("Item deleted.", "success")
     except Exception as e:
         flash(f"Delete failed: {str(e)}", "error")

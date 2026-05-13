@@ -26,9 +26,9 @@
               <div>{{ it.category_count }} linked furnishing categories</div>
               {% if it.furnishing_kind %}<div>{{ it.furnishing_kind }}</div>{% endif %}
             {% endif %}
-            {% if it.manual_pdf_path %}
+            {% if it.has_manual_pdf %}
               <div>
-                <a class="text-sky-700 underline underline-offset-4" href="{{ url_for('static', filename=it.manual_pdf_path) }}" target="_blank" rel="noopener">
+                <a class="text-sky-700 underline underline-offset-4" href="{{ url_for('routes.item_manual_download', item_id=it.id) }}" target="_blank" rel="noopener">
                   Open manual PDF
                 </a>
               </div>
@@ -91,9 +91,9 @@
                 <div>Shared across {{ it.category_count }} furnishing categories.</div>
                 {% if it.furnishing_kind %}<div>{{ it.furnishing_kind }}</div>{% endif %}
               {% endif %}
-              {% if it.manual_pdf_path %}
+              {% if it.has_manual_pdf %}
                 <div class="mt-1">
-                  <a class="text-sky-700 underline underline-offset-4" href="{{ url_for('static', filename=it.manual_pdf_path) }}" target="_blank" rel="noopener">
+                  <a class="text-sky-700 underline underline-offset-4" href="{{ url_for('routes.item_manual_download', item_id=it.id) }}" target="_blank" rel="noopener">
                     Open manual PDF
                   </a>
                 </div>

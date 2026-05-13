@@ -278,7 +278,8 @@ SQL_LIST_ITEMS = """
 SELECT
   i.id,
   i.sku,
-  i.manual_pdf_path,
+  MAX(i.manual_pdf_filename) AS manual_pdf_filename,
+  BOOL_OR(i.manual_pdf_data IS NOT NULL) AS has_manual_pdf,
   i.is_active,
   i.created_at,
   MIN(c.id) AS category_id,
@@ -300,7 +301,6 @@ LEFT JOIN furnishing_categories fc ON fc.category_id = c.id
 GROUP BY
   i.id,
   i.sku,
-  i.manual_pdf_path,
   i.is_active,
   i.created_at
 ORDER BY display_name, i.id;
@@ -325,11 +325,31 @@ SQL_GET_ITEM_FOR_EDIT = """
 SELECT
   i.id,
   i.sku,
-  i.manual_pdf_path,
+  i.manual_pdf_filename,
+  (i.manual_pdf_data IS NOT NULL) AS has_manual_pdf,
   i.is_active,
   i.created_at
 FROM items i
 WHERE i.id = %s;
+"""
+
+SQL_GET_ITEM_MANUAL = """
+SELECT
+  i.id,
+  i.sku,
+  i.manual_pdf_filename,
+  i.manual_pdf_data
+FROM items i
+WHERE i.id = %s;
+"""
+
+SQL_CUSTOMER_CAN_ACCESS_ITEM_MANUAL = """
+SELECT 1
+FROM booking_items bi
+JOIN bookings b ON b.id = bi.booking_id
+WHERE bi.item_id = %s
+  AND b.customer_id = %s
+LIMIT 1;
 """
 
 SQL_LIST_ITEM_CATEGORY_IDS = """
@@ -343,14 +363,23 @@ SQL_UPDATE_ITEM = """
 UPDATE items
 SET sku = %s,
     is_active = %s,
-    manual_pdf_path = %s
+    manual_pdf_filename = CASE
+      WHEN %s THEN NULL
+      WHEN %s IS NOT NULL THEN %s
+      ELSE manual_pdf_filename
+    END,
+    manual_pdf_data = CASE
+      WHEN %s THEN NULL
+      WHEN %s IS NOT NULL THEN %s
+      ELSE manual_pdf_data
+    END
 WHERE id = %s;
 """
 
 # Item create
 SQL_CREATE_ITEM = """
-INSERT INTO items (sku, is_active, manual_pdf_path)
-VALUES (%s, %s, %s)
+INSERT INTO items (sku, is_active, manual_pdf_filename, manual_pdf_data)
+VALUES (%s, %s, %s, %s)
 RETURNING id AS new_item_id;
 """
 
@@ -676,7 +705,7 @@ SQL_BOOKING_ITEMS = """
 SELECT
   i.id AS item_id,
   i.sku,
-  i.manual_pdf_path,
+  (i.manual_pdf_data IS NOT NULL) AS has_manual_pdf,
   c.id AS category_id,
   c.display_name,
 
@@ -723,7 +752,7 @@ SELECT
   bi.booking_id,
   i.id AS item_id,
   i.sku,
-  i.manual_pdf_path,
+  (i.manual_pdf_data IS NOT NULL) AS has_manual_pdf,
   c.id AS category_id,
   c.display_name,
 
