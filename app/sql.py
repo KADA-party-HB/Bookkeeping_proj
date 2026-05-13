@@ -365,13 +365,11 @@ SET sku = %s,
     is_active = %s,
     manual_pdf_filename = CASE
       WHEN %s THEN NULL
-      WHEN %s IS NOT NULL THEN %s
-      ELSE manual_pdf_filename
+      ELSE COALESCE(%s::VARCHAR(255), manual_pdf_filename)
     END,
     manual_pdf_data = CASE
       WHEN %s THEN NULL
-      WHEN %s IS NOT NULL THEN %s
-      ELSE manual_pdf_data
+      ELSE COALESCE(%s::BYTEA, manual_pdf_data)
     END
 WHERE id = %s;
 """
