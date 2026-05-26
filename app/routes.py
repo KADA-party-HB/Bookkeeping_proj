@@ -22,12 +22,14 @@ import secrets
 import re
 import time
 from collections import deque
+from pathlib import Path
 from threading import Lock
 from urllib.parse import quote
 from werkzeug.exceptions import RequestEntityTooLarge
 from werkzeug.security import generate_password_hash
 from werkzeug.utils import secure_filename
 
+from .booking_documents import build_booking_order_pdf
 from .city_lookup import extract_city_name
 from .db import PaginationOptions, paginate_query, query, execute, tx
 from .delivery import (
@@ -487,6 +489,16 @@ def _to_int_or_none(value):
 def _to_str_or_none(value):
     value = (value or "").strip()
     return value if value != "" else None
+
+
+def _get_accessible_booking(booking_id: int, *, user_id, role):
+    if role == "admin":
+        return query(SQL_BOOKING_DETAIL, (booking_id,), one=True)
+
+    customer = query(SQL_GET_CUSTOMER_BY_USER_ID, (user_id,), one=True)
+    if not customer:
+        abort(403)
+    return query(SQL_BOOKING_DETAIL_FOR_CUSTOMER, (booking_id, customer["id"]), one=True)
 
 
 def _normalize_email(value):
@@ -4011,14 +4023,7 @@ def booking_detail(booking_id: int):
     if not uid:
         return redirect(url_for("auth.login_form"))
 
-    if role == "admin":
-        booking = query(SQL_BOOKING_DETAIL, (booking_id,), one=True)
-    else:
-        cust = query(SQL_GET_CUSTOMER_BY_USER_ID, (uid,), one=True)
-        if not cust:
-            abort(403)
-        booking = query(SQL_BOOKING_DETAIL_FOR_CUSTOMER, (booking_id, cust["id"]), one=True)
-
+    booking = _get_accessible_booking(booking_id, user_id=uid, role=role)
     if not booking:
         flash("Bokningen hittades inte.", "error")
         return redirect(url_for("routes.home"))
@@ -4034,6 +4039,32 @@ def booking_detail(booking_id: int):
         item_summary=item_summary,
         total=total,
         role=role,
+    )
+
+
+@bp.get("/bookings/<int:booking_id>/order-pdf")
+def booking_order_pdf(booking_id: int):
+    require_admin()
+    booking = query(SQL_BOOKING_DETAIL, (booking_id,), one=True)
+    if not booking:
+        flash("Bokningen hittades inte.", "error")
+        return redirect(url_for("routes.home"))
+
+    items = query(SQL_BOOKING_ITEMS, (booking_id,))
+    item_summary = _build_booking_item_summary(items)
+    total = query(SQL_BOOKING_TOTAL, (booking_id,), one=True)
+
+    pdf_bytes = build_booking_order_pdf(
+        booking=booking,
+        item_summary=item_summary,
+        total=total or {},
+        static_root=Path(current_app.root_path) / "static",
+    )
+    return send_file(
+        BytesIO(pdf_bytes),
+        mimetype="application/pdf",
+        as_attachment=True,
+        download_name=f"booking-{booking_id}-order-contract.pdf",
     )
 
 

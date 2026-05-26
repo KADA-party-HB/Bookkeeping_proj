@@ -18,6 +18,13 @@
       <div class="ml-auto flex w-full flex-wrap gap-2 md:w-auto">
         <a
           class="rounded-lg border px-3 py-2 text-sm hover:bg-slate-50"
+          href="{{ url_for('routes.booking_order_pdf', booking_id=booking.id) }}"
+        >
+          Download order PDF
+        </a>
+
+        <a
+          class="rounded-lg border px-3 py-2 text-sm hover:bg-slate-50"
           href="{{ url_for('routes.admin_booking_edit_form', booking_id=booking.id) }}"
         >
           Edit
@@ -377,7 +384,7 @@
       {% else %}
         <div class="inline-flex rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-sm font-medium text-rose-700">Status: Avbokad</div>
       {% endif %}
-
+    </div>
     </div>
 
     <div class="mt-6 grid gap-3 md:grid-cols-4">
