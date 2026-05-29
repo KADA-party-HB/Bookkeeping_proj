@@ -125,6 +125,29 @@ FROM category_rental_period_prices
 WHERE rental_period_id = %s;
 """
 
+# Delivery pricing settings
+SQL_GET_DELIVERY_PRICING_SETTINGS = """
+SELECT base_fee, included_distance_km, extra_fee_per_km
+FROM delivery_pricing_settings
+WHERE singleton = TRUE
+LIMIT 1;
+"""
+
+SQL_UPSERT_DELIVERY_PRICING_SETTINGS = """
+INSERT INTO delivery_pricing_settings (
+  singleton,
+  base_fee,
+  included_distance_km,
+  extra_fee_per_km
+)
+VALUES (TRUE, %s, %s, %s)
+ON CONFLICT (singleton) DO UPDATE
+SET base_fee = EXCLUDED.base_fee,
+    included_distance_km = EXCLUDED.included_distance_km,
+    extra_fee_per_km = EXCLUDED.extra_fee_per_km,
+    updated_at = CURRENT_TIMESTAMP;
+"""
+
 # Booking: category availability + matching rental price for requested date range
 SQL_AVAILABLE_CATEGORIES = """
 WITH request_window AS (

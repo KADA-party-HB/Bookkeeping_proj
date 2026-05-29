@@ -6,14 +6,19 @@ from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 
 from .sql import (
+    SQL_GET_DELIVERY_PRICING_SETTINGS,
     SQL_LIST_ALL_CATEGORY_RENTAL_PERIOD_PRICES,
     SQL_LIST_CATEGORIES,
     SQL_LIST_RENTAL_PERIODS,
+    SQL_UPSERT_DELIVERY_PRICING_SETTINGS,
     SQL_UPSERT_CATEGORY_RENTAL_PERIOD_PRICE,
 )
 
 
 _NON_ALNUM_RE = re.compile(r"[^a-z0-9]+")
+DEFAULT_DELIVERY_BASE_FEE = Decimal("449.00")
+DEFAULT_DELIVERY_INCLUDED_DISTANCE_KM = Decimal("10.00")
+DEFAULT_DELIVERY_EXTRA_FEE_PER_KM = Decimal("5.00")
 
 
 def _normalize_key(value: str | None) -> str:
@@ -37,6 +42,23 @@ def _format_decimal(value) -> str:
     if value is None:
         return "0.00"
     return str(Decimal(str(value)).quantize(Decimal("0.01")))
+
+
+def get_delivery_pricing(cur) -> dict[str, Decimal]:
+    cur.execute(SQL_GET_DELIVERY_PRICING_SETTINGS)
+    row = cur.fetchone()
+    if not row:
+        return {
+            "base_fee": DEFAULT_DELIVERY_BASE_FEE,
+            "included_distance_km": DEFAULT_DELIVERY_INCLUDED_DISTANCE_KM,
+            "extra_fee_per_km": DEFAULT_DELIVERY_EXTRA_FEE_PER_KM,
+        }
+
+    return {
+        "base_fee": Decimal(str(row["base_fee"])).quantize(Decimal("0.01")),
+        "included_distance_km": Decimal(str(row["included_distance_km"])).quantize(Decimal("0.01")),
+        "extra_fee_per_km": Decimal(str(row["extra_fee_per_km"])).quantize(Decimal("0.01")),
+    }
 
 
 def load_price_catalog_from_bytes(data: bytes) -> dict:
@@ -68,6 +90,7 @@ def export_price_catalog(cur) -> dict:
 
     cur.execute(SQL_LIST_ALL_CATEGORY_RENTAL_PERIOD_PRICES)
     price_rows = cur.fetchall()
+    delivery_pricing = get_delivery_pricing(cur)
 
     prices_by_category_id: dict[int, list] = {}
     for row in price_rows:
@@ -103,9 +126,14 @@ def export_price_catalog(cur) -> dict:
         products.append(product)
 
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "source": "database",
         "exported_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "delivery_pricing": {
+            "base_fee": _format_decimal(delivery_pricing["base_fee"]),
+            "included_distance_km": _format_decimal(delivery_pricing["included_distance_km"]),
+            "extra_fee_per_km": _format_decimal(delivery_pricing["extra_fee_per_km"]),
+        },
         "rental_periods": [
             {
                 "id": row["id"],
@@ -123,6 +151,48 @@ def apply_price_catalog(cur, catalog: dict) -> dict:
     product_rows = catalog.get("products")
     if not isinstance(product_rows, list) or not product_rows:
         raise ValueError("The JSON file must contain a non-empty 'products' list.")
+
+    delivery_pricing = catalog.get("delivery_pricing")
+    updated_delivery_pricing = False
+    if delivery_pricing is not None:
+        if not isinstance(delivery_pricing, dict):
+            raise ValueError("The 'delivery_pricing' value must be an object when provided.")
+
+        required_fields = (
+            "base_fee",
+            "included_distance_km",
+            "extra_fee_per_km",
+        )
+        missing_fields = [
+            field_name
+            for field_name in required_fields
+            if field_name not in delivery_pricing
+        ]
+        if missing_fields:
+            raise ValueError(
+                "The 'delivery_pricing' object is missing: "
+                + ", ".join(missing_fields)
+                + "."
+            )
+
+        cur.execute(
+            SQL_UPSERT_DELIVERY_PRICING_SETTINGS,
+            (
+                _to_decimal(
+                    delivery_pricing["base_fee"],
+                    field_name="delivery_pricing base_fee",
+                ),
+                _to_decimal(
+                    delivery_pricing["included_distance_km"],
+                    field_name="delivery_pricing included_distance_km",
+                ),
+                _to_decimal(
+                    delivery_pricing["extra_fee_per_km"],
+                    field_name="delivery_pricing extra_fee_per_km",
+                ),
+            ),
+        )
+        updated_delivery_pricing = True
 
     cur.execute(SQL_LIST_CATEGORIES)
     categories = cur.fetchall()
@@ -227,6 +297,7 @@ def apply_price_catalog(cur, catalog: dict) -> dict:
         "updated_categories": sorted(updated_category_names),
         "updated_period_prices": updated_period_prices,
         "updated_setup_fees": updated_setup_fees,
+        "updated_delivery_pricing": updated_delivery_pricing,
         "missing_category_targets": missing_category_targets,
         "missing_period_labels": sorted(missing_period_labels),
     }

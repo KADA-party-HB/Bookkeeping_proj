@@ -536,7 +536,7 @@
                         <span>
                           <span class="block text-sm font-medium text-slate-900">Include delivery</span>
                           <span class="mt-1 block text-xs leading-5 text-slate-500">
-                            449 kr includes the first 10 km. Everything above 10 km adds 5 kr/km.
+                            {{ delivery_pricing_summary }}
                           </span>
                         </span>
                       </label>
@@ -1012,9 +1012,10 @@
       const existingCustomerDeliveryAddressNote = document.getElementById("existing-customer-delivery-address-note");
       const newCustomerFields = document.getElementById("new-customer-fields");
 
-      const DELIVERY_BASE_FEE = 449;
-      const DELIVERY_INCLUDED_DISTANCE_KM = 10;
-      const DELIVERY_EXTRA_FEE_PER_KM = 5;
+      const deliveryPricing = {{ delivery_pricing | tojson }};
+      const DELIVERY_BASE_FEE = Number(deliveryPricing.base_fee || 0);
+      const DELIVERY_INCLUDED_DISTANCE_KM = Number(deliveryPricing.included_distance_km || 0);
+      const DELIVERY_EXTRA_FEE_PER_KM = Number(deliveryPricing.extra_fee_per_km || 0);
 
       const errorClassNames = [
         "border-rose-400",

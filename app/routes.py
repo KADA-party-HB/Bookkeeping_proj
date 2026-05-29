@@ -2,6 +2,7 @@ from flask import (
     Blueprint,
     Response,
     current_app,
+    g,
     request,
     render_template,
     redirect,
@@ -41,6 +42,7 @@ from .mailer import send_booking_event_email
 from .price_sync import (
     apply_price_catalog,
     export_price_catalog,
+    get_delivery_pricing,
     load_price_catalog_from_bytes,
 )
 from .sql import (
@@ -159,10 +161,6 @@ DEFAULT_META_DESCRIPTION = (
 INDEXABLE_ROBOTS_VALUE = "index,follow,max-image-preview:large"
 NOINDEX_ROBOTS_VALUE = "noindex,nofollow,noarchive"
 CSRF_TOKEN_SESSION_KEY = "_csrf_token"
-
-DELIVERY_BASE_FEE = Decimal("449.00")
-DELIVERY_INCLUDED_DISTANCE_KM = Decimal("10")
-DELIVERY_EXTRA_FEE_PER_KM = Decimal("5.00")
 DEFAULT_PAGE_SIZE = 10
 MAX_PAGE_SIZE = 100
 
@@ -964,6 +962,42 @@ def _delivery_service_error_message(code: str) -> str:
     return error_map.get(code, "Vi kunde inte beräkna leverans just nu.")
 
 
+def _get_delivery_pricing_settings():
+    cached_pricing = getattr(g, "_delivery_pricing_settings", None)
+    if cached_pricing is not None:
+        return cached_pricing
+
+    delivery_pricing = tx(get_delivery_pricing)
+    g._delivery_pricing_settings = delivery_pricing
+    return delivery_pricing
+
+
+def _serialize_delivery_pricing_for_template(delivery_pricing: dict[str, Decimal]) -> dict[str, str]:
+    return {
+        "base_fee": str(delivery_pricing["base_fee"]),
+        "included_distance_km": str(delivery_pricing["included_distance_km"]),
+        "extra_fee_per_km": str(delivery_pricing["extra_fee_per_km"]),
+    }
+
+
+def _format_decimal_compact(value) -> str:
+    decimal_value = Decimal(str(value)).quantize(Decimal("0.01"))
+    formatted = format(decimal_value, "f")
+    if "." in formatted:
+        formatted = formatted.rstrip("0").rstrip(".")
+    return formatted
+
+
+def _delivery_pricing_summary_text(delivery_pricing: dict[str, Decimal]) -> str:
+    base_fee = _format_decimal_compact(delivery_pricing["base_fee"])
+    included_distance_km = _format_decimal_compact(delivery_pricing["included_distance_km"])
+    extra_fee_per_km = _format_decimal_compact(delivery_pricing["extra_fee_per_km"])
+    return (
+        f"{base_fee} kr includes the first {included_distance_km} km. "
+        f"Everything above {included_distance_km} km adds {extra_fee_per_km} kr/km."
+    )
+
+
 @bp.before_app_request
 def expire_stale_pending_bookings_before_request():
     if request.endpoint == "static":
@@ -985,8 +1019,14 @@ def _calculate_delivery_fee_from_distance(distance_km_value):
     if distance_km < 0:
         raise ValueError("negative_delivery_distance")
 
-    extra_distance = max(distance_km - DELIVERY_INCLUDED_DISTANCE_KM, Decimal("0"))
-    delivery_fee = DELIVERY_BASE_FEE + (extra_distance * DELIVERY_EXTRA_FEE_PER_KM)
+    delivery_pricing = _get_delivery_pricing_settings()
+    extra_distance = max(
+        distance_km - delivery_pricing["included_distance_km"],
+        Decimal("0"),
+    )
+    delivery_fee = delivery_pricing["base_fee"] + (
+        extra_distance * delivery_pricing["extra_fee_per_km"]
+    )
     return delivery_fee.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
@@ -2073,6 +2113,8 @@ def home():
     categories = None
     customers = None
     customer_profile = None
+    delivery_pricing = None
+    delivery_pricing_summary = None
 
     if start and end:
         categories = _query_available_categories(start, end)
@@ -2084,6 +2126,13 @@ def home():
         customer_profile = _load_customer_profile_for_user(uid)
 
     if role == "admin":
+        delivery_pricing_settings = _get_delivery_pricing_settings()
+        delivery_pricing = _serialize_delivery_pricing_for_template(
+            delivery_pricing_settings
+        )
+        delivery_pricing_summary = _delivery_pricing_summary_text(
+            delivery_pricing_settings
+        )
         return render_template(
             "home.html",
             start_date=start,
@@ -2091,6 +2140,8 @@ def home():
             initial_end_offset_days=initial_end_offset_days,
             categories=categories,
             customers=customers,
+            delivery_pricing=delivery_pricing,
+            delivery_pricing_summary=delivery_pricing_summary,
             role=role,
         )
     
@@ -2949,12 +3000,16 @@ def admin_prices_update():
         flash(f"Price update failed: {str(exc)}", "error")
         return redirect(request.referrer or url_for("routes.admin_items"))
 
+    success_parts = [
+        f"Updated {len(summary['updated_categories'])} categories",
+        f"{summary['updated_period_prices']} rental-period prices",
+        f"{summary['updated_setup_fees']} tent setup fees",
+    ]
+    if summary["updated_delivery_pricing"]:
+        success_parts.append("delivery pricing")
+
     flash(
-        (
-            f"Updated {len(summary['updated_categories'])} categories, "
-            f"{summary['updated_period_prices']} rental-period prices, and "
-            f"{summary['updated_setup_fees']} tent setup fees from {catalog_file.filename}."
-        ),
+        f"{', '.join(success_parts[:-1])}, and {success_parts[-1]} from {catalog_file.filename}.",
         "success",
     )
 

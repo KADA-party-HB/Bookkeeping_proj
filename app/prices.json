@@ -1,4 +1,10 @@
 {
+  "schema_version": 2,
+  "delivery_pricing": {
+    "base_fee": 449,
+    "included_distance_km": 10,
+    "extra_fee_per_km": 5
+  },
   "products": [
     {
       "label": "Bord",
