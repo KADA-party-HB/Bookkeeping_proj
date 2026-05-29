@@ -112,12 +112,16 @@ from .sql import (
     SQL_BOOKING_ITEMS_FOR_BOOKINGS,
     SQL_BOOKING_TOTAL,
     SQL_LIST_ALL_BOOKINGS,
+    SQL_LIST_ADMIN_CALENDAR_NOTES,
+    SQL_CREATE_ADMIN_CALENDAR_NOTE,
+    SQL_UPDATE_ADMIN_CALENDAR_NOTE,
+    SQL_DELETE_ADMIN_CALENDAR_NOTE,
     SQL_ADMIN_BOOKING_METRICS,
     SQL_CONFIRM_BOOKING,
     SQL_CANCEL_BOOKING,
     SQL_DELETE_BOOKING,
     SQL_UPDATE_BOOKING_ADMIN_FIELDS,
-    SQL_UPDATE_BOOKING_NOTE,
+    SQL_UPDATE_BOOKING_ADMIN_NOTE,
     SQL_BOOKING_ALLOCATION_CANDIDATES,
     SQL_DELETE_BOOKING_ITEMS_FOR_BOOKING,
     SQL_INSERT_BOOKING_ITEM,
@@ -4283,12 +4287,83 @@ def admin_booking_note_save(booking_id: int):
     require_admin()
 
     payload = request.get_json(silent=True) or {}
-    booking_note = _to_str_or_none(payload.get("booking_note"))
-    updated = query(SQL_UPDATE_BOOKING_NOTE, (booking_note, booking_id), one=True, commit=True)
+    admin_note = _to_str_or_none(payload.get("admin_note"))
+    updated = query(SQL_UPDATE_BOOKING_ADMIN_NOTE, (admin_note, booking_id), one=True, commit=True)
     if not updated:
         return jsonify({"ok": False, "error": "Booking not found."}), 404
 
-    return jsonify({"ok": True, "booking_note": updated["booking_note"] or ""})
+    return jsonify({"ok": True, "admin_note": updated["admin_note"] or ""})
+
+
+def _serialize_admin_calendar_note(row):
+    note_date = row["note_date"]
+    if hasattr(note_date, "isoformat"):
+        note_date = note_date.isoformat()
+    return {
+        "id": row["id"],
+        "note_date": note_date,
+        "note_text": row["note_text"] or "",
+        "save_url": url_for("routes.admin_calendar_note_save", note_id=row["id"]),
+        "delete_url": url_for("routes.admin_calendar_note_delete", note_id=row["id"]),
+    }
+
+
+@bp.post("/admin/calendar/notes")
+def admin_calendar_note_create():
+    require_admin()
+
+    payload = request.get_json(silent=True) or {}
+    note_date_raw = _to_str_or_none(payload.get("note_date"))
+    if not note_date_raw:
+        return jsonify({"ok": False, "error": "Note date is required."}), 400
+
+    try:
+        note_date = date.fromisoformat(note_date_raw)
+    except ValueError:
+        return jsonify({"ok": False, "error": "Invalid note date."}), 400
+
+    note_text = _to_str_or_none(payload.get("note_text")) or ""
+    created = query(
+        SQL_CREATE_ADMIN_CALENDAR_NOTE,
+        (note_date, note_text),
+        one=True,
+        commit=True,
+    )
+    return jsonify({"ok": True, "note": _serialize_admin_calendar_note(created)})
+
+
+@bp.post("/admin/calendar/notes/<int:note_id>")
+def admin_calendar_note_save(note_id: int):
+    require_admin()
+
+    payload = request.get_json(silent=True) or {}
+    note_text = _to_str_or_none(payload.get("note_text")) or ""
+    updated = query(
+        SQL_UPDATE_ADMIN_CALENDAR_NOTE,
+        (note_text, note_id),
+        one=True,
+        commit=True,
+    )
+    if not updated:
+        return jsonify({"ok": False, "error": "Admin note not found."}), 404
+
+    return jsonify({"ok": True, "note": _serialize_admin_calendar_note(updated)})
+
+
+@bp.post("/admin/calendar/notes/<int:note_id>/delete")
+def admin_calendar_note_delete(note_id: int):
+    require_admin()
+
+    deleted = query(
+        SQL_DELETE_ADMIN_CALENDAR_NOTE,
+        (note_id,),
+        one=True,
+        commit=True,
+    )
+    if not deleted:
+        return jsonify({"ok": False, "error": "Admin note not found."}), 404
+
+    return jsonify({"ok": True})
 
 
 @bp.post("/bookings/<int:booking_id>/confirm")
@@ -4375,6 +4450,7 @@ def customer_edit_save(customer_id: int):
 def admin_bookings_calendar():
     require_admin()
     bookings = [b for b in query(SQL_LIST_ALL_BOOKINGS) if b["status"] != "cancelled"]
+    admin_calendar_notes = [dict(row) for row in query(SQL_LIST_ADMIN_CALENDAR_NOTES)]
     booking_ids = [b["id"] for b in bookings]
     items_by_booking_id = {}
     category_inventory = {}
@@ -4426,9 +4502,13 @@ def admin_bookings_calendar():
                 item_data["type_label"] = "Item"
             b["calendar_items"].append(item_data)
 
+    for note in admin_calendar_notes:
+        note["end_date_plus_one"] = note["note_date"] + timedelta(days=1)
+
     return render_template(
         "booking_calendar.html",
         bookings=bookings,
+        admin_calendar_notes=admin_calendar_notes,
         category_inventory=list(category_inventory.values()),
         role="admin",
     )

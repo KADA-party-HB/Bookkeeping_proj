@@ -141,6 +141,19 @@ Table bookings {
   Note: 'Booking header. Delivery, setup, and manual price overrides are stored here as snapshots.'
 }
 
+Table admin_calendar_notes {
+  id serial [pk]
+  note_date date [not null]
+  note_text text [not null]
+  created_at timestamp [not null]
+
+  indexes {
+    (note_date, created_at)
+  }
+
+  Note: 'Admin-only one-day notes shown in the booking calendar.'
+}
+
 Table booking_items {
   booking_id int [not null, ref: > bookings.id]
   item_id int [not null, ref: > items.id]

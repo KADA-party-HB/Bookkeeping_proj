@@ -2,6 +2,7 @@
 
 DROP TABLE IF EXISTS item_category_memberships;
 DROP TABLE IF EXISTS booking_items;
+DROP TABLE IF EXISTS admin_calendar_notes;
 DROP TABLE IF EXISTS bookings;
 DROP TABLE IF EXISTS category_rental_period_prices;
 DROP TABLE IF EXISTS rental_periods;
@@ -346,6 +347,16 @@ CREATE TABLE bookings (
 CREATE INDEX idx_bookings_customer_created ON bookings(customer_id, created_at);
 CREATE INDEX idx_bookings_status ON bookings(status);
 CREATE INDEX idx_bookings_dates ON bookings(start_date, end_date);
+
+CREATE TABLE admin_calendar_notes (
+  id SERIAL PRIMARY KEY,
+  note_date DATE NOT NULL,
+  note_text TEXT NOT NULL DEFAULT '',
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_admin_calendar_notes_note_date
+  ON admin_calendar_notes(note_date, created_at);
 
 -- BOOKING_ITEMS (many-to-many booking <-> physical items)
 -- Stores the chosen rental period and price snapshot

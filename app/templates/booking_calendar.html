@@ -118,18 +118,21 @@
         <div id="calendar-popup-ref" class="text-xs font-medium uppercase tracking-[0.2em] text-slate-400"></div>
         <h3 id="calendar-popup-title" class="mt-2 text-xl font-semibold text-slate-900"></h3>
         <div id="calendar-popup-status" class="mt-2"></div>
-        <dl id="calendar-popup-contact-list" class="mt-4 grid gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm sm:grid-cols-3"></dl>
+        <div id="calendar-popup-contact-wrap" class="mt-4">
+          <dl id="calendar-popup-contact-list" class="grid gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm sm:grid-cols-3"></dl>
+        </div>
       </div>
       <button
         type="button"
-        class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:bg-slate-50 hover:text-slate-800"
+        class="inline-flex shrink-0 items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900"
         data-popup-close
       >
-        x
+        <span aria-hidden="true" class="text-base leading-none">&times;</span>
+        <span>Close</span>
       </button>
     </div>
 
-    <div class="mt-5">
+    <div id="calendar-popup-price-wrap" class="mt-5">
       <div class="flex items-end justify-between gap-4 border-b border-slate-200 pb-3">
         <div class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">Booked price list</div>
         <div id="calendar-popup-price" class="text-xl font-semibold text-slate-900"></div>
@@ -137,11 +140,23 @@
       <div id="calendar-popup-price-list" class="divide-y divide-slate-100 text-sm"></div>
     </div>
 
-    <form id="calendar-popup-note-form" class="mt-5">
-      <label class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400" for="calendar-popup-note">Booking note</label>
+    <div id="calendar-popup-booking-note-wrap" class="mt-5 hidden">
+      <label class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400" for="calendar-popup-booking-note">Customer note</label>
       <textarea
-        id="calendar-popup-note"
+        id="calendar-popup-booking-note"
         rows="4"
+        readonly
+        placeholder="No customer note."
+        class="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-100 px-4 py-3 text-sm text-slate-600 shadow-sm focus:outline-none"
+      ></textarea>
+    </div>
+
+    <form id="calendar-popup-note-form" class="mt-5">
+      <label id="calendar-popup-note-label" class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400" for="calendar-popup-admin-note">Admin note</label>
+      <textarea
+        id="calendar-popup-admin-note"
+        rows="4"
+        placeholder="Add an internal admin note."
         class="mt-2 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-800 shadow-sm transition focus:border-sky-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-sky-100"
       ></textarea>
       <div class="mt-3 flex flex-wrap items-center gap-3">
@@ -160,6 +175,13 @@
       <a id="calendar-popup-open" class="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white transition hover:bg-sky-700" href="#">
         Open booking
       </a>
+      <button
+        type="button"
+        id="calendar-popup-delete"
+        class="hidden inline-flex items-center justify-center rounded-2xl bg-amber-500 px-4 py-3 text-sm font-medium text-white transition hover:bg-amber-600"
+      >
+        Delete note
+      </button>
       <button
         type="button"
         class="inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
@@ -187,6 +209,7 @@
   }
 
   #booking-calendar .fc-daygrid-day-frame {
+    position: relative;
     min-height: 7.5rem;
   }
 
@@ -220,6 +243,77 @@
 
   .booking-event-chip[data-status="pending"] .booking-event-name {
     color: rgb(133 77 14);
+  }
+
+  .booking-event-chip[data-service="delivery"] {
+    border-color: rgb(125 211 252);
+    background: rgb(224 242 254);
+    color: rgb(7 89 133);
+  }
+
+  .booking-event-chip[data-service="delivery"] .booking-event-dot {
+    background: rgb(14 165 233);
+  }
+
+  .booking-event-chip[data-service="delivery"] .booking-event-ref {
+    color: rgb(3 105 161);
+  }
+
+  .booking-event-chip[data-service="delivery"] .booking-event-name {
+    color: rgb(7 89 133);
+  }
+
+  .booking-event-chip[data-service="assembly"] {
+    border-color: rgb(56 189 248);
+    background: rgb(186 230 253);
+    color: rgb(12 74 110);
+  }
+
+  .booking-event-chip[data-service="assembly"] .booking-event-dot {
+    background: rgb(2 132 199);
+  }
+
+  .booking-event-chip[data-service="assembly"] .booking-event-ref {
+    color: rgb(14 116 144);
+  }
+
+  .booking-event-chip[data-service="assembly"] .booking-event-name {
+    color: rgb(12 74 110);
+  }
+
+  .booking-event-chip.admin-note-marker {
+    width: auto;
+    max-width: 100%;
+    height: 1.15rem;
+    padding: 0 0.4rem 0 0.32rem;
+    gap: 0.3rem;
+    justify-content: flex-start;
+    border-color: rgb(134 239 172);
+    background: rgb(220 252 231);
+    color: rgb(21 128 61);
+  }
+
+  .booking-event-chip.admin-note-marker .booking-event-dot {
+    display: none;
+  }
+
+  .booking-event-chip.admin-note-marker::before {
+    content: "";
+    width: 0.42rem;
+    height: 0.42rem;
+    border-radius: 999px;
+    background: rgb(22 163 74);
+    flex: 0 0 auto;
+  }
+
+  .booking-event-chip.admin-note-marker .admin-note-marker-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: rgb(21 128 61);
   }
 
   .booking-event-chip[data-continues-before="true"] {
@@ -267,16 +361,88 @@
     color: rgb(12 74 110);
   }
 
+  #booking-calendar .calendar-day-add-note {
+    position: absolute;
+    top: 0.08rem;
+    left: 0.25rem;
+    z-index: 3;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.2rem;
+    height: 1.2rem;
+    border: 1px solid rgb(226 232 240);
+    border-radius: 999px;
+    background: rgb(255 255 255);
+    color: rgb(148 163 184);
+    font-size: 0.9rem;
+    line-height: 1;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+    transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
+  }
+
+  #booking-calendar .calendar-day-add-note:hover {
+    border-color: rgb(250 204 21);
+    background: rgb(254 249 195);
+    color: rgb(161 98 7);
+  }
+
+  #booking-calendar .calendar-day-add-note-symbol {
+    position: relative;
+    display: block;
+    width: 0.5rem;
+    height: 0.5rem;
+  }
+
+  #booking-calendar .calendar-day-add-note-symbol::before,
+  #booking-calendar .calendar-day-add-note-symbol::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    background: currentColor;
+    border-radius: 999px;
+    transform: translate(-50%, -50%);
+  }
+
+  #booking-calendar .calendar-day-add-note-symbol::before {
+    width: 0.5rem;
+    height: 1.5px;
+  }
+
+  #booking-calendar .calendar-day-add-note-symbol::after {
+    width: 1.5px;
+    height: 0.5rem;
+  }
+
   @media (max-width: 767px) {
     #booking-calendar .fc-daygrid-day-frame {
       min-height: 6.5rem;
+    }
+
+    #booking-calendar .fc .fc-toolbar.fc-header-toolbar {
+      gap: 0.6rem;
+      align-items: center;
+    }
+
+    #booking-calendar .fc .fc-toolbar-chunk {
+      min-width: 0;
+    }
+
+    #booking-calendar .fc .fc-toolbar-title {
+      font-size: 0.68rem !important;
+      line-height: 1.05 !important;
+      font-weight: 600;
+      white-space: nowrap;
     }
   }
 </style>
 
 <script id="booking-events-data" type="application/json">
 [
+  {% set ns = namespace(first=true) %}
   {% for b in bookings %}
+    {% if not ns.first %},{% endif %}
     {
       "id": {{ b.id|tojson }},
       "title": {{ ("Ref #" ~ b.id ~ " - " ~ (b.full_name or "Unknown customer"))|tojson }},
@@ -284,6 +450,7 @@
       "end": {{ ((b.end_date_plus_one|string) if b.end_date_plus_one is defined else (b.end_date|string))|tojson }},
       "url": {{ url_for('routes.booking_detail', booking_id=b.id)|tojson }},
       "extendedProps": {
+        "event_type": "booking",
         "status": {{ b.status|tojson }},
         "customer": {{ (b.full_name or "")|tojson }},
         "email": {{ (b.email or "")|tojson }},
@@ -297,6 +464,7 @@
         "item_summary": {{ b.calendar_item_summary|tojson }},
         "items": {{ b.calendar_items|tojson }},
         "booking_note": {{ (b.booking_note or "")|tojson }},
+        "admin_note": {{ (b.admin_note or "")|tojson }},
         "note_url": {{ url_for('routes.admin_booking_note_save', booking_id=b.id)|tojson }},
         "tent_summary": {{ (b.tent_summary or "No tent")|tojson }},
         "calendar_city": {{ (b.calendar_city or "")|tojson }},
@@ -306,7 +474,26 @@
         "include_delivery": {{ b.include_delivery|tojson }},
         "include_setup_service": {{ b.include_setup_service|tojson }}
       }
-    }{% if not loop.last %},{% endif %}
+    }
+    {% set ns.first = false %}
+  {% endfor %}
+  {% for note in admin_calendar_notes %}
+    {% if not ns.first %},{% endif %}
+    {
+      "id": {{ ("admin-note-" ~ note.id)|tojson }},
+      "title": {{ ((note.note_text or "Admin note")[:80])|tojson }},
+      "start": {{ (note.note_date|string)|tojson }},
+      "end": {{ (note.end_date_plus_one|string)|tojson }},
+      "extendedProps": {
+        "event_type": "admin_note",
+        "note_id": {{ note.id|tojson }},
+        "note_date": {{ (note.note_date|string)|tojson }},
+        "note_text": {{ (note.note_text or "")|tojson }},
+        "save_url": {{ url_for('routes.admin_calendar_note_save', note_id=note.id)|tojson }},
+        "delete_url": {{ url_for('routes.admin_calendar_note_delete', note_id=note.id)|tojson }}
+      }
+    }
+    {% set ns.first = false %}
   {% endfor %}
 ]
 </script>
@@ -326,14 +513,20 @@
     const popupRefEl = document.getElementById("calendar-popup-ref");
     const popupTitleEl = document.getElementById("calendar-popup-title");
     const popupStatusEl = document.getElementById("calendar-popup-status");
+    const popupContactWrapEl = document.getElementById("calendar-popup-contact-wrap");
     const popupPriceEl = document.getElementById("calendar-popup-price");
+    const popupPriceWrapEl = document.getElementById("calendar-popup-price-wrap");
     const popupPriceListEl = document.getElementById("calendar-popup-price-list");
     const popupContactListEl = document.getElementById("calendar-popup-contact-list");
+    const popupBookingNoteWrapEl = document.getElementById("calendar-popup-booking-note-wrap");
+    const popupBookingNoteEl = document.getElementById("calendar-popup-booking-note");
     const popupNoteFormEl = document.getElementById("calendar-popup-note-form");
-    const popupNoteEl = document.getElementById("calendar-popup-note");
+    const popupNoteLabelEl = document.getElementById("calendar-popup-note-label");
+    const popupAdminNoteEl = document.getElementById("calendar-popup-admin-note");
     const popupNoteSaveEl = document.getElementById("calendar-popup-note-save");
     const popupNoteStatusEl = document.getElementById("calendar-popup-note-status");
     const popupOpenEl = document.getElementById("calendar-popup-open");
+    const popupDeleteEl = document.getElementById("calendar-popup-delete");
     const categoryInventoryDataEl = document.getElementById("booking-category-inventory-data");
     const daySummarySectionEl = document.getElementById("calendar-day-summary-section");
     const daySummaryTitleEl = document.getElementById("calendar-day-summary-title");
@@ -351,6 +544,7 @@
     const freeSummaryEmptyEl = document.getElementById("calendar-free-summary-empty");
     const freeSummaryTableWrapEl = document.getElementById("calendar-free-summary-table-wrap");
     const freeSummaryBodyEl = document.getElementById("calendar-free-summary-body");
+    const adminCalendarNoteCreateUrl = {{ url_for('routes.admin_calendar_note_create')|tojson }};
     const events = JSON.parse(eventsDataEl.textContent);
     const categoryInventory = JSON.parse(categoryInventoryDataEl.textContent);
     const mobileQuery = window.matchMedia("(max-width: 767px)");
@@ -360,12 +554,17 @@
       month: "long",
       day: "numeric",
     });
+    const bookingDateFormatter = new Intl.DateTimeFormat("sv-SE", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
     let showFreeInventory = false;
-    let activePopupEvent = null;
+    let activePopupState = null;
 
     const closePopup = () => {
       popupEl.classList.add("hidden");
-      activePopupEvent = null;
+      activePopupState = null;
     };
 
     const parseAmount = (value) => {
@@ -374,6 +573,37 @@
     };
 
     const formatAmount = (value) => `${parseAmount(value).toFixed(2)} kr`;
+
+    const formatBookingDate = (value) => {
+      if (!value) {
+        return "";
+      }
+
+      const parsed = new Date(`${value}T00:00:00`);
+      if (Number.isNaN(parsed.getTime())) {
+        return value;
+      }
+
+      return bookingDateFormatter.format(parsed);
+    };
+
+    const buildAdminNoteEventData = (note) => {
+      const noteText = `${note.note_text || ""}`.trim();
+      return {
+        id: `admin-note-${note.id}`,
+        title: noteText || "Admin note",
+        start: note.note_date,
+        end: addDaysToIsoDate(note.note_date, 1),
+        extendedProps: {
+          event_type: "admin_note",
+          note_id: note.id,
+          note_date: note.note_date,
+          note_text: note.note_text || "",
+          save_url: note.save_url,
+          delete_url: note.delete_url,
+        },
+      };
+    };
 
     const addPriceRow = (label, detail, amount, options = {}) => {
       const row = document.createElement("div");
@@ -422,21 +652,47 @@
       popupContactListEl.appendChild(row);
     };
 
-    const openPopup = (event) => {
-      activePopupEvent = event;
+    const formatIsoDateLocal = (date) => {
+      const year = date.getFullYear();
+      const month = `${date.getMonth() + 1}`.padStart(2, "0");
+      const day = `${date.getDate()}`.padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    };
+
+    const addDaysToIsoDate = (isoDate, dayOffset) => {
+      const date = new Date(`${isoDate}T00:00:00`);
+      if (Number.isNaN(date.getTime())) {
+        return "";
+      }
+
+      date.setDate(date.getDate() + dayOffset);
+      return formatIsoDateLocal(date);
+    };
+
+    const openBookingPopup = (event) => {
       const props = event.extendedProps;
+      activePopupState = {
+        kind: "booking",
+        event,
+      };
 
       popupRefEl.textContent = `Booking #${event.id}`;
       popupTitleEl.textContent = props.customer || "Unknown customer";
-
-      const statusClass = "inline-flex rounded-full bg-sky-100 px-3 py-1 text-xs font-medium text-sky-800";
-      popupStatusEl.innerHTML = `<span class="${statusClass}">${props.status}</span>`;
+      popupStatusEl.innerHTML = '<span class="inline-flex rounded-full bg-sky-100 px-3 py-1 text-xs font-medium text-sky-800">' + `${props.status}` + "</span>";
+      popupContactWrapEl.classList.remove("hidden");
+      popupPriceWrapEl.classList.remove("hidden");
+      popupOpenEl.classList.remove("hidden");
+      popupDeleteEl.classList.add("hidden");
+      popupNoteLabelEl.textContent = "Admin note";
 
       popupPriceEl.textContent = formatAmount(props.total_cost);
       popupPriceListEl.innerHTML = "";
       popupContactListEl.innerHTML = "";
       popupNoteStatusEl.textContent = "";
-      popupNoteEl.value = props.booking_note || "";
+      const bookingNote = `${props.booking_note || ""}`;
+      popupBookingNoteWrapEl.classList.toggle("hidden", !bookingNote.trim());
+      popupBookingNoteEl.value = bookingNote;
+      popupAdminNoteEl.value = props.admin_note || "";
 
       const itemRows = props.item_summary || [];
       if (itemRows.length) {
@@ -475,6 +731,8 @@
 
       const addressParts = [props.address, props.postal_city].filter(Boolean);
       addContactRow("Full name", props.customer || "");
+      addContactRow("Start date", formatBookingDate(props.booking_start_date));
+      addContactRow("End date", formatBookingDate(props.booking_end_date));
       addContactRow("Phone", props.phone || "");
       addContactRow("Address", props.delivery_address || addressParts.join(", "));
       popupOpenEl.href = event.url || "#";
@@ -482,21 +740,59 @@
       popupEl.classList.remove("hidden");
     };
 
-    const formatIsoDateLocal = (date) => {
-      const year = date.getFullYear();
-      const month = `${date.getMonth() + 1}`.padStart(2, "0");
-      const day = `${date.getDate()}`.padStart(2, "0");
-      return `${year}-${month}-${day}`;
+    const openAdminNotePopup = (event) => {
+      const props = event.extendedProps;
+      activePopupState = {
+        kind: "admin_note",
+        event,
+      };
+
+      popupRefEl.textContent = "Admin note";
+      popupTitleEl.textContent = formatBookingDate(props.note_date);
+      popupStatusEl.innerHTML = '<span class="inline-flex rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-800">Day note</span>';
+      popupContactWrapEl.classList.add("hidden");
+      popupPriceWrapEl.classList.add("hidden");
+      popupBookingNoteWrapEl.classList.add("hidden");
+      popupOpenEl.classList.add("hidden");
+      popupDeleteEl.classList.remove("hidden");
+      popupNoteLabelEl.textContent = "Note";
+      popupContactListEl.innerHTML = "";
+      popupPriceListEl.innerHTML = "";
+      popupNoteStatusEl.textContent = "";
+      popupAdminNoteEl.value = props.note_text || "";
+
+      popupEl.classList.remove("hidden");
     };
 
-    const addDaysToIsoDate = (isoDate, dayOffset) => {
-      const date = new Date(`${isoDate}T00:00:00`);
-      if (Number.isNaN(date.getTime())) {
-        return "";
-      }
+    const openAdminNoteDraft = (noteDate) => {
+      activePopupState = {
+        kind: "admin_note_draft",
+        noteDate,
+      };
 
-      date.setDate(date.getDate() + dayOffset);
-      return formatIsoDateLocal(date);
+      popupRefEl.textContent = "Admin note";
+      popupTitleEl.textContent = formatBookingDate(noteDate);
+      popupStatusEl.innerHTML = '<span class="inline-flex rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-800">New day note</span>';
+      popupContactWrapEl.classList.add("hidden");
+      popupPriceWrapEl.classList.add("hidden");
+      popupBookingNoteWrapEl.classList.add("hidden");
+      popupOpenEl.classList.add("hidden");
+      popupDeleteEl.classList.add("hidden");
+      popupNoteLabelEl.textContent = "Note";
+      popupContactListEl.innerHTML = "";
+      popupPriceListEl.innerHTML = "";
+      popupNoteStatusEl.textContent = "";
+      popupAdminNoteEl.value = "";
+
+      popupEl.classList.remove("hidden");
+    };
+
+    const openPopup = (event) => {
+      if (event.extendedProps?.event_type === "admin_note") {
+        openAdminNotePopup(event);
+        return;
+      }
+      openBookingPopup(event);
     };
 
     const createSummaryCell = ({ className = "", text = null, html = null }) => {
@@ -533,6 +829,7 @@
       const selectedBookings = events.filter((event) => {
         const props = event.extendedProps || {};
         return (
+          props.event_type === "booking" &&
           props.booking_start_date &&
           props.booking_end_date &&
           props.booking_start_date <= selectedDate &&
@@ -711,32 +1008,89 @@
 
     popupNoteFormEl.addEventListener("submit", async (event) => {
       event.preventDefault();
-      if (!activePopupEvent) return;
+      if (!activePopupState) return;
 
-      const props = activePopupEvent.extendedProps;
       popupNoteSaveEl.disabled = true;
       popupNoteSaveEl.textContent = "Saving...";
       popupNoteStatusEl.textContent = "";
 
       try {
-        const response = await fetch(props.note_url, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Requested-With": "XMLHttpRequest",
-          },
-          body: JSON.stringify({ booking_note: popupNoteEl.value }),
-        });
-        const result = await response.json();
+        if (activePopupState.kind === "booking") {
+          const eventRef = activePopupState.event;
+          const props = eventRef.extendedProps;
+          const response = await fetch(props.note_url, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Requested-With": "XMLHttpRequest",
+            },
+            body: JSON.stringify({ admin_note: popupAdminNoteEl.value }),
+          });
+          const result = await response.json();
 
-        if (!response.ok || !result.ok) {
-          throw new Error(result.error || "Could not save note.");
-        }
+          if (!response.ok || !result.ok) {
+            throw new Error(result.error || "Could not save note.");
+          }
 
-        activePopupEvent.setExtendedProp("booking_note", result.booking_note || "");
-        const eventData = events.find((row) => String(row.id) === String(activePopupEvent.id));
-        if (eventData?.extendedProps) {
-          eventData.extendedProps.booking_note = result.booking_note || "";
+          eventRef.setExtendedProp("admin_note", result.admin_note || "");
+          const eventData = events.find((row) => String(row.id) === String(eventRef.id));
+          if (eventData?.extendedProps) {
+            eventData.extendedProps.admin_note = result.admin_note || "";
+          }
+        } else if (activePopupState.kind === "admin_note") {
+          const eventRef = activePopupState.event;
+          const response = await fetch(eventRef.extendedProps.save_url, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Requested-With": "XMLHttpRequest",
+            },
+            body: JSON.stringify({ note_text: popupAdminNoteEl.value }),
+          });
+          const result = await response.json();
+
+          if (!response.ok || !result.ok) {
+            throw new Error(result.error || "Could not save note.");
+          }
+
+          const updatedEventData = buildAdminNoteEventData(result.note);
+          eventRef.setProp("title", updatedEventData.title);
+          eventRef.setExtendedProp("note_text", updatedEventData.extendedProps.note_text);
+          eventRef.setExtendedProp("save_url", updatedEventData.extendedProps.save_url);
+          eventRef.setExtendedProp("delete_url", updatedEventData.extendedProps.delete_url);
+
+          const eventData = events.find((row) => String(row.id) === String(eventRef.id));
+          if (eventData) {
+            eventData.title = updatedEventData.title;
+            eventData.extendedProps = {
+              ...eventData.extendedProps,
+              ...updatedEventData.extendedProps,
+            };
+          }
+        } else if (activePopupState.kind === "admin_note_draft") {
+          const response = await fetch(adminCalendarNoteCreateUrl, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Requested-With": "XMLHttpRequest",
+            },
+            body: JSON.stringify({
+              note_date: activePopupState.noteDate,
+              note_text: popupAdminNoteEl.value,
+            }),
+          });
+          const result = await response.json();
+
+          if (!response.ok || !result.ok) {
+            throw new Error(result.error || "Could not create note.");
+          }
+
+          const eventData = buildAdminNoteEventData(result.note);
+          events.push(eventData);
+          const createdEvent = calendar.addEvent(eventData);
+          openAdminNotePopup(createdEvent);
+        } else {
+          throw new Error("Unknown popup state.");
         }
         popupNoteStatusEl.textContent = "Saved";
       } catch (error) {
@@ -744,6 +1098,39 @@
       } finally {
         popupNoteSaveEl.disabled = false;
         popupNoteSaveEl.textContent = "Save note";
+      }
+    });
+
+    popupDeleteEl.addEventListener("click", async () => {
+      if (!activePopupState || activePopupState.kind !== "admin_note") return;
+
+      popupDeleteEl.disabled = true;
+      popupNoteStatusEl.textContent = "";
+
+      try {
+        const eventRef = activePopupState.event;
+        const response = await fetch(eventRef.extendedProps.delete_url, {
+          method: "POST",
+          headers: {
+            "X-Requested-With": "XMLHttpRequest",
+          },
+        });
+        const result = await response.json();
+
+        if (!response.ok || !result.ok) {
+          throw new Error(result.error || "Could not delete note.");
+        }
+
+        const eventIndex = events.findIndex((row) => String(row.id) === String(eventRef.id));
+        if (eventIndex >= 0) {
+          events.splice(eventIndex, 1);
+        }
+        eventRef.remove();
+        closePopup();
+      } catch (error) {
+        popupNoteStatusEl.textContent = error.message || "Could not delete note.";
+      } finally {
+        popupDeleteEl.disabled = false;
       }
     });
 
@@ -762,12 +1149,12 @@
         ? {
             left: "prev,next",
             center: "title",
-            right: "dayGridMonth,dayGridDay,listMonth"
+            right: "dayGridMonth"
           }
         : {
             left: "prev,next today",
             center: "title",
-            right: "dayGridMonth,dayGridDay,timeGridWeek,listMonth"
+            right: "dayGridMonth,timeGridWeek"
           }
     );
 
@@ -779,6 +1166,14 @@
       editable: false,
       selectable: false,
       dayMaxEvents: true,
+      eventOrder: function(left, right) {
+        const leftType = left.extendedProps?.event_type === "admin_note" ? 1 : 0;
+        const rightType = right.extendedProps?.event_type === "admin_note" ? 1 : 0;
+        if (leftType !== rightType) {
+          return leftType - rightType;
+        }
+        return 0;
+      },
       eventBackgroundColor: "transparent",
       eventBorderColor: "transparent",
       eventTextColor: "#0f172a",
@@ -787,12 +1182,56 @@
       datesSet: function(info) {
         renderDaySummary(info.view);
       },
+      dayCellDidMount: function(arg) {
+        const addButton = document.createElement("button");
+        addButton.type = "button";
+        addButton.className = "calendar-day-add-note";
+        addButton.title = "Add admin note";
+        addButton.setAttribute("aria-label", "Add admin note");
+        const addButtonSymbol = document.createElement("span");
+        addButtonSymbol.className = "calendar-day-add-note-symbol";
+        addButton.appendChild(addButtonSymbol);
+        addButton.addEventListener("click", (clickEvent) => {
+          clickEvent.preventDefault();
+          clickEvent.stopPropagation();
+          openAdminNoteDraft(formatIsoDateLocal(arg.date));
+        });
+
+        const dayFrame = arg.el.querySelector(".fc-daygrid-day-frame");
+        if (dayFrame) {
+          dayFrame.appendChild(addButton);
+          return;
+        }
+
+        const syncInner = arg.el.querySelector(".fc-scrollgrid-sync-inner");
+        if (syncInner) {
+          syncInner.prepend(addButton);
+        }
+      },
       eventContent: function(arg) {
         const props = arg.event.extendedProps;
         const chip = document.createElement("button");
         chip.type = "button";
         chip.className = "booking-event-chip";
-        chip.dataset.status = props.status || "pending";
+        chip.dataset.eventType = props.event_type || "booking";
+        if (props.event_type === "admin_note") {
+          chip.classList.add("admin-note-marker");
+          const noteText = `${props.note_text || ""}`.trim() || "Admin note";
+          chip.setAttribute("aria-label", noteText);
+          const noteLabel = document.createElement("span");
+          noteLabel.className = "admin-note-marker-label";
+          noteLabel.textContent = noteText;
+          chip.appendChild(noteLabel);
+          chip.addEventListener("click", () => openPopup(arg.event));
+          return { domNodes: [chip] };
+        }
+
+        if (props.event_type === "booking") {
+          chip.dataset.status = props.status || "pending";
+          chip.dataset.service = props.include_setup_service
+            ? "assembly"
+            : (props.include_delivery ? "delivery" : "standard");
+        }
         chip.dataset.continuesBefore = String(!arg.isStart);
         chip.dataset.continuesAfter = String(!arg.isEnd);
 
@@ -805,8 +1244,10 @@
 
         const ref = document.createElement("span");
         ref.className = "booking-event-ref";
-        ref.textContent = `#${arg.event.id}`;
-        textWrap.appendChild(ref);
+        if (props.event_type === "booking") {
+          ref.textContent = `#${arg.event.id}`;
+          textWrap.appendChild(ref);
+        }
 
         const name = document.createElement("span");
         name.className = "booking-event-name";
@@ -829,15 +1270,20 @@
         info.jsEvent.preventDefault();
       },
       eventDidMount: function(info) {
-        const status = info.event.extendedProps.status;
-        const customer = info.event.extendedProps.customer;
-        const email = info.event.extendedProps.email;
+        const props = info.event.extendedProps;
+        if (props.event_type === "admin_note") {
+          info.el.title =
+            `Admin note\n` +
+            `Date: ${props.note_date}\n` +
+            `${props.note_text || "No note text"}`;
+          return;
+        }
 
         info.el.title =
           `Booking #${info.event.id}\n` +
-          `Customer: ${customer}\n` +
-          `Email: ${email}\n` +
-          `Status: ${status}`;
+          `Customer: ${props.customer}\n` +
+          `Email: ${props.email}\n` +
+          `Status: ${props.status}`;
       }
     });
 

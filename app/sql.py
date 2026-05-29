@@ -932,6 +932,38 @@ LEFT JOIN booking_rollup br ON br.booking_id = b.id
 ORDER BY b.created_at DESC;
 """
 
+SQL_LIST_ADMIN_CALENDAR_NOTES = """
+SELECT
+  id,
+  note_date,
+  note_text,
+  created_at
+FROM admin_calendar_notes
+ORDER BY note_date ASC, created_at ASC, id ASC;
+"""
+
+SQL_CREATE_ADMIN_CALENDAR_NOTE = """
+INSERT INTO admin_calendar_notes (
+  note_date,
+  note_text
+)
+VALUES (%s, %s)
+RETURNING id, note_date, note_text, created_at;
+"""
+
+SQL_UPDATE_ADMIN_CALENDAR_NOTE = """
+UPDATE admin_calendar_notes
+SET note_text = %s
+WHERE id = %s
+RETURNING id, note_date, note_text, created_at;
+"""
+
+SQL_DELETE_ADMIN_CALENDAR_NOTE = """
+DELETE FROM admin_calendar_notes
+WHERE id = %s
+RETURNING id;
+"""
+
 SQL_ADMIN_BOOKING_METRICS = """
 WITH booking_rollup AS (
   SELECT
@@ -1136,11 +1168,11 @@ SET customer_id = %s,
 WHERE id = %s;
 """
 
-SQL_UPDATE_BOOKING_NOTE = """
+SQL_UPDATE_BOOKING_ADMIN_NOTE = """
 UPDATE bookings
-SET booking_note = %s
+SET admin_note = %s
 WHERE id = %s
-RETURNING booking_note;
+RETURNING admin_note;
 """
 
 SQL_GET_CUSTOMER_FOR_EDIT = """
