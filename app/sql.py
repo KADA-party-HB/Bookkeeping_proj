@@ -549,7 +549,7 @@ SELECT
   (fc.category_id IS NOT NULL) AS is_furnishing,
   fc.furnishing_kind,
   fc.weight_kg,
-  fc.setup_service_fee,
+  fc.setup_service_fee AS furnishing_setup_service_fee,
   fc.notes,
 
   COUNT(DISTINCT icm.item_id) AS total_items,
@@ -584,7 +584,7 @@ SELECT
   (fc.category_id IS NOT NULL) AS is_furnishing,
   fc.furnishing_kind,
   fc.weight_kg,
-  fc.setup_service_fee,
+  fc.setup_service_fee AS furnishing_setup_service_fee,
   fc.notes
 FROM categories c
 LEFT JOIN tent_categories tc ON tc.category_id = c.id
