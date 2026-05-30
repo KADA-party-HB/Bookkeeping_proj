@@ -127,7 +127,12 @@ WHERE rental_period_id = %s;
 
 # Delivery pricing settings
 SQL_GET_DELIVERY_PRICING_SETTINGS = """
-SELECT base_fee, included_distance_km, extra_fee_per_km
+SELECT
+  base_fee,
+  included_distance_km,
+  extra_fee_per_km,
+  customer_prices_include_vat,
+  admin_dark_mode_enabled
 FROM delivery_pricing_settings
 WHERE singleton = TRUE
 LIMIT 1;
@@ -138,14 +143,92 @@ INSERT INTO delivery_pricing_settings (
   singleton,
   base_fee,
   included_distance_km,
-  extra_fee_per_km
+  extra_fee_per_km,
+  customer_prices_include_vat,
+  admin_dark_mode_enabled
 )
-VALUES (TRUE, %s, %s, %s)
+VALUES (TRUE, %s, %s, %s, %s, %s)
 ON CONFLICT (singleton) DO UPDATE
 SET base_fee = EXCLUDED.base_fee,
     included_distance_km = EXCLUDED.included_distance_km,
     extra_fee_per_km = EXCLUDED.extra_fee_per_km,
+    customer_prices_include_vat = EXCLUDED.customer_prices_include_vat,
+    admin_dark_mode_enabled = EXCLUDED.admin_dark_mode_enabled,
     updated_at = CURRENT_TIMESTAMP;
+"""
+
+# Booking: public catalog overview before dates are selected
+SQL_GUEST_CATEGORY_OVERVIEW = """
+WITH active_inventory AS (
+  SELECT
+    icm.category_id,
+    COUNT(DISTINCT icm.item_id) FILTER (WHERE i.is_active) AS available_items,
+    COALESCE(
+      ARRAY_AGG(DISTINCT icm.item_id ORDER BY icm.item_id) FILTER (WHERE i.is_active),
+      ARRAY[]::INT[]
+    ) AS available_item_ids
+  FROM item_category_memberships icm
+  JOIN items i ON i.id = icm.item_id
+  GROUP BY icm.category_id
+),
+first_standard_period AS (
+  SELECT
+    crpp.category_id,
+    rp.id AS rental_period_id,
+    rp.label AS rental_period_label,
+    rp.min_days,
+    rp.max_days,
+    crpp.price,
+    crpp.sort_order,
+    ROW_NUMBER() OVER (
+      PARTITION BY crpp.category_id
+      ORDER BY crpp.sort_order, rp.min_days, rp.max_days, rp.id
+    ) AS rn
+  FROM category_rental_period_prices crpp
+  JOIN rental_periods rp ON rp.id = crpp.rental_period_id
+)
+SELECT
+  c.id,
+  c.display_name,
+
+  fsp.rental_period_id,
+  fsp.rental_period_label,
+  fsp.min_days AS rental_period_min_days,
+  fsp.max_days AS rental_period_max_days,
+  fsp.price AS quoted_period_price,
+  (fsp.rental_period_id IS NOT NULL) AS has_standard_price,
+
+  (tc.category_id IS NOT NULL) AS is_tent,
+  tc.capacity,
+  tc.season_rating,
+  tc.estimated_build_time_minutes,
+  COALESCE(tc.setup_service_fee, fc.setup_service_fee, 0) AS setup_service_fee,
+  tc.packed_weight_kg,
+  tc.floor_area_m2,
+
+  (fc.category_id IS NOT NULL) AS is_furnishing,
+  fc.furnishing_kind,
+  fc.weight_kg,
+  fc.notes,
+
+  COALESCE(ai.available_items, 0) AS available_items,
+  COALESCE(ai.available_item_ids, ARRAY[]::INT[]) AS available_item_ids,
+  0 AS same_day_turnaround_items,
+  ARRAY[]::INT[] AS same_day_turnaround_item_ids,
+  COALESCE(ai.available_item_ids, ARRAY[]::INT[]) AS bookable_item_ids,
+  COALESCE(ai.available_items, 0) AS admin_available_items
+FROM categories c
+LEFT JOIN active_inventory ai ON ai.category_id = c.id
+LEFT JOIN tent_categories tc ON tc.category_id = c.id
+LEFT JOIN furnishing_categories fc ON fc.category_id = c.id
+LEFT JOIN first_standard_period fsp
+  ON fsp.category_id = c.id
+ AND fsp.rn = 1
+ORDER BY
+  (COALESCE(ai.available_items, 0) = 0),
+  (fsp.rental_period_id IS NULL),
+  (tc.category_id IS NOT NULL) DESC,
+  c.display_name;
 """
 
 # Booking: category availability + matching rental price for requested date range
@@ -248,7 +331,7 @@ SELECT
   tc.capacity,
   tc.season_rating,
   tc.estimated_build_time_minutes,
-  tc.setup_service_fee,
+  COALESCE(tc.setup_service_fee, fc.setup_service_fee, 0) AS setup_service_fee,
   tc.packed_weight_kg,
   tc.floor_area_m2,
 
@@ -461,11 +544,12 @@ SELECT
   tc.packed_weight_kg,
   tc.floor_area_m2,
   tc.estimated_build_time_minutes,
-  tc.setup_service_fee,
+  COALESCE(tc.setup_service_fee, fc.setup_service_fee, 0) AS setup_service_fee,
 
   (fc.category_id IS NOT NULL) AS is_furnishing,
   fc.furnishing_kind,
   fc.weight_kg,
+  fc.setup_service_fee,
   fc.notes,
 
   COUNT(DISTINCT icm.item_id) AS total_items,
@@ -479,7 +563,7 @@ GROUP BY
   c.id, c.display_name, c.created_at,
   tc.category_id, tc.capacity, tc.season_rating, tc.packed_weight_kg,
   tc.floor_area_m2, tc.estimated_build_time_minutes, tc.setup_service_fee,
-  fc.category_id, fc.furnishing_kind, fc.weight_kg, fc.notes
+  fc.category_id, fc.furnishing_kind, fc.weight_kg, fc.setup_service_fee, fc.notes
 ORDER BY (tc.category_id IS NOT NULL) DESC, c.display_name;
 """
 
@@ -495,11 +579,12 @@ SELECT
   tc.packed_weight_kg,
   tc.floor_area_m2,
   tc.estimated_build_time_minutes,
-  tc.setup_service_fee,
+  COALESCE(tc.setup_service_fee, fc.setup_service_fee, 0) AS setup_service_fee,
 
   (fc.category_id IS NOT NULL) AS is_furnishing,
   fc.furnishing_kind,
   fc.weight_kg,
+  fc.setup_service_fee,
   fc.notes
 FROM categories c
 LEFT JOIN tent_categories tc ON tc.category_id = c.id
@@ -531,9 +616,10 @@ INSERT INTO furnishing_categories (
   category_id,
   furnishing_kind,
   weight_kg,
+  setup_service_fee,
   notes
 )
-VALUES (%s, %s, %s, %s);
+VALUES (%s, %s, %s, %s, %s);
 """
 
 SQL_UPDATE_CATEGORY_BASE = """
@@ -557,6 +643,7 @@ SQL_UPDATE_FURN_CATEGORY = """
 UPDATE furnishing_categories
 SET furnishing_kind = %s,
     weight_kg = %s,
+    setup_service_fee = %s,
     notes = %s
 WHERE category_id = %s;
 """
@@ -754,7 +841,7 @@ SELECT
   (tc.category_id IS NOT NULL) AS is_tent,
   tc.capacity,
   tc.season_rating,
-  tc.setup_service_fee AS current_setup_service_fee,
+  COALESCE(tc.setup_service_fee, fc.setup_service_fee, 0) AS current_setup_service_fee,
 
   (fc.category_id IS NOT NULL) AS is_furnishing,
   fc.furnishing_kind
@@ -801,7 +888,7 @@ SELECT
   (tc.category_id IS NOT NULL) AS is_tent,
   tc.capacity,
   tc.season_rating,
-  tc.setup_service_fee AS current_setup_service_fee,
+  COALESCE(tc.setup_service_fee, fc.setup_service_fee, 0) AS current_setup_service_fee,
 
   (fc.category_id IS NOT NULL) AS is_furnishing,
   fc.furnishing_kind

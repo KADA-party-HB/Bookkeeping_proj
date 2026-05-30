@@ -194,6 +194,113 @@
 </div>
 
 <style>
+  .admin-darkmode #booking-calendar .fc {
+    --fc-page-bg-color: rgb(15 23 42);
+    --fc-neutral-bg-color: rgb(15 23 42);
+    --fc-border-color: rgba(148, 163, 184, 0.18);
+    --fc-button-bg-color: rgb(30 41 59);
+    --fc-button-border-color: rgba(148, 163, 184, 0.22);
+    --fc-button-hover-bg-color: rgb(14 165 233);
+    --fc-button-hover-border-color: rgb(14 165 233);
+    --fc-button-active-bg-color: rgb(8 47 73);
+    --fc-button-active-border-color: rgb(8 47 73);
+    --fc-today-bg-color: rgba(56, 189, 248, 0.08);
+    color: rgb(226 232 240);
+  }
+
+  .admin-darkmode #booking-calendar .fc-theme-standard .fc-scrollgrid,
+  .admin-darkmode #booking-calendar .fc-theme-standard td,
+  .admin-darkmode #booking-calendar .fc-theme-standard th,
+  .admin-darkmode #booking-calendar .fc-scrollgrid,
+  .admin-darkmode #booking-calendar .fc-scrollgrid-section > *,
+  .admin-darkmode #booking-calendar .fc-col-header-cell,
+  .admin-darkmode #booking-calendar .fc-daygrid-day,
+  .admin-darkmode #booking-calendar .fc-daygrid-day-frame {
+    border-color: rgba(148, 163, 184, 0.18) !important;
+  }
+
+  .admin-darkmode #booking-calendar .fc .fc-scrollgrid,
+  .admin-darkmode #booking-calendar .fc .fc-view-harness,
+  .admin-darkmode #booking-calendar .fc .fc-daygrid-body,
+  .admin-darkmode #booking-calendar .fc .fc-daygrid-body table,
+  .admin-darkmode #booking-calendar .fc .fc-col-header,
+  .admin-darkmode #booking-calendar .fc .fc-daygrid-day-frame {
+    background: rgb(15 23 42) !important;
+  }
+
+  .admin-darkmode #booking-calendar .fc .fc-toolbar-title,
+  .admin-darkmode #booking-calendar .fc .fc-col-header-cell-cushion,
+  .admin-darkmode #booking-calendar .fc .fc-daygrid-day-number,
+  .admin-darkmode #booking-calendar .fc .fc-button {
+    color: rgb(241 245 249) !important;
+  }
+
+  .admin-darkmode #booking-calendar .fc .fc-button {
+    box-shadow: none;
+  }
+
+  .admin-darkmode #booking-calendar .fc .fc-button:disabled {
+    opacity: 0.55;
+  }
+
+  .admin-darkmode #booking-calendar .calendar-day-add-note {
+    border-color: rgba(148, 163, 184, 0.22);
+    background: rgb(30 41 59);
+    color: rgb(148 163 184);
+    box-shadow: none;
+  }
+
+  .admin-darkmode #booking-calendar .calendar-day-add-note:hover {
+    border-color: rgb(250 204 21);
+    background: rgb(254 240 138);
+    color: rgb(113 63 18);
+  }
+
+  .admin-darkmode #calendar-day-summary-section,
+  .admin-darkmode #calendar-day-summary-table-wrap,
+  .admin-darkmode #calendar-free-summary-table-wrap,
+  .admin-darkmode #calendar-booking-popup > div:last-child {
+    border-color: rgba(148, 163, 184, 0.18) !important;
+    background: rgb(15 23 42) !important;
+  }
+
+  .admin-darkmode #calendar-day-summary-body,
+  .admin-darkmode #calendar-free-summary-body {
+    background: rgb(15 23 42) !important;
+  }
+
+  .admin-darkmode #calendar-popup-price-list {
+    border-color: rgba(148, 163, 184, 0.1) !important;
+  }
+
+  .admin-darkmode #calendar-popup-contact-list,
+  .admin-darkmode #calendar-popup-booking-note,
+  .admin-darkmode #calendar-popup-admin-note,
+  .admin-darkmode #calendar-day-summary-empty,
+  .admin-darkmode #calendar-free-summary-empty {
+    border-color: rgba(148, 163, 184, 0.18) !important;
+    background: rgb(30 41 59) !important;
+  }
+
+  .admin-darkmode #calendar-day-summary-booking-count,
+  .admin-darkmode #calendar-free-toggle {
+    border-color: rgba(148, 163, 184, 0.18) !important;
+    background: rgb(30 41 59) !important;
+  }
+
+  .admin-darkmode #calendar-free-toggle-track {
+    background: rgb(51 65 85) !important;
+  }
+
+  .admin-darkmode #calendar-free-toggle-knob {
+    border-color: rgba(148, 163, 184, 0.18) !important;
+    background: rgb(226 232 240) !important;
+  }
+
+  .admin-darkmode #calendar-popup-price-wrap > div:first-child {
+    border-color: rgba(148, 163, 184, 0.18) !important;
+  }
+
   #booking-calendar .fc .fc-event {
     border: 0;
     background: transparent;

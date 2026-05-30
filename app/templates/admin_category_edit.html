@@ -158,6 +158,21 @@
             >
           </div>
 
+          <div>
+            <label class="text-sm font-medium text-slate-700" for="setup_service_fee">Setup service fee</label>
+            <input
+              id="setup_service_fee"
+              name="setup_service_fee"
+              type="number"
+              step="0.01"
+              min="0"
+              value="{{ cat.setup_service_fee }}"
+              required
+              class="mt-1 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 shadow-sm transition focus:border-sky-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-sky-100"
+            >
+            <p class="mt-2 text-xs text-slate-500">Use 0 when setup is not offered for this furnishing category.</p>
+          </div>
+
           <div class="md:col-span-2">
             <label class="text-sm font-medium text-slate-700" for="notes">Notes (optional)</label>
             <textarea

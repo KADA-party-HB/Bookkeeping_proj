@@ -73,7 +73,7 @@
       <div class="flex items-center justify-between gap-3">
         <div>
           <h2 class="text-lg font-bold text-slate-950">Välj datum</h2>
-          <p class="mt-1 text-sm text-slate-600">Välj hyresperiod minst 7 dagar framåt för att ladda tillgängliga artiklar.</p>
+          <p class="mt-1 text-sm text-slate-600">Välj hyresperiod minst 7 dagar framåt för exakt tillgänglighet. Sortiment och standardpriser visas redan nedan.</p>
         </div>
         <div class="rounded-full bg-pink-500 px-3 py-1 text-xs font-medium text-white shadow-sm whitespace-nowrap">Steg 1</div>
       </div>
@@ -207,6 +207,10 @@
     let pagerUsesResponsiveDefault = !pagerPerPage || Number(pagerPerPage?.value || responsivePerPage) === responsivePerPage;
     let perPage = Number(pagerPerPage?.value || responsivePerPage);
     const defaultSubmitLabel = submitButton?.textContent.trim() || "";
+    const pricesIncludeVat = {{ customer_prices_include_vat|default(false)|tojson }};
+    const vatRate = 0.25;
+    const summarySubtotal = form.querySelector("#summary-subtotal");
+    const summaryVat = form.querySelector("#summary-vat");
 
     const parseNumber = (value) => {
       const parsed = Number(String(value || "0").replace(",", "."));
@@ -806,7 +810,7 @@
       const itemCount = selected.reduce((sum, item) => sum + item.qty, 0);
       const rental = selected.reduce((sum, item) => sum + (item.unitPrice * item.qty), 0);
       const setup = includeSetup?.checked
-        ? selected.reduce((sum, item) => sum + ((item.isTent ? item.setupFee : 0) * item.qty), 0)
+        ? selected.reduce((sum, item) => sum + (item.setupFee * item.qty), 0)
         : 0;
       const delivery = includeDelivery?.checked && validatedDelivery ? validatedDelivery.deliveryFee : 0;
 
@@ -821,6 +825,8 @@
 
     const renderSummary = () => {
       const state = getState();
+      const subtotalExVat = pricesIncludeVat ? state.total / (1 + vatRate) : state.total;
+      const vatAmount = pricesIncludeVat ? state.total - subtotalExVat : 0;
 
       if (summaryItems) summaryItems.textContent = `${state.itemCount} valda`;
       if (summaryRental) summaryRental.textContent = formatMoney(state.rental);
@@ -840,6 +846,8 @@
         }
       }
 
+      if (summarySubtotal) summarySubtotal.textContent = formatMoney(subtotalExVat);
+      if (summaryVat) summaryVat.textContent = formatMoney(vatAmount);
       if (summaryTotal) summaryTotal.textContent = formatMoney(state.total);
     };
 
@@ -916,7 +924,7 @@
 
       if (setupServiceHelp) {
         setupServiceHelp.textContent = deliveryEnabled
-          ? "Monteringsavgift läggs bara till för tält. Leverans krävs."
+          ? "Monteringsavgift läggs till för valda kategorier som har montering. Leverans krävs."
           : "Montering kräver leverans. Välj leverans först.";
       }
     };

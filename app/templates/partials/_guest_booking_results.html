@@ -1,6 +1,7 @@
 {% import "_components.html" as ui with context %}
 
 {% if categories is not none %}
+  {% if has_selected_dates %}
   <form
     method="post"
     action="{{ url_for('routes.guest_booking_create') }}"
@@ -120,9 +121,10 @@
                     {% if c.is_tent %}
                       <div>Kapacitet: {{ c.capacity }}</div>
                       <div>Säsong: {{ c.season_rating }}</div>
-                      <div>Montering: {{ c.setup_service_fee }} kr</div>
+                      {% if c.setup_service_fee %}<div>Montering: {{ c.setup_service_fee }} kr</div>{% endif %}
                     {% else %}
                       <div>{{ c.furnishing_kind }}</div>
+                      {% if c.setup_service_fee %}<div>Montering: {{ c.setup_service_fee }} kr</div>{% endif %}
                       {% if c.weight_kg %}<div>Vikt: {{ c.weight_kg }} kg</div>{% endif %}
                     {% endif %}
                   </div>
@@ -143,7 +145,7 @@
                       data-category-id="{{ c.id }}"
                       data-category-name="{{ c.display_name }}"
                       data-unit-price="{{ c.quoted_period_price if c.has_standard_price else 0 }}"
-                      data-setup-fee="{{ c.setup_service_fee if c.is_tent else 0 }}"
+                      data-setup-fee="{{ c.setup_service_fee or 0 }}"
                       data-is-tent="{{ 'true' if c.is_tent else 'false' }}"
                       data-available-item-ids='{{ c.available_item_ids|tojson }}'
                       class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 shadow-sm transition focus:border-pink-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-pink-100"
@@ -247,9 +249,10 @@
                         {% if c.is_tent %}
                           <div>Kapacitet: {{ c.capacity }}</div>
                           <div class="mt-1">Säsong: {{ c.season_rating }}</div>
-                          <div class="mt-1">Montering: {{ c.setup_service_fee }} kr</div>
+                          {% if c.setup_service_fee %}<div class="mt-1">Montering: {{ c.setup_service_fee }} kr</div>{% endif %}
                         {% else %}
                           <div>{{ c.furnishing_kind }}</div>
+                          {% if c.setup_service_fee %}<div class="mt-1">Montering: {{ c.setup_service_fee }} kr</div>{% endif %}
                           {% if c.weight_kg %}<div class="mt-1">Vikt: {{ c.weight_kg }} kg</div>{% endif %}
                         {% endif %}
                       </td>
@@ -268,7 +271,7 @@
                           data-category-id="{{ c.id }}"
                           data-category-name="{{ c.display_name }}"
                           data-unit-price="{{ c.quoted_period_price if c.has_standard_price else 0 }}"
-                          data-setup-fee="{{ c.setup_service_fee if c.is_tent else 0 }}"
+                          data-setup-fee="{{ c.setup_service_fee or 0 }}"
                           data-is-tent="{{ 'true' if c.is_tent else 'false' }}"
                           data-available-item-ids='{{ c.available_item_ids|tojson }}'
                           class="w-24 rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 shadow-sm transition focus:border-pink-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-pink-100"
@@ -365,7 +368,7 @@
             >
             <span class="text-sm text-slate-700">
               <span class="block font-medium text-slate-900">Inkludera montering</span>
-              <span class="mt-1 block" id="setup-service-help">Monteringsavgift läggs bara till för tält. Leverans krävs.</span>
+              <span class="mt-1 block" id="setup-service-help">Monteringsavgift läggs till för valda kategorier som har montering. Leverans krävs.</span>
             </span>
           </label>
 
@@ -525,9 +528,21 @@
             <span id="summary-delivery" class="font-semibold text-slate-950">Inte tillvalt</span>
           </div>
 
+          {% if customer_prices_include_vat %}
+            <div class="flex items-center justify-between gap-4">
+              <span class="text-slate-500">Pris exkl. moms</span>
+              <span id="summary-subtotal" class="font-semibold text-slate-950">0 kr</span>
+            </div>
+
+            <div class="flex items-center justify-between gap-4">
+              <span class="text-slate-500">Moms (25%)</span>
+              <span id="summary-vat" class="font-semibold text-slate-950">0 kr</span>
+            </div>
+          {% endif %}
+
           <div class="border-t border-pink-100 pt-3">
             <div class="flex items-center justify-between gap-4 text-base font-semibold">
-              <span>Total</span>
+              <span>{% if customer_prices_include_vat %}Totalt inkl. moms{% else %}Total{% endif %}</span>
               <span id="summary-total" class="text-rose-600">0 kr</span>
             </div>
           </div>
@@ -992,24 +1007,18 @@
         let selectedItems = 0;
         let rentalTotal = 0;
         let setupTotal = 0;
-        let tentQty = 0;
 
         qtyInputs.forEach((input) => {
           const qty = clampQtyInput(input);
           const unitPrice = safeNumber(input.dataset.unitPrice);
           const setupFee = safeNumber(input.dataset.setupFee);
-          const isTent = input.dataset.isTent === "true";
 
           if (qty > 0) {
             selectedItems += qty;
             rentalTotal += qty * unitPrice;
 
-            if (isTent) {
-              tentQty += qty;
-
-              if (setupCheckbox && setupCheckbox.checked) {
-                setupTotal += qty * setupFee;
-              }
+            if (setupCheckbox && setupCheckbox.checked) {
+              setupTotal += qty * setupFee;
             }
           }
         });
@@ -1026,7 +1035,7 @@
 
         if (summarySetup) {
           if (setupCheckbox && setupCheckbox.checked) {
-            summarySetup.textContent = tentQty > 0 ? formatKr(setupTotal) : "0 kr";
+            summarySetup.textContent = formatKr(setupTotal);
           } else {
             summarySetup.textContent = "Inte tillvalt";
           }
@@ -1069,4 +1078,276 @@
       updateSummary();
     });
   </script>
+  {% else %}
+    <section class="mt-6 rounded-[2rem] border border-slate-200 bg-white shadow-[0_24px_60px_-42px_rgba(15,23,42,0.16)]">
+      <div class="border-b border-pink-100 bg-[linear-gradient(180deg,rgba(253,242,248,0.55),rgba(255,255,255,0.96))] px-6 py-5 md:px-8">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <div class="text-xs font-medium uppercase tracking-[0.2em] text-rose-400">Sortiment</div>
+            <h2 class="mt-1 text-2xl font-black text-slate-950">Tillgängliga artiklar och priser</h2>
+            <p class="mt-2 max-w-2xl text-sm text-slate-600">
+              Välj datum ovan för exakt tillgänglighet och bokning.
+            </p>
+          </div>
+
+          <div class="rounded-full border border-pink-200 bg-white px-4 py-2 text-sm font-medium text-slate-700">
+            {{ categories|length }} kategorier visas
+          </div>
+        </div>
+      </div>
+
+      <div class="px-6 py-6 md:px-8">
+        {% if categories|length == 0 %}
+          <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-600">
+            <i>Inga kategorier finns att visa just nu.</i>
+          </div>
+        {% else %}
+          <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {% for c in categories %}
+              {% set furnishing_theme = c.is_furnishing %}
+              <article class="rounded-[1.5rem] border bg-white p-5 shadow-[0_18px_45px_-36px_rgba(15,23,42,0.12)] {% if furnishing_theme %}border-emerald-100{% else %}border-pink-100{% endif %}">
+                <div class="flex items-start justify-between gap-3">
+                  <div>
+                    <h3 class="font-semibold text-slate-900">{{ c.display_name }}</h3>
+                    <div class="mt-2 hidden flex-wrap gap-2">
+                      {{ ui.inventory_type_badges(c.is_tent, c.is_furnishing, variant='customer', tent_label='Tält', furnishing_label='Inredning') }}
+                    </div>
+                  </div>
+
+                  <span class="inline-flex rounded-full border px-3 py-1 text-xs font-medium {% if furnishing_theme %}border-emerald-200 bg-emerald-50 text-emerald-700{% else %}border-pink-200 bg-pink-50 text-rose-600{% endif %}">
+                    {% if c.is_tent %}
+                      Tält
+                    {% elif c.is_furnishing %}
+                      Inredning
+                    {% else %}
+                      Kategori
+                    {% endif %}
+                  </span>
+                </div>
+
+                <div class="mt-4 rounded-2xl border bg-white px-4 py-4 {% if furnishing_theme %}border-emerald-200{% else %}border-pink-100{% endif %}">
+                  {% if c.all_period_prices %}
+                    <div class="text-xs font-semibold uppercase tracking-[0.16em] {% if furnishing_theme %}text-emerald-700{% else %}text-rose-500{% endif %}">Priser</div>
+                    {% set cheapest_price_row = (c.all_period_prices|sort(attribute='price')|first) %}
+                    <div class="mt-3">
+                      <div class="text-lg font-semibold text-slate-950">Från {{ cheapest_price_row.price }} kr</div>
+                      <div class="mt-1 text-xs text-slate-500">
+                        {{ cheapest_price_row.label }}
+                        {% if cheapest_price_row.min_days == 1 and cheapest_price_row.max_days == 1 %}
+                          • 1 dag
+                        {% else %}
+                          • {{ cheapest_price_row.min_days }}-{{ cheapest_price_row.max_days }} dagar
+                        {% endif %}
+                      </div>
+                    </div>
+                    <div class="mt-3" data-price-popover-root>
+                      {% set price_option_count = c.all_period_prices|length + (1 if c.setup_service_fee else 0) %}
+                      <button
+                        type="button"
+                        data-price-popover-toggle
+                        aria-expanded="false"
+                        class="flex w-full cursor-pointer items-center justify-between gap-3 rounded-xl border bg-white px-3 py-2 text-left text-sm font-medium transition {% if furnishing_theme %}border-emerald-200 text-emerald-900 hover:border-emerald-300 hover:bg-emerald-50{% else %}border-pink-200 text-rose-900 hover:border-pink-300 hover:bg-pink-50{% endif %}"
+                      >
+                        <span>Visa alla priser</span>
+                        <span class="rounded-full border bg-white px-2.5 py-1 text-xs font-semibold {% if furnishing_theme %}border-emerald-200 text-emerald-700{% else %}border-pink-200 text-rose-500{% endif %}">
+                          {{ price_option_count }} st
+                        </span>
+                      </button>
+
+                      <div
+                        class="fixed z-[80] hidden rounded-2xl border bg-white p-3 shadow-xl {% if furnishing_theme %}border-emerald-200{% else %}border-pink-200{% endif %}"
+                        data-price-popover-panel
+                      >
+                        <div class="mb-3 flex items-center justify-between gap-3">
+                          <div class="text-xs font-semibold uppercase tracking-[0.16em] {% if furnishing_theme %}text-emerald-700{% else %}text-rose-500{% endif %}">
+                            Priser
+                          </div>
+                          <button
+                            type="button"
+                            data-price-popover-close
+                            class="inline-flex h-7 w-7 items-center justify-center rounded-full border pb-0.5 text-sm font-semibold leading-none transition {% if furnishing_theme %}border-emerald-200 text-emerald-700 hover:bg-emerald-50{% else %}border-pink-200 text-rose-500 hover:bg-pink-50{% endif %}"
+                            aria-label="Stäng prislista"
+                          >
+                            x
+                          </button>
+                        </div>
+
+                        <div class="space-y-2">
+                        {% for price_row in c.all_period_prices %}
+                          <div class="flex items-start justify-between gap-4 rounded-xl border bg-white px-3 py-2 text-sm {% if furnishing_theme %}border-emerald-100{% else %}border-pink-100{% endif %}">
+                            <div>
+                              <div class="font-medium text-slate-900">{{ price_row.label }}</div>
+                              <div class="mt-1 text-xs text-slate-500">
+                                {% if price_row.min_days == 1 and price_row.max_days == 1 %}
+                                  1 dag
+                                {% else %}
+                                  {{ price_row.min_days }}-{{ price_row.max_days }} dagar
+                                {% endif %}
+                              </div>
+                            </div>
+                            <div class="shrink-0 font-semibold {% if furnishing_theme %}text-emerald-700{% else %}text-rose-600{% endif %}">{{ price_row.price }} kr</div>
+                          </div>
+                        {% endfor %}
+                        {% if c.setup_service_fee %}
+                          <div class="flex items-start justify-between gap-4 rounded-xl border bg-white px-3 py-2 text-sm {% if furnishing_theme %}border-emerald-100{% else %}border-pink-100{% endif %}">
+                            <div>
+                              <div class="font-medium text-slate-900">Montering</div>
+                              <div class="mt-1 text-xs text-slate-500">Tillkommer vid val av montering.</div>
+                            </div>
+                            <div class="shrink-0 font-semibold {% if furnishing_theme %}text-emerald-700{% else %}text-rose-600{% endif %}">{{ c.setup_service_fee }} kr</div>
+                          </div>
+                        {% endif %}
+                      </div>
+                    </div>
+                  {% elif c.has_standard_price %}
+                    <div class="text-lg font-semibold text-slate-950">{{ c.quoted_period_price }} kr</div>
+                    <div class="mt-1 text-xs text-slate-500">
+                      {{ c.rental_period_label }}
+                      {% if c.rental_period_min_days == 1 and c.rental_period_max_days == 1 %}
+                        • 1 dag
+                      {% else %}
+                        • {{ c.rental_period_min_days }}-{{ c.rental_period_max_days }} dagar
+                      {% endif %}
+                    </div>
+                  {% else %}
+                    <div class="text-sm font-semibold text-amber-700">Standardpris saknas</div>
+                    <div class="mt-1 text-xs text-slate-500">Kontakta oss för prisuppgift.</div>
+                  {% endif %}
+                </div>
+
+                {% if c.is_tent %}
+                  <div class="mt-4 space-y-1 text-sm text-slate-600">
+                    <div>Kapacitet: {{ c.capacity }}</div>
+                    <div>Säsong: {{ c.season_rating }}</div>
+                  </div>
+                {% endif %}
+              </article>
+            {% endfor %}
+          </div>
+        {% endif %}
+      </div>
+    </section>
+    <script>
+      function initGuestCatalogPricePopovers(root = document) {
+        const popoverRoots = Array.from(root.querySelectorAll("[data-price-popover-root]"));
+        if (!popoverRoots.length) {
+          return;
+        }
+
+        const viewportPadding = 16;
+
+        const positionPopover = (toggle, popover) => {
+          if (!toggle || !popover) {
+            return;
+          }
+
+          const toggleRect = toggle.getBoundingClientRect();
+          popover.style.left = "0px";
+          popover.style.top = "0px";
+          popover.style.width = `${Math.round(toggleRect.width)}px`;
+          popover.classList.remove("hidden");
+
+          const popoverRect = popover.getBoundingClientRect();
+          let left = toggleRect.left;
+          let top = toggleRect.bottom + 10;
+
+          if (left + popoverRect.width > window.innerWidth - viewportPadding) {
+            left = window.innerWidth - popoverRect.width - viewportPadding;
+          }
+
+          if (left < viewportPadding) {
+            left = viewportPadding;
+          }
+
+          if (top + popoverRect.height > window.innerHeight - viewportPadding) {
+            top = toggleRect.top - popoverRect.height - 10;
+          }
+
+          if (top < viewportPadding) {
+            top = viewportPadding;
+          }
+
+          popover.style.left = `${Math.round(left)}px`;
+          popover.style.top = `${Math.round(top)}px`;
+        };
+
+        const closePopovers = (exceptRoot = null) => {
+          popoverRoots.forEach((popoverRoot) => {
+            const popover = popoverRoot.querySelector("[data-price-popover-panel]");
+            const toggle = popoverRoot.querySelector("[data-price-popover-toggle]");
+            const shouldKeepOpen = exceptRoot !== null && popoverRoot === exceptRoot;
+            if (popover) {
+              popover.classList.toggle("hidden", !shouldKeepOpen);
+              if (!shouldKeepOpen) {
+                popover.style.left = "";
+                popover.style.top = "";
+                popover.style.width = "";
+              }
+            }
+            if (toggle) {
+              toggle.setAttribute("aria-expanded", shouldKeepOpen ? "true" : "false");
+            }
+          });
+        };
+
+        popoverRoots.forEach((popoverRoot) => {
+          if (popoverRoot.dataset.initialized === "true") {
+            return;
+          }
+
+          popoverRoot.dataset.initialized = "true";
+
+          const toggle = popoverRoot.querySelector("[data-price-popover-toggle]");
+          const popover = popoverRoot.querySelector("[data-price-popover-panel]");
+          const closeButton = popoverRoot.querySelector("[data-price-popover-close]");
+
+          if (toggle && popover) {
+            toggle.addEventListener("click", (event) => {
+              event.preventDefault();
+              event.stopPropagation();
+
+              const willOpen = popover.classList.contains("hidden");
+              closePopovers(willOpen ? popoverRoot : null);
+              if (willOpen) {
+                positionPopover(toggle, popover);
+              }
+            });
+          }
+
+          if (closeButton) {
+            closeButton.addEventListener("click", (event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              closePopovers();
+            });
+          }
+        });
+
+        if (window.__guestCatalogPricePopoversBound !== true) {
+          document.addEventListener("click", (event) => {
+            if (event.target.closest("[data-price-popover-root]")) {
+              return;
+            }
+            closePopovers();
+          });
+
+          document.addEventListener("keydown", (event) => {
+            if (event.key === "Escape") {
+              closePopovers();
+            }
+          });
+
+          window.addEventListener("resize", () => closePopovers());
+          window.addEventListener("scroll", () => closePopovers(), true);
+          window.__guestCatalogPricePopoversBound = true;
+        }
+      }
+
+      document.addEventListener("DOMContentLoaded", () => {
+        if (window.initGuestCatalogPricePopovers) {
+          window.initGuestCatalogPricePopovers(document);
+        }
+      });
+    </script>
+  {% endif %}
 {% endif %}

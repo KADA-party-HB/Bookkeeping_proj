@@ -253,7 +253,7 @@
                             data-category-id="{{ c.id }}"
                             data-category-name="{{ c.display_name }}"
                             data-standard-price="{{ c.quoted_period_price if c.has_standard_price else '' }}"
-                            data-setup-fee="{{ c.setup_service_fee if c.is_tent else 0 }}"
+                            data-setup-fee="{{ c.setup_service_fee or 0 }}"
                             data-is-tent="{{ 'true' if c.is_tent else 'false' }}"
                             data-strict-available="{{ c.available_items }}"
                             data-turnaround-available="{{ c.same_day_turnaround_items }}"
@@ -402,7 +402,7 @@
                               data-category-id="{{ c.id }}"
                               data-category-name="{{ c.display_name }}"
                               data-standard-price="{{ c.quoted_period_price if c.has_standard_price else '' }}"
-                              data-setup-fee="{{ c.setup_service_fee if c.is_tent else 0 }}"
+                              data-setup-fee="{{ c.setup_service_fee or 0 }}"
                               data-is-tent="{{ 'true' if c.is_tent else 'false' }}"
                               data-strict-available="{{ c.available_items }}"
                               data-turnaround-available="{{ c.same_day_turnaround_items }}"
@@ -437,7 +437,7 @@
                               <div>Capacity: {{ c.capacity }}</div>
                               <div>Season rating: {{ c.season_rating }}</div>
                               <div>Build time: {{ c.estimated_build_time_minutes }} min</div>
-                              <div>Setup service: {{ c.setup_service_fee }} kr</div>
+                              {% if c.setup_service_fee %}<div>Setup service: {{ c.setup_service_fee }} kr</div>{% endif %}
                               {% if c.packed_weight_kg %}
                                 <div>Packed weight: {{ c.packed_weight_kg }} kg</div>
                               {% endif %}
@@ -446,6 +446,7 @@
                               {% endif %}
                             {% else %}
                               <div>{{ c.furnishing_kind }}</div>
+                              {% if c.setup_service_fee %}<div>Setup service: {{ c.setup_service_fee }} kr</div>{% endif %}
                               {% if c.weight_kg %}
                                 <div>Weight: {{ c.weight_kg }} kg</div>
                               {% endif %}
@@ -1700,7 +1701,7 @@
             const customPrice = customPriceInput ? parseMoney(customPriceInput.value) : null;
             const hasCustomPrice = customPriceInput && customPriceInput.value.trim() !== "";
             const unitPrice = hasCustomPrice ? customPrice : parseMoney(input.dataset.standardPrice);
-            const setupFee = input.dataset.isTent === "true" ? parseMoney(input.dataset.setupFee) : 0;
+            const setupFee = parseMoney(input.dataset.setupFee);
 
             return {
               id: categoryId,
@@ -1708,7 +1709,6 @@
               qty,
               unitPrice,
               setupFee,
-              isTent: input.dataset.isTent === "true",
               usesCustomPrice: Boolean(hasCustomPrice),
               strictAvailable: parseInt(input.dataset.strictAvailable || "0", 10) || 0,
               turnaroundAvailable: parseInt(input.dataset.turnaroundAvailable || "0", 10) || 0,
@@ -1769,7 +1769,7 @@
 
         const rental = selectedItems.reduce((sum, item) => sum + (item.unitPrice * item.qty), 0);
         const setup = includeSetup
-          ? selectedItems.reduce((sum, item) => sum + ((item.isTent ? item.setupFee : 0) * item.qty), 0)
+          ? selectedItems.reduce((sum, item) => sum + (item.setupFee * item.qty), 0)
           : 0;
         const total = hasBookingOverride ? bookingOverride : rental + setup + deliveryFee;
         const turnaroundSelections = selectedItems

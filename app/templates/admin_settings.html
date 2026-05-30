@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="rounded-[2rem] border border-slate-200 bg-[linear-gradient(135deg,#fffdfd_0%,#ffffff_52%,#f0fdf4_100%)] shadow-sm">
+  <div class="px-6 py-8 md:px-8">
+    <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <div>
+        <div class="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium uppercase tracking-[0.2em] text-emerald-700">
+          Admin Settings
+        </div>
+        <h1 class="mt-4 text-3xl font-semibold tracking-tight text-slate-900">Pricing and workspace settings</h1>
+        <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+          Manage customer-facing VAT display, delivery pricing, and the admin workspace theme from one place.
+        </p>
+      </div>
+
+      <div class="rounded-[1.5rem] border border-slate-200 bg-white px-4 py-4 text-sm text-slate-600 shadow-sm">
+        <div class="font-medium text-slate-900">Current delivery rule</div>
+        <div class="mt-1">{{ delivery_pricing_summary }}</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<form
+  method="post"
+  action="{{ url_for('routes.admin_settings_save') }}"
+  class="mt-6 grid gap-6 xl:grid-cols-[1.1fr_0.9fr]"
+>
+  <section class="rounded-[2rem] border border-slate-200 bg-white shadow-sm">
+    <div class="border-b border-slate-200 px-6 py-5 md:px-8">
+      <div class="text-xs font-medium uppercase tracking-[0.2em] text-slate-400">Delivery</div>
+      <h2 class="mt-1 text-2xl font-semibold text-slate-900">Delivery pricing</h2>
+      <p class="mt-1 text-sm text-slate-500">These values are used for delivery quotes and booking totals.</p>
+    </div>
+
+    <div class="grid gap-5 px-6 py-6 md:grid-cols-3 md:px-8">
+      <div>
+        <label class="text-sm font-medium text-slate-700" for="base_fee">Base fee</label>
+        <input
+          id="base_fee"
+          type="number"
+          min="0"
+          step="0.01"
+          name="base_fee"
+          value="{{ delivery_pricing.base_fee }}"
+          class="mt-1 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 shadow-sm transition focus:border-emerald-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-emerald-100"
+        >
+        <p class="mt-2 text-xs text-slate-500">Fixed starting cost in SEK.</p>
+      </div>
+
+      <div>
+        <label class="text-sm font-medium text-slate-700" for="included_distance_km">Included distance (km)</label>
+        <input
+          id="included_distance_km"
+          type="number"
+          min="0"
+          step="0.01"
+          name="included_distance_km"
+          value="{{ delivery_pricing.included_distance_km }}"
+          class="mt-1 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 shadow-sm transition focus:border-emerald-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-emerald-100"
+        >
+        <p class="mt-2 text-xs text-slate-500">Distance covered before extra charges apply.</p>
+      </div>
+
+      <div>
+        <label class="text-sm font-medium text-slate-700" for="extra_fee_per_km">Extra fee / km</label>
+        <input
+          id="extra_fee_per_km"
+          type="number"
+          min="0"
+          step="0.01"
+          name="extra_fee_per_km"
+          value="{{ delivery_pricing.extra_fee_per_km }}"
+          class="mt-1 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 shadow-sm transition focus:border-emerald-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-emerald-100"
+        >
+        <p class="mt-2 text-xs text-slate-500">Added per kilometer beyond the included distance.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="rounded-[2rem] border border-slate-200 bg-white shadow-sm">
+    <div class="border-b border-slate-200 px-6 py-5 md:px-8">
+      <div class="text-xs font-medium uppercase tracking-[0.2em] text-slate-400">Display</div>
+      <h2 class="mt-1 text-2xl font-semibold text-slate-900">Customer and admin display</h2>
+      <p class="mt-1 text-sm text-slate-500">Control how prices are shown to customers and how the admin workspace looks.</p>
+    </div>
+
+    <div class="space-y-4 px-6 py-6 md:px-8">
+      <label class="flex items-start gap-3 rounded-[1.5rem] border border-emerald-200 bg-emerald-50/60 px-4 py-4">
+        <input
+          type="checkbox"
+          name="customer_prices_include_vat"
+          value="on"
+          {% if delivery_pricing.customer_prices_include_vat %}checked{% endif %}
+          class="mt-1 h-4 w-4 rounded border-emerald-300 text-emerald-600 focus:ring-emerald-300"
+        >
+        <span>
+          <span class="block text-sm font-medium text-slate-900">Show customer prices including 25% VAT</span>
+          <span class="mt-1 block text-xs leading-5 text-slate-600">
+            Applies to customer-visible rental, setup, delivery, booking totals, and booking emails. Stored base prices stay unchanged.
+          </span>
+        </span>
+      </label>
+
+      <label class="flex items-start gap-3 rounded-[1.5rem] border border-sky-200 bg-sky-50/60 px-4 py-4">
+        <input
+          type="checkbox"
+          name="admin_dark_mode_enabled"
+          value="on"
+          {% if delivery_pricing.admin_dark_mode_enabled %}checked{% endif %}
+          class="mt-1 h-4 w-4 rounded border-sky-300 text-sky-600 focus:ring-sky-300"
+        >
+        <span>
+          <span class="block text-sm font-medium text-slate-900">Enable dark mode for the admin workspace</span>
+          <span class="mt-1 block text-xs leading-5 text-slate-600">
+            Changes the admin shell and common admin surfaces to a darker appearance without affecting customer pages.
+          </span>
+        </span>
+      </label>
+
+      <div class="rounded-[1.5rem] border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-600">
+        <div class="font-medium text-slate-900">Current state</div>
+        <div class="mt-2 space-y-1">
+          <div>Customer VAT display: {{ "Enabled" if delivery_pricing.customer_prices_include_vat else "Disabled" }}</div>
+          <div>Admin dark mode: {{ "Enabled" if delivery_pricing.admin_dark_mode_enabled else "Disabled" }}</div>
+        </div>
+      </div>
+
+      <button class="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white transition hover:bg-emerald-700 focus:outline-none focus:ring-4 focus:ring-emerald-100">
+        Save settings
+      </button>
+    </div>
+  </section>
+</form>
+{% endblock %}

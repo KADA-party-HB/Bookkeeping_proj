@@ -74,6 +74,8 @@ CREATE TABLE delivery_pricing_settings (
   base_fee NUMERIC(10,2) NOT NULL DEFAULT 449.00,
   included_distance_km NUMERIC(10,2) NOT NULL DEFAULT 10.00,
   extra_fee_per_km NUMERIC(10,2) NOT NULL DEFAULT 5.00,
+  customer_prices_include_vat BOOLEAN NOT NULL DEFAULT FALSE,
+  admin_dark_mode_enabled BOOLEAN NOT NULL DEFAULT FALSE,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT chk_delivery_pricing_base_fee CHECK (base_fee >= 0),
   CONSTRAINT chk_delivery_pricing_included_distance CHECK (included_distance_km >= 0),
@@ -84,9 +86,11 @@ INSERT INTO delivery_pricing_settings (
   singleton,
   base_fee,
   included_distance_km,
-  extra_fee_per_km
+  extra_fee_per_km,
+  customer_prices_include_vat,
+  admin_dark_mode_enabled
 )
-VALUES (TRUE, 449.00, 10.00, 5.00);
+VALUES (TRUE, 449.00, 10.00, 5.00, FALSE, FALSE);
 
 -- CATEGORY <-> RENTAL PERIOD pricing
 -- This is where the actual price lives.
@@ -190,8 +194,10 @@ CREATE TABLE furnishing_categories (
   category_id INT PRIMARY KEY REFERENCES categories(id) ON DELETE CASCADE,
   furnishing_kind VARCHAR(100) NOT NULL,
   weight_kg NUMERIC(5,2),
+  setup_service_fee NUMERIC(10,2) NOT NULL DEFAULT 0.00,
   notes TEXT,
-  CONSTRAINT chk_furncat_weight CHECK (weight_kg IS NULL OR weight_kg >= 0)
+  CONSTRAINT chk_furncat_weight CHECK (weight_kg IS NULL OR weight_kg >= 0),
+  CONSTRAINT chk_furncat_setup_fee CHECK (setup_service_fee >= 0)
 );
 
 -- subtype enforcement (tent_categories XOR furnishing_categories)
@@ -546,12 +552,13 @@ BEGIN
   DO UPDATE SET display_name = EXCLUDED.display_name
   RETURNING id INTO v_category_id;
 
-  INSERT INTO furnishing_categories (category_id, furnishing_kind, weight_kg, notes)
-  VALUES (v_category_id, p_furnishing_kind, p_weight_kg, p_notes)
+  INSERT INTO furnishing_categories (category_id, furnishing_kind, weight_kg, setup_service_fee, notes)
+  VALUES (v_category_id, p_furnishing_kind, p_weight_kg, 0.00, p_notes)
   ON CONFLICT (category_id)
   DO UPDATE SET
     furnishing_kind = EXCLUDED.furnishing_kind,
     weight_kg = EXCLUDED.weight_kg,
+    setup_service_fee = EXCLUDED.setup_service_fee,
     notes = EXCLUDED.notes;
 
   INSERT INTO items (sku, is_active)
@@ -731,10 +738,12 @@ BEGIN
     END IF;
 
     IF p_include_setup_service THEN
-      SELECT tc.setup_service_fee
+      SELECT COALESCE(tc.setup_service_fee, fc.setup_service_fee, 0)
         INTO v_setup_service_fee
-      FROM tent_categories tc
-      WHERE tc.category_id = v_cat;
+      FROM categories c
+      LEFT JOIN tent_categories tc ON tc.category_id = c.id
+      LEFT JOIN furnishing_categories fc ON fc.category_id = c.id
+      WHERE c.id = v_cat;
     ELSE
       v_setup_service_fee := NULL;
     END IF;

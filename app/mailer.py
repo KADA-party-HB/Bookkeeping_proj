@@ -7,7 +7,6 @@ import ssl
 
 from flask import current_app, render_template, url_for
 
-
 _BOOKING_NOTIFICATION_COPY = {
     "created": {
         "subject": "Din bokning #{booking_id} har tagits emot",

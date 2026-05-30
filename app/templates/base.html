@@ -12,6 +12,10 @@
 {% set apple_touch_icon_url = apple_touch_icon_url|default(url_for('static', filename='img/kada_logo_no_text.png', _external=True), true) %}
 {% set manifest_url = manifest_url|default(url_for('routes.site_webmanifest'), true) %}
 {% set theme_color = theme_color|default("#ec4899", true) %}
+{% set admin_dark_mode_active = is_admin_view and admin_dark_mode_enabled|default(false, true) %}
+{% if admin_dark_mode_active %}
+  {% set theme_color = "#020617" %}
+{% endif %}
 {% set business_full_address = business_full_address|default("", true) %}
 {% set business_plus_code = business_plus_code|default("", true) %}
 {% set geo_region = geo_region|default("", true) %}
@@ -186,9 +190,214 @@
       line-height: 1;
       white-space: nowrap;
     }
+
+    .admin-darkmode {
+      color-scheme: dark;
+      background:
+        radial-gradient(circle at top left, rgba(56, 189, 248, 0.12), transparent 28%),
+        radial-gradient(circle at bottom right, rgba(34, 197, 94, 0.1), transparent 26%),
+        linear-gradient(180deg, #020617 0%, #06111f 32%, #0f172a 100%) !important;
+      color: rgb(226 232 240);
+    }
+
+    .admin-darkmode nav {
+      border-color: rgba(148, 163, 184, 0.16) !important;
+      background: rgba(2, 6, 23, 0.86) !important;
+      box-shadow: 0 18px 40px -28px rgba(2, 6, 23, 0.9);
+    }
+
+    .admin-darkmode [class*="bg-gradient"],
+    .admin-darkmode [class*="bg-["] {
+      background-image: none !important;
+    }
+
+    .admin-darkmode .bg-white,
+    .admin-darkmode .bg-white\/90,
+    .admin-darkmode .bg-white\/85,
+    .admin-darkmode .bg-white\/80,
+    .admin-darkmode .bg-white\/10,
+    .admin-darkmode .bg-slate-50,
+    .admin-darkmode .bg-slate-50\/60,
+    .admin-darkmode .bg-slate-50\/55,
+    .admin-darkmode .from-white,
+    .admin-darkmode .via-slate-50,
+    .admin-darkmode .to-sky-50\/60 {
+      background-color: rgb(15 23 42) !important;
+    }
+
+    .admin-darkmode .border-slate-200,
+    .admin-darkmode .border-slate-300,
+    .admin-darkmode .border-white\/70,
+    .admin-darkmode .border-white\/10 {
+      border-color: rgba(148, 163, 184, 0.18) !important;
+    }
+
+    .admin-darkmode .text-slate-900,
+    .admin-darkmode .text-slate-800,
+    .admin-darkmode .text-slate-700 {
+      color: rgb(241 245 249) !important;
+    }
+
+    .admin-darkmode .text-slate-600,
+    .admin-darkmode .text-slate-500,
+    .admin-darkmode .text-slate-400,
+    .admin-darkmode .text-slate-300 {
+      color: rgb(148 163 184) !important;
+    }
+
+    .admin-darkmode .bg-slate-100,
+    .admin-darkmode .bg-sky-50,
+    .admin-darkmode .bg-sky-100,
+    .admin-darkmode .bg-amber-50,
+    .admin-darkmode .bg-amber-100,
+    .admin-darkmode .bg-emerald-50,
+    .admin-darkmode .bg-emerald-100,
+    .admin-darkmode .bg-pink-50,
+    .admin-darkmode .bg-pink-100,
+    .admin-darkmode .bg-rose-50,
+    .admin-darkmode .bg-rose-100,
+    .admin-darkmode .bg-blue-50,
+    .admin-darkmode .bg-blue-100,
+    .admin-darkmode .bg-yellow-50,
+    .admin-darkmode .bg-yellow-100 {
+      color: rgb(15 23 42) !important;
+    }
+
+    .admin-darkmode .bg-slate-100 .text-slate-900,
+    .admin-darkmode .bg-slate-100 .text-slate-800,
+    .admin-darkmode .bg-slate-100 .text-slate-700,
+    .admin-darkmode .bg-sky-50 .text-slate-900,
+    .admin-darkmode .bg-sky-50 .text-slate-800,
+    .admin-darkmode .bg-sky-50 .text-slate-700,
+    .admin-darkmode .bg-sky-100 .text-slate-900,
+    .admin-darkmode .bg-sky-100 .text-slate-800,
+    .admin-darkmode .bg-sky-100 .text-slate-700,
+    .admin-darkmode .bg-amber-50 .text-slate-900,
+    .admin-darkmode .bg-amber-50 .text-slate-800,
+    .admin-darkmode .bg-amber-50 .text-slate-700,
+    .admin-darkmode .bg-amber-100 .text-slate-900,
+    .admin-darkmode .bg-amber-100 .text-slate-800,
+    .admin-darkmode .bg-amber-100 .text-slate-700,
+    .admin-darkmode .bg-emerald-50 .text-slate-900,
+    .admin-darkmode .bg-emerald-50 .text-slate-800,
+    .admin-darkmode .bg-emerald-50 .text-slate-700,
+    .admin-darkmode .bg-emerald-100 .text-slate-900,
+    .admin-darkmode .bg-emerald-100 .text-slate-800,
+    .admin-darkmode .bg-emerald-100 .text-slate-700,
+    .admin-darkmode .bg-pink-50 .text-slate-900,
+    .admin-darkmode .bg-pink-50 .text-slate-800,
+    .admin-darkmode .bg-pink-50 .text-slate-700,
+    .admin-darkmode .bg-pink-100 .text-slate-900,
+    .admin-darkmode .bg-pink-100 .text-slate-800,
+    .admin-darkmode .bg-pink-100 .text-slate-700,
+    .admin-darkmode .bg-rose-50 .text-slate-900,
+    .admin-darkmode .bg-rose-50 .text-slate-800,
+    .admin-darkmode .bg-rose-50 .text-slate-700,
+    .admin-darkmode .bg-rose-100 .text-slate-900,
+    .admin-darkmode .bg-rose-100 .text-slate-800,
+    .admin-darkmode .bg-rose-100 .text-slate-700,
+    .admin-darkmode .bg-blue-50 .text-slate-900,
+    .admin-darkmode .bg-blue-50 .text-slate-800,
+    .admin-darkmode .bg-blue-50 .text-slate-700,
+    .admin-darkmode .bg-blue-100 .text-slate-900,
+    .admin-darkmode .bg-blue-100 .text-slate-800,
+    .admin-darkmode .bg-blue-100 .text-slate-700,
+    .admin-darkmode .bg-yellow-50 .text-slate-900,
+    .admin-darkmode .bg-yellow-50 .text-slate-800,
+    .admin-darkmode .bg-yellow-50 .text-slate-700,
+    .admin-darkmode .bg-yellow-100 .text-slate-900,
+    .admin-darkmode .bg-yellow-100 .text-slate-800,
+    .admin-darkmode .bg-yellow-100 .text-slate-700 {
+      color: rgb(15 23 42) !important;
+    }
+
+    .admin-darkmode .bg-slate-100 .text-slate-600,
+    .admin-darkmode .bg-slate-100 .text-slate-500,
+    .admin-darkmode .bg-slate-100 .text-slate-400,
+    .admin-darkmode .bg-sky-50 .text-slate-600,
+    .admin-darkmode .bg-sky-50 .text-slate-500,
+    .admin-darkmode .bg-sky-50 .text-slate-400,
+    .admin-darkmode .bg-sky-100 .text-slate-600,
+    .admin-darkmode .bg-sky-100 .text-slate-500,
+    .admin-darkmode .bg-sky-100 .text-slate-400,
+    .admin-darkmode .bg-amber-50 .text-slate-600,
+    .admin-darkmode .bg-amber-50 .text-slate-500,
+    .admin-darkmode .bg-amber-50 .text-slate-400,
+    .admin-darkmode .bg-amber-100 .text-slate-600,
+    .admin-darkmode .bg-amber-100 .text-slate-500,
+    .admin-darkmode .bg-amber-100 .text-slate-400,
+    .admin-darkmode .bg-emerald-50 .text-slate-600,
+    .admin-darkmode .bg-emerald-50 .text-slate-500,
+    .admin-darkmode .bg-emerald-50 .text-slate-400,
+    .admin-darkmode .bg-emerald-100 .text-slate-600,
+    .admin-darkmode .bg-emerald-100 .text-slate-500,
+    .admin-darkmode .bg-emerald-100 .text-slate-400,
+    .admin-darkmode .bg-pink-50 .text-slate-600,
+    .admin-darkmode .bg-pink-50 .text-slate-500,
+    .admin-darkmode .bg-pink-50 .text-slate-400,
+    .admin-darkmode .bg-pink-100 .text-slate-600,
+    .admin-darkmode .bg-pink-100 .text-slate-500,
+    .admin-darkmode .bg-pink-100 .text-slate-400,
+    .admin-darkmode .bg-rose-50 .text-slate-600,
+    .admin-darkmode .bg-rose-50 .text-slate-500,
+    .admin-darkmode .bg-rose-50 .text-slate-400,
+    .admin-darkmode .bg-rose-100 .text-slate-600,
+    .admin-darkmode .bg-rose-100 .text-slate-500,
+    .admin-darkmode .bg-rose-100 .text-slate-400,
+    .admin-darkmode .bg-blue-50 .text-slate-600,
+    .admin-darkmode .bg-blue-50 .text-slate-500,
+    .admin-darkmode .bg-blue-50 .text-slate-400,
+    .admin-darkmode .bg-blue-100 .text-slate-600,
+    .admin-darkmode .bg-blue-100 .text-slate-500,
+    .admin-darkmode .bg-blue-100 .text-slate-400,
+    .admin-darkmode .bg-yellow-50 .text-slate-600,
+    .admin-darkmode .bg-yellow-50 .text-slate-500,
+    .admin-darkmode .bg-yellow-50 .text-slate-400,
+    .admin-darkmode .bg-yellow-100 .text-slate-600,
+    .admin-darkmode .bg-yellow-100 .text-slate-500,
+    .admin-darkmode .bg-yellow-100 .text-slate-400 {
+      color: rgb(51 65 85) !important;
+    }
+
+    .admin-darkmode .hover\:bg-sky-50\/40:hover,
+    .admin-darkmode .hover\:bg-sky-50\/60:hover,
+    .admin-darkmode .hover\:bg-pink-50\/35:hover {
+      color: rgb(15 23 42) !important;
+    }
+
+    .admin-darkmode .hover\:bg-sky-50\/40:hover .text-slate-900,
+    .admin-darkmode .hover\:bg-sky-50\/40:hover .text-slate-800,
+    .admin-darkmode .hover\:bg-sky-50\/40:hover .text-slate-700,
+    .admin-darkmode .hover\:bg-sky-50\/60:hover .text-slate-900,
+    .admin-darkmode .hover\:bg-sky-50\/60:hover .text-slate-800,
+    .admin-darkmode .hover\:bg-sky-50\/60:hover .text-slate-700,
+    .admin-darkmode .hover\:bg-pink-50\/35:hover .text-slate-900,
+    .admin-darkmode .hover\:bg-pink-50\/35:hover .text-slate-800,
+    .admin-darkmode .hover\:bg-pink-50\/35:hover .text-slate-700 {
+      color: rgb(15 23 42) !important;
+    }
+
+    .admin-darkmode .hover\:bg-sky-50\/40:hover .text-slate-600,
+    .admin-darkmode .hover\:bg-sky-50\/40:hover .text-slate-500,
+    .admin-darkmode .hover\:bg-sky-50\/40:hover .text-slate-400,
+    .admin-darkmode .hover\:bg-sky-50\/60:hover .text-slate-600,
+    .admin-darkmode .hover\:bg-sky-50\/60:hover .text-slate-500,
+    .admin-darkmode .hover\:bg-sky-50\/60:hover .text-slate-400,
+    .admin-darkmode .hover\:bg-pink-50\/35:hover .text-slate-600,
+    .admin-darkmode .hover\:bg-pink-50\/35:hover .text-slate-500,
+    .admin-darkmode .hover\:bg-pink-50\/35:hover .text-slate-400 {
+      color: rgb(51 65 85) !important;
+    }
+
+    .admin-darkmode input,
+    .admin-darkmode select,
+    .admin-darkmode textarea {
+      background-color: rgb(15 23 42) !important;
+      color: rgb(241 245 249) !important;
+    }
   </style>
 </head>
-<body class="min-h-screen text-slate-900 {% if is_admin_view %}bg-[linear-gradient(180deg,#f6fbff_0%,#f8fafc_38%,#ffffff_100%)]{% else %}customer-theme{% endif %}">
+<body class="min-h-screen text-slate-900 {% if is_admin_view %}{% if admin_dark_mode_active %}admin-darkmode{% else %}bg-[linear-gradient(180deg,#f6fbff_0%,#f8fafc_38%,#ffffff_100%)]{% endif %}{% else %}customer-theme{% endif %}">
   <nav class="{% if is_admin_view %}sticky top-0 z-30 border-b border-white/70 bg-white/85 backdrop-blur{% else %}sticky top-0 z-30 border-b border-pink-100/80 bg-white/95 backdrop-blur-xl shadow-[0_18px_40px_-28px_rgba(15,23,42,0.12)]{% endif %}">
     <div class="mx-auto flex max-w-7xl items-center gap-3 px-4 py-4 md:px-6">
       <a class="{% if is_admin_view %}inline-flex items-center gap-3 rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm{% else %}inline-flex items-center justify-center transition hover:scale-[1.01]{% endif %}" href="{{ url_for('routes.home') }}" aria-label="{% if is_admin_view %}Home{% else %}Boka{% endif %}">
@@ -220,6 +429,9 @@
             </a>
             <a class="rounded-full px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-sky-50 hover:text-sky-800" href="{{ url_for('routes.admin_rental_periods') }}">
               Rental periods
+            </a>
+            <a class="rounded-full px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-sky-50 hover:text-sky-800" href="{{ url_for('routes.admin_settings') }}">
+              Settings
             </a>
           </div>
 
@@ -274,6 +486,9 @@
                 </a>
                 <a class="rounded-2xl px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-sky-50 hover:text-sky-800" href="{{ url_for('routes.admin_rental_periods') }}">
                   Rental periods
+                </a>
+                <a class="rounded-2xl px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-sky-50 hover:text-sky-800" href="{{ url_for('routes.admin_settings') }}">
+                  Settings
                 </a>
                 <form method="post" action="{{ url_for('auth.logout') }}" class="m-0">
                   <button class="mt-2 inline-flex w-full items-center justify-center rounded-2xl bg-sky-100 px-4 py-3 text-sm font-medium text-sky-800 transition hover:bg-sky-200" type="submit">
@@ -431,7 +646,7 @@
 
           <div class="mt-4 grid gap-2 rounded-[1.5rem] border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-600">
             <p>1. Download the latest JSON from the database.</p>
-            <p>2. Update rental prices, delivery pricing, or tent setup fees in the file.</p>
+            <p>2. Update rental prices, delivery pricing, or setup fees in the file.</p>
             <p>3. Drop the edited JSON here and confirm the upload.</p>
           </div>
 

@@ -52,12 +52,16 @@ def get_delivery_pricing(cur) -> dict[str, Decimal]:
             "base_fee": DEFAULT_DELIVERY_BASE_FEE,
             "included_distance_km": DEFAULT_DELIVERY_INCLUDED_DISTANCE_KM,
             "extra_fee_per_km": DEFAULT_DELIVERY_EXTRA_FEE_PER_KM,
+            "customer_prices_include_vat": False,
+            "admin_dark_mode_enabled": False,
         }
 
     return {
         "base_fee": Decimal(str(row["base_fee"])).quantize(Decimal("0.01")),
         "included_distance_km": Decimal(str(row["included_distance_km"])).quantize(Decimal("0.01")),
         "extra_fee_per_km": Decimal(str(row["extra_fee_per_km"])).quantize(Decimal("0.01")),
+        "customer_prices_include_vat": bool(row.get("customer_prices_include_vat")),
+        "admin_dark_mode_enabled": bool(row.get("admin_dark_mode_enabled")),
     }
 
 
@@ -120,7 +124,7 @@ def export_price_catalog(cur) -> dict:
             "rental_period_prices": rental_period_prices,
         }
 
-        if category["is_tent"] and category["setup_service_fee"] is not None:
+        if category["setup_service_fee"] is not None:
             product["setup_service_fee"] = _format_decimal(category["setup_service_fee"])
 
         products.append(product)
@@ -133,6 +137,9 @@ def export_price_catalog(cur) -> dict:
             "base_fee": _format_decimal(delivery_pricing["base_fee"]),
             "included_distance_km": _format_decimal(delivery_pricing["included_distance_km"]),
             "extra_fee_per_km": _format_decimal(delivery_pricing["extra_fee_per_km"]),
+            "customer_prices_include_vat": bool(
+                delivery_pricing["customer_prices_include_vat"]
+            ),
         },
         "rental_periods": [
             {
@@ -158,6 +165,7 @@ def apply_price_catalog(cur, catalog: dict) -> dict:
         if not isinstance(delivery_pricing, dict):
             raise ValueError("The 'delivery_pricing' value must be an object when provided.")
 
+        current_delivery_pricing = get_delivery_pricing(cur)
         required_fields = (
             "base_fee",
             "included_distance_km",
@@ -189,6 +197,18 @@ def apply_price_catalog(cur, catalog: dict) -> dict:
                 _to_decimal(
                     delivery_pricing["extra_fee_per_km"],
                     field_name="delivery_pricing extra_fee_per_km",
+                ),
+                bool(
+                    delivery_pricing.get(
+                        "customer_prices_include_vat",
+                        current_delivery_pricing["customer_prices_include_vat"],
+                    )
+                ),
+                bool(
+                    delivery_pricing.get(
+                        "admin_dark_mode_enabled",
+                        current_delivery_pricing["admin_dark_mode_enabled"],
+                    )
                 ),
             ),
         )
@@ -254,18 +274,26 @@ def apply_price_catalog(cur, catalog: dict) -> dict:
         for category in matched_categories:
             category_changed = False
 
-            if setup_service_fee is not None and category.get("is_tent"):
+            if setup_service_fee is not None and (
+                category.get("is_tent") or category.get("is_furnishing")
+            ):
+                setup_service_fee_value = _to_decimal(
+                    setup_service_fee,
+                    field_name=f"{product_label} setup_service_fee",
+                )
+                target_table = (
+                    "tent_categories"
+                    if category.get("is_tent")
+                    else "furnishing_categories"
+                )
                 cur.execute(
-                    """
-                    UPDATE tent_categories
+                    f"""
+                    UPDATE {target_table}
                     SET setup_service_fee = %s
                     WHERE category_id = %s;
                     """,
                     (
-                        _to_decimal(
-                            setup_service_fee,
-                            field_name=f"{product_label} setup_service_fee",
-                        ),
+                        setup_service_fee_value,
                         category["id"],
                     ),
                 )

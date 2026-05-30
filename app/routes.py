@@ -39,6 +39,7 @@ from .delivery import (
     resolve_delivery_quote,
 )
 from .mailer import send_booking_event_email
+from .pricing import apply_vat
 from .price_sync import (
     apply_price_catalog,
     export_price_catalog,
@@ -70,8 +71,10 @@ from .sql import (
     SQL_UPDATE_RENTAL_PERIOD,
     SQL_DELETE_RENTAL_PERIOD,
     SQL_RENTAL_PERIOD_USAGE_COUNT,
+    SQL_UPSERT_DELIVERY_PRICING_SETTINGS,
 
     # booking
+    SQL_GUEST_CATEGORY_OVERVIEW,
     SQL_AVAILABLE_CATEGORIES,
     SQL_FIND_CATEGORY_RENTAL_PRICING,
     SQL_CREATE_BOOKING,
@@ -104,6 +107,7 @@ from .sql import (
     SQL_UPDATE_FURN_CATEGORY,
 
     # category rental period pricing
+    SQL_LIST_ALL_CATEGORY_RENTAL_PERIOD_PRICES,
     SQL_LIST_CATEGORY_RENTAL_PERIOD_PRICES,
     SQL_UPSERT_CATEGORY_RENTAL_PERIOD_PRICE,
 
@@ -493,6 +497,22 @@ def _to_str_or_none(value):
     return value if value != "" else None
 
 
+def _parse_nonnegative_decimal_setting(value, *, field_label: str) -> Decimal:
+    text = (value or "").strip().replace(",", ".")
+    if text == "":
+        raise ValueError(f"{field_label} is required.")
+
+    try:
+        decimal_value = Decimal(text)
+    except InvalidOperation as exc:
+        raise ValueError(f"{field_label} must be a valid number.") from exc
+
+    if decimal_value < 0:
+        raise ValueError(f"{field_label} must be 0 or greater.")
+
+    return decimal_value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+
 def _get_accessible_booking(booking_id: int, *, user_id, role):
     if role == "admin":
         return query(SQL_BOOKING_DETAIL, (booking_id,), one=True)
@@ -561,6 +581,14 @@ def _notify_booking_event_email(notification_type: str, booking_id: int):
         total = query(SQL_BOOKING_TOTAL, (booking_id,), one=True)
         items = query(SQL_BOOKING_ITEMS, (booking_id,))
         item_summary = _build_booking_item_summary(items)
+        if _customer_prices_include_vat_enabled():
+            _apply_customer_price_display_to_booking(
+                booking=booking,
+                items=items,
+                item_summary=item_summary,
+                total=total,
+                include_vat=True,
+            )
         return send_booking_event_email(
             notification_type=notification_type,
             booking=booking,
@@ -826,10 +854,15 @@ def inject_pagination_helpers():
 
         return url_for(request.endpoint, **(request.view_args or {}), **args)
 
+    admin_dark_mode_enabled = False
+    if session.get("role") == "admin":
+        admin_dark_mode_enabled = _admin_dark_mode_enabled()
+
     return {
         "pagination_url": pagination_url,
         "sort_url": sort_url,
         "csrf_token": _csrf_token,
+        "admin_dark_mode_enabled": admin_dark_mode_enabled,
         **_route_meta_defaults(),
     }
 
@@ -977,7 +1010,34 @@ def _serialize_delivery_pricing_for_template(delivery_pricing: dict[str, Decimal
         "base_fee": str(delivery_pricing["base_fee"]),
         "included_distance_km": str(delivery_pricing["included_distance_km"]),
         "extra_fee_per_km": str(delivery_pricing["extra_fee_per_km"]),
+        "customer_prices_include_vat": bool(
+            delivery_pricing["customer_prices_include_vat"]
+        ),
+        "admin_dark_mode_enabled": bool(
+            delivery_pricing["admin_dark_mode_enabled"]
+        ),
     }
+
+
+def _save_delivery_pricing_settings(
+    *,
+    base_fee: Decimal,
+    included_distance_km: Decimal,
+    extra_fee_per_km: Decimal,
+    customer_prices_include_vat: bool,
+    admin_dark_mode_enabled: bool,
+):
+    execute(
+        SQL_UPSERT_DELIVERY_PRICING_SETTINGS,
+        (
+            base_fee,
+            included_distance_km,
+            extra_fee_per_km,
+            customer_prices_include_vat,
+            admin_dark_mode_enabled,
+        ),
+    )
+    g.pop("_delivery_pricing_settings", None)
 
 
 def _format_decimal_compact(value) -> str:
@@ -992,9 +1052,99 @@ def _delivery_pricing_summary_text(delivery_pricing: dict[str, Decimal]) -> str:
     base_fee = _format_decimal_compact(delivery_pricing["base_fee"])
     included_distance_km = _format_decimal_compact(delivery_pricing["included_distance_km"])
     extra_fee_per_km = _format_decimal_compact(delivery_pricing["extra_fee_per_km"])
-    return (
+    summary = (
         f"{base_fee} kr includes the first {included_distance_km} km. "
         f"Everything above {included_distance_km} km adds {extra_fee_per_km} kr/km."
+    )
+    if delivery_pricing.get("customer_prices_include_vat"):
+        summary += " Customer prices are shown including 25% VAT."
+    return summary
+
+
+def _customer_prices_include_vat_enabled() -> bool:
+    return bool(_get_delivery_pricing_settings().get("customer_prices_include_vat"))
+
+
+def _admin_dark_mode_enabled() -> bool:
+    return bool(_get_delivery_pricing_settings().get("admin_dark_mode_enabled"))
+
+
+def _apply_vat_to_money_fields(row, *field_names: str, include_vat: bool):
+    if not row or not include_vat:
+        return row
+
+    for field_name in field_names:
+        if field_name in row and row[field_name] is not None:
+            row[field_name] = apply_vat(row[field_name], enabled=True)
+    return row
+
+
+def _apply_customer_price_display_to_categories(categories, *, include_vat: bool):
+    if not categories or not include_vat:
+        return categories
+
+    for category in categories:
+        _apply_vat_to_money_fields(
+            category,
+            "quoted_period_price",
+            "setup_service_fee",
+            include_vat=include_vat,
+        )
+        for price_row in category.get("all_period_prices") or []:
+            _apply_vat_to_money_fields(price_row, "price", include_vat=include_vat)
+
+    return categories
+
+
+def _apply_customer_price_display_to_booking(
+    *,
+    booking,
+    items,
+    item_summary,
+    total,
+    include_vat: bool,
+):
+    if not include_vat:
+        return
+
+    _apply_vat_to_money_fields(
+        booking,
+        "delivery_fee",
+        "custom_total_price",
+        include_vat=include_vat,
+    )
+
+    for item in items or []:
+        _apply_vat_to_money_fields(
+            item,
+            "quoted_period_price",
+            "setup_service_fee",
+            "custom_total_price",
+            "effective_rental_price",
+            "effective_setup_fee",
+            "effective_line_total",
+            include_vat=include_vat,
+        )
+
+    for row in item_summary or []:
+        _apply_vat_to_money_fields(
+            row,
+            "quoted_period_price",
+            "effective_setup_fee",
+            "custom_total_price",
+            "effective_line_total",
+            "group_total",
+            include_vat=include_vat,
+        )
+
+    _apply_vat_to_money_fields(
+        total,
+        "rental_cost",
+        "setup_cost",
+        "delivery_cost",
+        "booking_custom_total_price",
+        "total_cost",
+        include_vat=include_vat,
     )
 
 
@@ -1030,7 +1180,7 @@ def _calculate_delivery_fee_from_distance(distance_km_value):
     return delivery_fee.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
-def _delivery_quote_json_response(address: str, *, log_prefix: str):
+def _delivery_quote_json_response(address: str, *, log_prefix: str, include_vat: bool = False):
     current_app.logger.info(
         "%s_requested address=%r",
         log_prefix,
@@ -1075,6 +1225,7 @@ def _delivery_quote_json_response(address: str, *, log_prefix: str):
         )
 
     delivery_fee = _calculate_delivery_fee_from_distance(str(quote["distance_km"]))
+    display_delivery_fee = apply_vat(delivery_fee, enabled=include_vat)
     current_app.logger.info(
         "%s_succeeded address=%r formatted=%r distance_km=%s delivery_fee=%s confidence=%s result_type=%r",
         log_prefix,
@@ -1090,7 +1241,7 @@ def _delivery_quote_json_response(address: str, *, log_prefix: str):
             "ok": True,
             "formatted_address": quote["formatted_address"],
             "distance_km": str(quote["distance_km"]),
-            "delivery_fee": str(delivery_fee),
+            "delivery_fee": str(display_delivery_fee),
             "confidence": str(quote["confidence"]),
             "result_type": quote["result_type"],
         }
@@ -1233,6 +1384,33 @@ def _build_booking_edit_category_rows(current_items, all_categories, available_c
 
 def _query_available_categories(start_date: str, end_date: str):
     return query(SQL_AVAILABLE_CATEGORIES, (start_date, end_date))
+
+
+def _query_guest_category_overview():
+    return query(SQL_GUEST_CATEGORY_OVERVIEW)
+
+
+def _attach_category_period_prices(categories):
+    if not categories:
+        return categories
+
+    pricing_rows = query(SQL_LIST_ALL_CATEGORY_RENTAL_PERIOD_PRICES)
+    pricing_by_category_id = {}
+    for row in pricing_rows:
+        pricing_by_category_id.setdefault(row["category_id"], []).append(
+            {
+                "rental_period_id": row["rental_period_id"],
+                "label": row["label"],
+                "min_days": row["min_days"],
+                "max_days": row["max_days"],
+                "price": row["price"],
+            }
+        )
+
+    for category in categories:
+        category["all_period_prices"] = pricing_by_category_id.get(category["id"], [])
+
+    return categories
 
 
 def _load_booking_allocation_candidates(
@@ -1585,7 +1763,7 @@ def _create_admin_booking_with_allocations(
 
         setup_service_fee = (
             category_context["setup_service_fee"]
-            if include_setup_service and category_context["is_tent"]
+            if include_setup_service
             else None
         )
 
@@ -1771,7 +1949,7 @@ def _reallocate_booking_items_for_dates(
 
         setup_service_fee = (
             row["current_setup_service_fee"]
-            if include_setup_service and row["is_tent"]
+            if include_setup_service
             else None
         )
 
@@ -1820,7 +1998,7 @@ def _reallocate_booking_items_for_dates(
 
         setup_service_fee = (
             category_context["setup_service_fee"]
-            if include_setup_service and category_context["is_tent"]
+            if include_setup_service
             else None
         )
 
@@ -2115,12 +2293,29 @@ def home():
     customer_profile = None
     delivery_pricing = None
     delivery_pricing_summary = None
+    customer_prices_include_vat = False
+    has_selected_dates = bool(start and end)
 
-    if start and end:
+    if role != "admin":
+        customer_prices_include_vat = _customer_prices_include_vat_enabled()
+
+    if has_selected_dates:
         categories = _query_available_categories(start, end)
+        if role != "admin":
+            _apply_customer_price_display_to_categories(
+                categories,
+                include_vat=customer_prices_include_vat,
+            )
 
         if role == "admin":
             customers = query(SQL_LIST_CUSTOMERS)
+    elif role != "admin":
+        categories = _query_guest_category_overview()
+        _attach_category_period_prices(categories)
+        _apply_customer_price_display_to_categories(
+            categories,
+            include_vat=customer_prices_include_vat,
+        )
 
     if role == "customer" and uid:
         customer_profile = _load_customer_profile_for_user(uid)
@@ -2151,9 +2346,11 @@ def home():
         "start_date": start,
         "end_date": end,
         "categories": categories,
+        "has_selected_dates": has_selected_dates,
         "customer_profile": customer_profile,
         "role": role,
         "min_date": min_date,
+        "customer_prices_include_vat": customer_prices_include_vat,
     }
 
     if _is_ajax_request():
@@ -2166,7 +2363,11 @@ def home():
 def guest_delivery_quote():
     payload = request.get_json(silent=True) or {}
     address = (payload.get("address") or "").strip()
-    return _delivery_quote_json_response(address, log_prefix="guest_delivery_quote")
+    return _delivery_quote_json_response(
+        address,
+        log_prefix="guest_delivery_quote",
+        include_vat=_customer_prices_include_vat_enabled(),
+    )
 
 
 @bp.post("/admin/delivery-quote")
@@ -2174,7 +2375,63 @@ def admin_delivery_quote():
     require_admin()
     payload = request.get_json(silent=True) or {}
     address = (payload.get("address") or "").strip()
-    return _delivery_quote_json_response(address, log_prefix="admin_delivery_quote")
+    return _delivery_quote_json_response(
+        address,
+        log_prefix="admin_delivery_quote",
+        include_vat=False,
+    )
+
+
+@bp.get("/admin/settings")
+def admin_settings():
+    require_admin()
+    delivery_pricing_settings = _get_delivery_pricing_settings()
+    return render_template(
+        "admin_settings.html",
+        delivery_pricing=delivery_pricing_settings,
+        delivery_pricing_summary=_delivery_pricing_summary_text(
+            delivery_pricing_settings
+        ),
+        role="admin",
+    )
+
+
+@bp.post("/admin/settings")
+def admin_settings_save():
+    require_admin()
+
+    try:
+        base_fee = _parse_nonnegative_decimal_setting(
+            request.form.get("base_fee"),
+            field_label="Base delivery fee",
+        )
+        included_distance_km = _parse_nonnegative_decimal_setting(
+            request.form.get("included_distance_km"),
+            field_label="Included delivery distance",
+        )
+        extra_fee_per_km = _parse_nonnegative_decimal_setting(
+            request.form.get("extra_fee_per_km"),
+            field_label="Extra delivery fee per km",
+        )
+        customer_prices_include_vat = _to_bool(
+            request.form.get("customer_prices_include_vat")
+        )
+        admin_dark_mode_enabled = _to_bool(
+            request.form.get("admin_dark_mode_enabled")
+        )
+        _save_delivery_pricing_settings(
+            base_fee=base_fee,
+            included_distance_km=included_distance_km,
+            extra_fee_per_km=extra_fee_per_km,
+            customer_prices_include_vat=customer_prices_include_vat,
+            admin_dark_mode_enabled=admin_dark_mode_enabled,
+        )
+        flash("Settings updated.", "success")
+    except ValueError as exc:
+        flash(str(exc), "error")
+
+    return redirect(url_for("routes.admin_settings"))
+
 
 @bp.post("/guest/bookings/create")
 def guest_booking_create():
@@ -2809,6 +3066,15 @@ def customer_detail(customer_id: int):
             default_dir="desc",
             params=(customer_id,),
         )
+        customer_prices_include_vat = role != "admin" and _customer_prices_include_vat_enabled()
+        if customer_prices_include_vat:
+            for booking_row in bookings_page.items:
+                _apply_vat_to_money_fields(
+                    booking_row,
+                    "delivery_fee",
+                    "custom_total_price",
+                    include_vat=True,
+                )
         return render_template(
             "_customer_detail_bookings_section.html",
             customer=cust,
@@ -2816,6 +3082,7 @@ def customer_detail(customer_id: int):
             bookings_page=bookings_page,
             current_sort=sort_key,
             current_sort_dir=sort_dir,
+            customer_prices_include_vat=customer_prices_include_vat,
             role=role,
         )
 
@@ -3003,7 +3270,7 @@ def admin_prices_update():
     success_parts = [
         f"Updated {len(summary['updated_categories'])} categories",
         f"{summary['updated_period_prices']} rental-period prices",
-        f"{summary['updated_setup_fees']} tent setup fees",
+        f"{summary['updated_setup_fees']} setup fees",
     ]
     if summary["updated_delivery_pricing"]:
         success_parts.append("delivery pricing")
@@ -3440,6 +3707,15 @@ def customer_detail(customer_id: int):
         (customer_id,),
         pagination=_pagination_options(default_per_page=10),
     )
+    customer_prices_include_vat = role != "admin" and _customer_prices_include_vat_enabled()
+    if customer_prices_include_vat:
+        for booking_row in bookings_page.items:
+            _apply_vat_to_money_fields(
+                booking_row,
+                "delivery_fee",
+                "custom_total_price",
+                include_vat=True,
+            )
     return render_template(
         "customer_detail.html",
         customer=cust,
@@ -3447,6 +3723,7 @@ def customer_detail(customer_id: int):
         bookings_page=bookings_page,
         current_sort=sort_key,
         current_sort_dir=sort_dir,
+        customer_prices_include_vat=customer_prices_include_vat,
         role=role,
     )
 
@@ -3929,6 +4206,7 @@ def admin_category_furn_new():
     name = request.form.get("display_name", "").strip()
     kind = request.form.get("furnishing_kind", "").strip()
     weight_kg = _to_str_or_none(request.form.get("weight_kg"))
+    setup_service_fee = request.form.get("setup_service_fee", "").strip() or "0"
     notes = _to_str_or_none(request.form.get("notes"))
     period_rows = _collect_category_period_prices_from_form()
 
@@ -3944,7 +4222,10 @@ def admin_category_furn_new():
         cur.execute(SQL_CREATE_CATEGORY, (name,))
         cat_id = cur.fetchone()["id"]
 
-        cur.execute(SQL_CREATE_FURN_CATEGORY_ROW, (cat_id, kind, weight_kg, notes))
+        cur.execute(
+            SQL_CREATE_FURN_CATEGORY_ROW,
+            (cat_id, kind, weight_kg, setup_service_fee, notes),
+        )
 
         for row in period_rows:
             cur.execute(
@@ -4036,6 +4317,7 @@ def admin_category_edit_save(category_id: int):
         else:
             kind = request.form.get("furnishing_kind", "").strip()
             weight_kg = _to_str_or_none(request.form.get("weight_kg"))
+            setup_service_fee = _to_str_or_none(request.form.get("setup_service_fee")) or "0"
             notes = _to_str_or_none(request.form.get("notes"))
 
             cur.execute(
@@ -4043,6 +4325,7 @@ def admin_category_edit_save(category_id: int):
                 (
                     kind,
                     weight_kg,
+                    setup_service_fee,
                     notes,
                     category_id,
                 ),
@@ -4090,6 +4373,15 @@ def booking_detail(booking_id: int):
     items = query(SQL_BOOKING_ITEMS, (booking_id,))
     item_summary = _build_booking_item_summary(items)
     total = query(SQL_BOOKING_TOTAL, (booking_id,), one=True)
+    customer_prices_include_vat = role != "admin" and _customer_prices_include_vat_enabled()
+    if customer_prices_include_vat:
+        _apply_customer_price_display_to_booking(
+            booking=booking,
+            items=items,
+            item_summary=item_summary,
+            total=total,
+            include_vat=True,
+        )
 
     return render_template(
         "booking_detail.html",
@@ -4097,6 +4389,7 @@ def booking_detail(booking_id: int):
         items=items,
         item_summary=item_summary,
         total=total,
+        customer_prices_include_vat=customer_prices_include_vat,
         role=role,
     )
 
