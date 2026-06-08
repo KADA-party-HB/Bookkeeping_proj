@@ -321,71 +321,50 @@
   }
 
   .booking-event-chip {
+    --booking-chip-border: rgb(125 211 252);
+    --booking-chip-bg: rgb(240 249 255);
+    --booking-chip-text: rgb(12 74 110);
+    --booking-chip-dot: rgb(2 132 199);
+    --booking-chip-ref: rgb(14 116 144);
+    --booking-chip-name: rgb(12 74 110);
     display: flex;
     align-items: center;
     gap: 0.35rem;
     width: 100%;
-    border: 1px solid rgb(125 211 252);
+    border: 1px solid var(--booking-chip-border);
     border-radius: 999px;
-    background: rgb(240 249 255);
+    background: var(--booking-chip-bg);
     padding: 0.18rem 0.45rem;
-    color: rgb(12 74 110);
+    color: var(--booking-chip-text);
     box-shadow: none;
     overflow: hidden;
   }
 
-  .booking-event-chip[data-status="pending"] {
-    border-color: rgb(253 224 71);
-    background: rgb(254 252 232);
-    color: rgb(133 77 14);
-  }
-
-  .booking-event-chip[data-status="pending"] .booking-event-dot {
-    background: rgb(202 138 4);
-  }
-
-  .booking-event-chip[data-status="pending"] .booking-event-ref {
-    color: rgb(161 98 7);
-  }
-
-  .booking-event-chip[data-status="pending"] .booking-event-name {
-    color: rgb(133 77 14);
-  }
-
   .booking-event-chip[data-service="delivery"] {
-    border-color: rgb(96 165 250);
-    background: rgb(219 234 254);
-    color: rgb(12 74 110);
-  }
-
-  .booking-event-chip[data-service="delivery"] .booking-event-dot {
-    background: rgb(59 130 246);
-  }
-
-  .booking-event-chip[data-service="delivery"] .booking-event-ref {
-    color: rgb(14 116 144);
-  }
-
-  .booking-event-chip[data-service="delivery"] .booking-event-name {
-    color: rgb(12 74 110);
+    --booking-chip-border: rgb(103 232 249);
+    --booking-chip-bg: rgb(236 254 255);
+    --booking-chip-text: rgb(14 116 144);
+    --booking-chip-dot: rgb(6 182 212);
+    --booking-chip-ref: rgb(8 145 178);
+    --booking-chip-name: rgb(14 116 144);
   }
 
   .booking-event-chip[data-service="assembly"] {
-    border-color: rgb(59 130 246);
-    background: rgb(191 219 254);
-    color: rgb(12 74 110);
+    --booking-chip-border: rgb(196 181 253);
+    --booking-chip-bg: rgb(245 243 255);
+    --booking-chip-text: rgb(109 40 217);
+    --booking-chip-dot: rgb(124 58 237);
+    --booking-chip-ref: rgb(126 34 206);
+    --booking-chip-name: rgb(109 40 217);
   }
 
-  .booking-event-chip[data-service="assembly"] .booking-event-dot {
-    background: rgb(29 78 216);
-  }
-
-  .booking-event-chip[data-service="assembly"] .booking-event-ref {
-    color: rgb(14 116 144);
-  }
-
-  .booking-event-chip[data-service="assembly"] .booking-event-name {
-    color: rgb(12 74 110);
+  .booking-event-chip[data-status="pending"] {
+    --booking-chip-border: rgb(253 224 71);
+    --booking-chip-bg: rgb(254 252 232);
+    --booking-chip-text: rgb(133 77 14);
+    --booking-chip-dot: rgb(202 138 4);
+    --booking-chip-ref: rgb(161 98 7);
+    --booking-chip-name: rgb(133 77 14);
   }
 
   .booking-event-chip.admin-note-marker {
@@ -438,7 +417,7 @@
     width: 0.38rem;
     height: 0.38rem;
     border-radius: 999px;
-    background: rgb(2 132 199);
+    background: var(--booking-chip-dot);
   }
 
   .booking-event-text {
@@ -455,7 +434,7 @@
     font-weight: 700;
     letter-spacing: 0.06em;
     text-transform: uppercase;
-    color: rgb(14 116 144);
+    color: var(--booking-chip-ref);
   }
 
   .booking-event-name {
@@ -465,7 +444,7 @@
     white-space: nowrap;
     font-size: 0.68rem;
     font-weight: 600;
-    color: rgb(12 74 110);
+    color: var(--booking-chip-name);
   }
 
   #booking-calendar .calendar-day-add-note {
@@ -776,6 +755,19 @@
       return formatIsoDateLocal(date);
     };
 
+    const getBookingStatusBadgeHtml = (status) => {
+      if (status === "pending") {
+        return '<span class="inline-flex rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-800">pending</span>';
+      }
+      if (status === "confirmed") {
+        return '<span class="inline-flex rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-800">confirmed</span>';
+      }
+      if (status === "cancelled") {
+        return '<span class="inline-flex rounded-full bg-rose-100 px-3 py-1 text-xs font-medium text-rose-800">cancelled</span>';
+      }
+      return `<span class="inline-flex rounded-full bg-sky-100 px-3 py-1 text-xs font-medium text-sky-800">${status || "unknown"}</span>`;
+    };
+
     const openBookingPopup = (event) => {
       const props = event.extendedProps;
       activePopupState = {
@@ -785,7 +777,7 @@
 
       popupRefEl.textContent = `Booking #${event.id}`;
       popupTitleEl.textContent = props.customer || "Unknown customer";
-      popupStatusEl.innerHTML = '<span class="inline-flex rounded-full bg-sky-100 px-3 py-1 text-xs font-medium text-sky-800">' + `${props.status}` + "</span>";
+      popupStatusEl.innerHTML = getBookingStatusBadgeHtml(props.status);
       popupContactWrapEl.classList.remove("hidden");
       popupPriceWrapEl.classList.remove("hidden");
       popupOpenEl.classList.remove("hidden");
@@ -1274,10 +1266,27 @@
       selectable: false,
       dayMaxEvents: true,
       eventOrder: function(left, right) {
-        const leftType = left.extendedProps?.event_type === "admin_note" ? 1 : 0;
-        const rightType = right.extendedProps?.event_type === "admin_note" ? 1 : 0;
-        if (leftType !== rightType) {
-          return leftType - rightType;
+        const eventRank = (event) => {
+          const props = event.extendedProps || {};
+          if (props.event_type === "admin_note") {
+            return 3;
+          }
+          if (props.status === "pending") {
+            return 0;
+          }
+          if (props.status === "confirmed") {
+            return 1;
+          }
+          if (props.status === "cancelled") {
+            return 2;
+          }
+          return 2;
+        };
+
+        const leftRank = eventRank(left);
+        const rightRank = eventRank(right);
+        if (leftRank !== rightRank) {
+          return leftRank - rightRank;
         }
         return 0;
       },
