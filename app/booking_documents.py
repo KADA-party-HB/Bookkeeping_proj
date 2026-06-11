@@ -397,7 +397,7 @@ def build_booking_order_pdf(
 
     _append_section(story, summary_section, keep_together=True)
 
-    accept_section = [Spacer(1, 8), Paragraph("9. Accept och underskrift", section_style)]
+    accept_section = [Spacer(1, 8), Paragraph("5. Accept och underskrift", section_style)]
     accept_section.append(
         Paragraph(
             (
