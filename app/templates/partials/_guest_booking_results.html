@@ -445,25 +445,27 @@
           {% endif %}
 
           <div>
-            <label class="text-sm font-medium text-slate-700" for="address">Adress (gata)</label>
+            <label class="text-sm font-medium text-slate-700" for="address">Adress för bokningen (gata)</label>
             <input
               id="address"
               name="address"
               type="text"
-              value="{{ customer_profile.address if customer_profile else '' }}"
-              placeholder="Gatuadress"
+              value=""
+              placeholder="T&auml;lt destination"
               autocomplete="street-address"
               class="mt-1 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 shadow-sm transition focus:border-pink-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-pink-100"
             >
+            <p class="mt-2 text-xs text-slate-500">Skriv in T&auml;lt destination.</p>
           </div>
 
           <div>
-            <label class="text-sm font-medium text-slate-700" for="postal_city">Postort</label>
+            <label class="text-sm font-medium text-slate-700" for="postal_city">Postort för bokningen</label>
             <input
               id="postal_city"
               name="postal_city"
               type="text"
-              value="{{ customer_profile.postal_city if customer_profile and customer_profile.postal_city else '' }}"
+              value=""
+              placeholder="Postort f&ouml;r T&auml;lt destination"
               autocomplete="address-level2"
               class="mt-1 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 shadow-sm transition focus:border-pink-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-pink-100"
             >

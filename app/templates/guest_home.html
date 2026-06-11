@@ -707,7 +707,7 @@
       submitButton.disabled = validationInFlight;
       submitButton.setAttribute("aria-busy", validationInFlight ? "true" : "false");
       submitButton.textContent = submitPendingAfterValidation && validationInFlight
-        ? "Validerar adress..."
+        ? "Validerar T\u00e4lt destination..."
         : defaultSubmitLabel;
     };
 
@@ -840,7 +840,7 @@
         } else if (validationInFlight) {
           summaryDelivery.textContent = "Validerar...";
         } else if (!hasCompleteDeliveryAddress()) {
-          summaryDelivery.textContent = "Ange adress och postort";
+          summaryDelivery.textContent = "Ange T\u00e4lt destination och postort";
         } else {
           summaryDelivery.textContent = "Klar för validering";
         }
@@ -1279,7 +1279,7 @@
           syncSubmitButtonState();
 
           if (!valid) {
-            showFormFieldError("Kontrollera den markerade adressen innan du skickar bokningen.", addressField);
+            showFormFieldError("Kontrollera markerad T\u00e4lt destination innan du skickar bokningen.", addressField);
             return;
           }
 

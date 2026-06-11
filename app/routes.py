@@ -975,17 +975,17 @@ def apply_request_rate_limits():
 
 def _delivery_validation_error_message(code: str) -> str:
     error_map = {
-        "missing_address": "Ange en leveransadress.",
-        "address_not_found": "Vi kunde inte hitta den adressen.",
-        "address_too_broad": "Ange en mer exakt gatuadress.",
+        "missing_address": "Ange T\u00e4lt destination.",
+        "address_not_found": "Vi kunde inte hitta T\u00e4lt destination.",
+        "address_too_broad": "Ange en mer exakt T\u00e4lt destination.",
         "address_low_confidence": "Vi kunde inte verifiera adressen tillräckligt noggrant. Lägg till mer information.",
     }
-    return error_map.get(code, "Vi kunde inte validera leveransadressen.")
+    return error_map.get(code, "Vi kunde inte validera T\u00e4lt destination.")
 
 
 def _delivery_service_error_message(code: str) -> str:
     error_map = {
-        "map_api_not_configured": "Validering av leveransadress är inte konfigurerad ännu.",
+        "map_api_not_configured": "Validering av T\u00e4lt destination \u00e4r inte konfigurerad \u00e4nnu.",
         "delivery_origin_not_configured": "Leveransursprunget är inte konfigurerat ännu.",
         "map_api_connection_error": "Vi kunde inte nå karttjänsten just nu.",
         "map_api_http_error": "Karttjänsten returnerade ett fel.",
@@ -2492,8 +2492,8 @@ def guest_booking_create():
     account_full_name = request.form.get("full_name", "").strip()
     account_email = _normalize_email(request.form.get("email")) or None
     account_phone = _to_str_or_none(request.form.get("phone"))
-    account_address = _to_str_or_none(request.form.get("address"))
-    account_postal_city = _sanitize_postal_city(request.form.get("postal_city"))
+    booking_address = _to_str_or_none(request.form.get("address"))
+    booking_postal_city = _sanitize_postal_city(request.form.get("postal_city"))
     account_password = request.form.get("password", "")
     account_password_confirm = request.form.get("password_confirm", "")
 
@@ -2501,7 +2501,6 @@ def guest_booking_create():
         account_full_name = customer["full_name"]
         account_email = customer["email"] or account_email
         account_phone = account_phone if account_phone is not None else customer["phone"]
-        account_address = account_address if account_address is not None else customer["address"]
     else:
         if not account_full_name or not account_email or not account_password:
             flash("Namn, e-post och lösenord krävs för att skapa ett konto.", "error")
@@ -2522,7 +2521,7 @@ def guest_booking_create():
             )
             return redirect(url_for("routes.home", start_date=start, end_date=end))
 
-    delivery_lookup_address = _build_full_delivery_address(account_address, account_postal_city)
+    delivery_lookup_address = _build_full_delivery_address(booking_address, booking_postal_city)
 
     selections = _collect_selected_quantities_from_form()
     category_ids = [category_id for category_id, _ in selections]
@@ -2572,7 +2571,7 @@ def guest_booking_create():
         return redirect(url_for("routes.home", start_date=start, end_date=end))
 
     if include_delivery and not delivery_lookup_address:
-        flash("Ange leveransadressen innan du skickar bokningen.", "error")
+        flash("Ange T\u00e4lt destination innan du skickar bokningen.", "error")
         return redirect(url_for("routes.home", start_date=start, end_date=end))
 
     try:
@@ -2597,20 +2596,7 @@ def guest_booking_create():
             effective_customer_id = customer["id"] if customer else None
             created_user = None
 
-            if customer:
-                cur.execute(
-                    SQL_UPDATE_CUSTOMER,
-                    (
-                        account_full_name,
-                        account_email,
-                        account_phone,
-                        account_address,
-                        account_postal_city,
-                        customer["id"],
-                    ),
-                )
-                cur.fetchone()
-            else:
+            if not customer:
                 password_hash = generate_password_hash(account_password)
                 cur.execute(SQL_CREATE_USER, (account_email, password_hash, "customer"))
                 created_user = cur.fetchone()
@@ -2621,8 +2607,8 @@ def guest_booking_create():
                         account_full_name,
                         account_email,
                         account_phone,
-                        account_address,
-                        account_postal_city,
+                        None,
+                        None,
                         created_user["id"],
                     ),
                 )
@@ -2696,8 +2682,6 @@ def booking_create_from_home():
         new_full_name = request.form.get("new_customer_full_name", "").strip()
         new_email = _to_str_or_none(request.form.get("new_customer_email"))
         new_phone = _to_str_or_none(request.form.get("new_customer_phone"))
-        new_address = _to_str_or_none(request.form.get("new_customer_address"))
-        new_postal_city = _sanitize_postal_city(request.form.get("new_customer_postal_city"))
         selected_existing_customer = None
 
         if create_new_customer:
@@ -2738,31 +2722,16 @@ def booking_create_from_home():
         )
 
         if role == "admin":
-            if create_new_customer:
-                booking_delivery_address = _to_str_or_none(request.form.get("booking_delivery_address"))
-                booking_delivery_postal_city = _sanitize_postal_city(
-                    request.form.get("booking_delivery_postal_city")
-                )
-            else:
-                booking_delivery_address = _to_str_or_none(
-                    selected_existing_customer["address"] if selected_existing_customer else None
-                )
-                booking_delivery_postal_city = _sanitize_postal_city(
-                    selected_existing_customer["postal_city"] if selected_existing_customer else None
-                )
+            booking_delivery_address = _to_str_or_none(request.form.get("booking_delivery_address"))
+            booking_delivery_postal_city = _sanitize_postal_city(
+                request.form.get("booking_delivery_postal_city")
+            )
             booking_delivery_full_address = _build_full_delivery_address(
                 booking_delivery_address,
                 booking_delivery_postal_city,
             )
             if not booking_delivery_full_address:
-                flash(
-                    (
-                        "Enter the delivery address for this booking."
-                        if create_new_customer
-                        else "The selected customer needs a saved address before delivery can be added."
-                    ),
-                    "error",
-                )
+                flash("Enter T\u00e4lt destination for this booking.", "error")
                 return redirect(url_for("routes.home", start_date=start, end_date=end))
 
         if admin_delivery_override:
@@ -2777,18 +2746,6 @@ def booking_create_from_home():
                     "negative_delivery_fee_override": "Custom delivery fee must be 0 kr or more.",
                 }
                 flash(error_map.get(str(exc), "Could not use the custom delivery fee."), "error")
-                return redirect(url_for("routes.home", start_date=start, end_date=end))
-        elif role == "admin" and not create_new_customer:
-            try:
-                quote = resolve_delivery_quote(booking_delivery_full_address)
-                delivery_fee = str(_calculate_delivery_fee_from_distance(str(quote["distance_km"])))
-                delivery_distance_km = str(quote["distance_km"])
-                booking_delivery_full_address = quote["formatted_address"]
-            except DeliveryAddressValidationError as exc:
-                flash(_delivery_validation_error_message(exc.code), "error")
-                return redirect(url_for("routes.home", start_date=start, end_date=end))
-            except DeliveryServiceError as exc:
-                flash(_delivery_service_error_message(exc.code), "error")
                 return redirect(url_for("routes.home", start_date=start, end_date=end))
         else:
             try:
@@ -2902,8 +2859,8 @@ def booking_create_from_home():
                                 new_full_name,
                                 new_email if new_email is not None else existing_customer["email"],
                                 new_phone if new_phone is not None else existing_customer["phone"],
-                                new_address if new_address is not None else existing_customer["address"],
-                                new_postal_city if new_postal_city is not None else existing_customer["postal_city"],
+                                existing_customer["address"],
+                                existing_customer["postal_city"],
                                 existing_customer["id"],
                             ),
                         )
@@ -2911,7 +2868,7 @@ def booking_create_from_home():
                     else:
                         cur.execute(
                             SQL_CREATE_CUSTOMER,
-                            (new_full_name, new_email, new_phone, new_address, new_postal_city, None),
+                            (new_full_name, new_email, new_phone, None, None, None),
                         )
                         customer = cur.fetchone()
 
@@ -4486,6 +4443,10 @@ def admin_booking_edit_save(booking_id: int):
 
     if end_date < start_date:
         flash("End date cannot be earlier than start date.", "error")
+        return redirect(url_for("routes.admin_booking_edit_form", booking_id=booking_id))
+
+    if include_delivery and not delivery_address:
+        flash("T\u00e4lt destination is required when delivery is included.", "error")
         return redirect(url_for("routes.admin_booking_edit_form", booking_id=booking_id))
 
     try:

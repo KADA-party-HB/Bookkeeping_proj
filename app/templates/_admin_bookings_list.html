@@ -17,7 +17,7 @@
           </div>
           <div class="mt-3 flex flex-wrap gap-2">
             <span class="inline-flex rounded-full bg-slate-900 px-3 py-1 text-xs font-medium text-white">
-              {{ b.tent_summary if b.has_tent else "No tent" }}{% if b.has_tent and b.postal_city %} - {{ b.postal_city }}{% endif %}
+              {{ b.tent_summary if b.has_tent else "No tent" }}
             </span>
             {% if b.include_setup_service %}
               <span class="inline-flex rounded-full bg-sky-100 px-3 py-1 text-xs font-medium text-sky-800">Setup</span>
@@ -73,11 +73,11 @@
                 {{ ui.booking_status_badge(b.status) }}
               </a>
             </td>
-            <td class="p-3" data-sort-value="{{ (b.tent_summary if b.has_tent else 'No tent') ~ (' - ' ~ b.postal_city if b.has_tent and b.postal_city else '') }}">
+            <td class="p-3" data-sort-value="{{ b.tent_summary if b.has_tent else 'No tent' }}">
               <a class="block h-full w-full" href="{{ url_for('routes.booking_detail', booking_id=b.id) }}">
                 {% if b.has_tent %}
                   <span class="inline-flex rounded-full bg-sky-100 px-2.5 py-1 text-xs font-medium text-sky-800">
-                    {{ b.tent_summary }}{% if b.postal_city %} - {{ b.postal_city }}{% endif %}
+                    {{ b.tent_summary }}
                   </span>
                 {% else %}
                   <span class="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">

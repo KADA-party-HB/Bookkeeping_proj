@@ -828,12 +828,11 @@
         addPriceRow("Booking total override", props.custom_price_note || "Overrides calculated line total", formatAmount(props.total_cost));
       }
 
-      const addressParts = [props.address, props.postal_city].filter(Boolean);
       addContactRow("Full name", props.customer || "");
       addContactRow("Start date", formatBookingDate(props.booking_start_date));
       addContactRow("End date", formatBookingDate(props.booking_end_date));
       addContactRow("Phone", props.phone || "");
-      addContactRow("Address", props.delivery_address || addressParts.join(", "));
+      addContactRow("Address", props.delivery_address || [props.address, props.postal_city].filter(Boolean).join(", "));
       popupOpenEl.href = event.url || "#";
 
       popupEl.classList.remove("hidden");

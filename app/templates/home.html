@@ -590,26 +590,27 @@
                       {% if role == 'admin' %}
                         <div class="mt-4 grid gap-3">
                           <div>
-                            <label class="text-sm font-medium text-slate-700" for="booking_delivery_address">Delivery address for this booking (street address, city)</label>
+                            <label class="text-sm font-medium text-slate-700" for="booking_delivery_address">T&auml;lt destination for this booking (street address)</label>
                             <input
                               id="booking_delivery_address"
                               name="booking_delivery_address"
                               type="text"
-                              placeholder="Street address, city"
+                              placeholder="T&auml;lt destination"
                               disabled
                               data-delivery-address-field
                               class="mt-1 w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 shadow-sm transition focus:border-sky-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-sky-100 disabled:cursor-not-allowed disabled:opacity-60"
                             >
                             <p class="mt-2 hidden text-xs font-medium text-rose-600" data-field-error-for="booking_delivery_address"></p>
+                            <p class="mt-2 text-xs text-slate-500">Type in T&auml;lt destination for the booking.</p>
                           </div>
 
                           <div>
-                            <label class="text-sm font-medium text-slate-700" for="booking_delivery_postal_city">Postal city</label>
+                            <label class="text-sm font-medium text-slate-700" for="booking_delivery_postal_city">Postal city for T&auml;lt destination</label>
                             <input
                               id="booking_delivery_postal_city"
                               name="booking_delivery_postal_city"
                               type="text"
-                              placeholder="City"
+                              placeholder="Postal city"
                               disabled
                               data-delivery-address-field
                               class="mt-1 w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 shadow-sm transition focus:border-sky-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-sky-100 disabled:cursor-not-allowed disabled:opacity-60"
@@ -719,15 +720,13 @@
                               <option
                                 value="{{ cu.id }}"
                                 data-customer-name="{{ cu.full_name }}"
-                                data-customer-address="{{ cu.address or '' }}"
-                                data-customer-postal-city="{{ cu.postal_city or '' }}"
                               >
                                 {{ cu.full_name }} ({{ cu.email }})
                               </option>
                             {% endfor %}
                           </select>
                           <p id="existing-customer-delivery-address-note" class="mt-2 text-xs text-slate-300">
-                            Delivery uses the selected customer's saved address.
+                            T&auml;lt destination is stored on this booking, not on the customer profile.
                           </p>
                           <p class="mt-2 hidden text-xs font-medium text-rose-300" data-field-error-for="customer_id"></p>
                         </div>
@@ -766,29 +765,6 @@
                               disabled
                               class="mt-1 w-full rounded-xl border border-white/10 bg-slate-800 px-3 py-2 text-white shadow-sm transition focus:border-sky-400 focus:outline-none focus:ring-4 focus:ring-sky-400/20 disabled:opacity-50"
                             >
-                          </div>
-
-                          <div>
-                            <label class="text-sm font-medium text-slate-100" for="new_customer_postal_city">Postal city</label>
-                            <input
-                              id="new_customer_postal_city"
-                              name="new_customer_postal_city"
-                              data-new-user-field
-                              disabled
-                              class="mt-1 w-full rounded-xl border border-white/10 bg-slate-800 px-3 py-2 text-white shadow-sm transition focus:border-sky-400 focus:outline-none focus:ring-4 focus:ring-sky-400/20 disabled:opacity-50"
-                            >
-                          </div>
-
-                          <div class="md:col-span-2">
-                            <label class="text-sm font-medium text-slate-100" for="new_customer_address">Address</label>
-                            <textarea
-                              id="new_customer_address"
-                              name="new_customer_address"
-                              rows="3"
-                              data-new-user-field
-                              disabled
-                              class="mt-1 w-full rounded-xl border border-white/10 bg-slate-800 px-3 py-2 text-white shadow-sm transition focus:border-sky-400 focus:outline-none focus:ring-4 focus:ring-sky-400/20 disabled:opacity-50"
-                            ></textarea>
                           </div>
                         </div>
                       </div>
@@ -1102,22 +1078,10 @@
       };
 
       const getSelectedExistingCustomerAddressText = () => {
-        const selectedCustomer = getSelectedExistingCustomer();
-        if (!selectedCustomer) {
-          return "";
-        }
-
-        return [
-          selectedCustomer.dataset.customerAddress?.trim() || "",
-          selectedCustomer.dataset.customerPostalCity?.trim() || "",
-        ].filter(Boolean).join(", ");
+        return "";
       };
 
-      const shouldUseSelectedCustomerQuote = () => (
-        Boolean(includeDeliveryToggle?.checked)
-        && !Boolean(newCustomerToggle?.checked)
-        && !Boolean(deliveryFeeOverrideToggle?.checked)
-      );
+      const shouldUseSelectedCustomerQuote = () => false;
 
       const getSelectedCustomerQuoteKey = () => {
         if (!shouldUseSelectedCustomerQuote()) {
@@ -1241,31 +1205,14 @@
       };
 
       const syncExistingCustomerDeliveryAddress = () => {
-        const usesExistingCustomer = !Boolean(newCustomerToggle?.checked);
-        const selectedCustomer = usesExistingCustomer ? getSelectedExistingCustomer() : null;
-        const addressValue = selectedCustomer?.dataset.customerAddress?.trim() || "";
-        const postalCityValue = selectedCustomer?.dataset.customerPostalCity?.trim() || "";
-
-        if (bookingDeliveryAddress) {
-          bookingDeliveryAddress.value = usesExistingCustomer ? addressValue : "";
-        }
-
-        if (bookingDeliveryPostalCity) {
-          bookingDeliveryPostalCity.value = usesExistingCustomer ? postalCityValue : "";
-        }
-
         if (existingCustomerDeliveryAddressNote) {
-          if (!usesExistingCustomer) {
+          if (newCustomerToggle?.checked) {
             existingCustomerDeliveryAddressNote.classList.add("hidden");
-          } else if (!selectedCustomer) {
+          } else if (!getSelectedExistingCustomer()) {
             existingCustomerDeliveryAddressNote.classList.remove("hidden");
-            existingCustomerDeliveryAddressNote.textContent = "Select a customer to calculate delivery from their saved address.";
-          } else if (addressValue || postalCityValue) {
-            existingCustomerDeliveryAddressNote.classList.remove("hidden");
-            existingCustomerDeliveryAddressNote.textContent = "Delivery price is calculated from the selected customer's saved address.";
           } else {
             existingCustomerDeliveryAddressNote.classList.remove("hidden");
-            existingCustomerDeliveryAddressNote.textContent = "This customer has no saved delivery address yet.";
+            existingCustomerDeliveryAddressNote.textContent = "T\u00e4lt destination is stored on this booking, not on the customer profile.";
           }
         }
       };
@@ -1313,12 +1260,10 @@
       const syncDeliveryMode = () => {
         const checked = Boolean(includeDeliveryToggle?.checked);
         const hasOverride = checked && Boolean(deliveryFeeOverrideToggle?.checked);
-        const useSelectedCustomerAddress = checked && !Boolean(newCustomerToggle?.checked);
-        const useSelectedCustomerAddressForQuote = useSelectedCustomerAddress && !hasOverride;
 
         if (deliveryDistanceInput) {
-          deliveryDistanceInput.disabled = !checked || hasOverride || useSelectedCustomerAddressForQuote;
-          if (!checked || hasOverride || useSelectedCustomerAddressForQuote) {
+          deliveryDistanceInput.disabled = !checked || hasOverride;
+          if (!checked || hasOverride) {
             clearFieldError(deliveryDistanceInput);
           }
         }
@@ -1342,14 +1287,14 @@
         }
 
         form.querySelectorAll("[data-delivery-address-field]").forEach((field) => {
-          field.disabled = !checked || useSelectedCustomerAddress;
+          field.disabled = !checked;
           if (!checked) {
             field.value = "";
             clearFieldError(field);
           }
         });
 
-        if (!checked || hasOverride || useSelectedCustomerAddressForQuote) {
+        if (!checked || hasOverride) {
           if (deliveryDistanceInput) {
             deliveryDistanceInput.value = "";
           }
@@ -1722,24 +1667,9 @@
         const includeSetup = form.querySelector('input[name="include_setup_service"]')?.checked || false;
         const includeDelivery = form.querySelector('input[name="include_delivery"]')?.checked || false;
         const manualDeliveryOverride = includeDelivery && Boolean(deliveryFeeOverrideToggle?.checked);
-        const useSelectedCustomerQuote = includeDelivery && !manualDeliveryOverride && !Boolean(newCustomerToggle?.checked);
-        const deliveryDistanceRaw = useSelectedCustomerQuote
-          ? (
-              selectedCustomerDeliveryQuote
-              && selectedCustomerDeliveryQuote.key === getSelectedCustomerQuoteKey()
-              && Number.isFinite(selectedCustomerDeliveryQuote.distanceKm)
-                ? String(selectedCustomerDeliveryQuote.distanceKm)
-                : ""
-            )
-          : (deliveryDistanceInput?.value.trim() || "");
-        const deliveryDistanceKm = useSelectedCustomerQuote
-          ? (
-              selectedCustomerDeliveryQuote
-              && selectedCustomerDeliveryQuote.key === getSelectedCustomerQuoteKey()
-                ? selectedCustomerDeliveryQuote.distanceKm
-                : null
-            )
-          : (includeDelivery ? parseDistanceKm(deliveryDistanceRaw) : null);
+        const useSelectedCustomerQuote = false;
+        const deliveryDistanceRaw = deliveryDistanceInput?.value.trim() || "";
+        const deliveryDistanceKm = includeDelivery ? parseDistanceKm(deliveryDistanceRaw) : null;
         const hasDeliveryDistance = includeDelivery && Number.isFinite(deliveryDistanceKm) && deliveryDistanceKm >= 0;
         const deliveryOverrideRaw = deliveryFeeOverrideInput?.value.trim() || "";
         const deliveryOverrideValue = manualDeliveryOverride ? parseMoney(deliveryOverrideRaw) : 0;
@@ -1748,11 +1678,7 @@
           ? deliveryOverrideValue
           : (
               hasDeliveryDistance
-                ? (
-                    useSelectedCustomerQuote
-                      ? selectedCustomerDeliveryQuote?.deliveryFee || 0
-                      : calculateDeliveryFee(deliveryDistanceKm)
-                  )
+                ? calculateDeliveryFee(deliveryDistanceKm)
                 : 0
             );
         const bookingOverrideInput = form.querySelector('input[name="booking_custom_total_price"]');
@@ -1838,30 +1764,6 @@
             if (deliveryFeePreview) {
               deliveryFeePreview.textContent = "Enter a custom delivery fee.";
             }
-          } else if (state.useSelectedCustomerQuote && state.hasDeliveryDistance) {
-            const deliveryLabel = `${formatMoney(state.delivery)} (${formatDistanceKm(state.deliveryDistanceKm)} km)`;
-            summaryDelivery.textContent = deliveryLabel;
-            if (deliveryFeePreview) {
-              deliveryFeePreview.textContent = `Calculated from saved customer address: ${deliveryLabel}`;
-            }
-          } else if (state.useSelectedCustomerQuote && state.selectedCustomerDeliveryQuoteInFlight) {
-            summaryDelivery.textContent = "Calculating...";
-            if (deliveryFeePreview) {
-              deliveryFeePreview.textContent = "Calculating delivery from the selected customer's saved address.";
-            }
-          } else if (state.useSelectedCustomerQuote && state.selectedCustomerDeliveryQuoteError) {
-            summaryDelivery.textContent = "Could not calculate";
-            if (deliveryFeePreview) {
-              deliveryFeePreview.textContent = state.selectedCustomerDeliveryQuoteError;
-            }
-          } else if (state.useSelectedCustomerQuote) {
-            const selectedCustomerAddress = getSelectedExistingCustomerAddressText();
-            summaryDelivery.textContent = selectedCustomerAddress ? "Calculating..." : "Saved address missing";
-            if (deliveryFeePreview) {
-              deliveryFeePreview.textContent = selectedCustomerAddress
-                ? "Calculating delivery from the selected customer's saved address."
-                : "The selected customer needs a saved address before delivery can be added.";
-            }
           } else if (state.hasDeliveryDistance) {
             const deliveryLabel = `${formatMoney(state.delivery)} (${formatDistanceKm(state.deliveryDistanceKm)} km)`;
             summaryDelivery.textContent = deliveryLabel;
@@ -1910,32 +1812,17 @@
           ].filter(Boolean).join(", ");
 
           if (!deliveryAddressSummary) {
-            const usesExistingCustomerAddress = !Boolean(newCustomerToggle?.checked);
-            const deliveryAddressErrorField = usesExistingCustomerAddress ? customerSelect : bookingDeliveryAddress;
             setFieldError(
-              deliveryAddressErrorField,
-              usesExistingCustomerAddress
-                ? "The selected customer needs a saved address before delivery can be added."
-                : "Enter the delivery address for this booking.",
+              bookingDeliveryAddress,
+              "Enter T\u00e4lt destination for this booking.",
             );
-            firstInvalidField ||= deliveryAddressErrorField;
+            firstInvalidField ||= bookingDeliveryAddress;
           }
 
           if (state.manualDeliveryOverride) {
             if (!state.deliveryOverrideRaw) {
               setFieldError(deliveryFeeOverrideInput, "Enter a custom delivery fee.");
               firstInvalidField ||= deliveryFeeOverrideInput;
-            }
-          } else if (state.useSelectedCustomerQuote) {
-            const quoteOk = await requestSelectedCustomerDeliveryQuote();
-            state = getSummaryState();
-
-            if (!quoteOk) {
-              setFieldError(
-                customerSelect,
-                state.selectedCustomerDeliveryQuoteError || "Could not calculate delivery for the selected customer's address.",
-              );
-              firstInvalidField ||= customerSelect;
             }
           } else if (!state.deliveryDistanceRaw) {
             setFieldError(deliveryDistanceInput, "Enter a delivery distance in km to calculate the fee.");
@@ -2001,7 +1888,7 @@
             modalWarning.classList.remove("hidden");
           }
           if (modalWarningText) {
-            modalWarningText.textContent = `A customer named "${state.customerCollision.dataset.customerName}" already exists. Confirming will update that customer with any new email, phone, or address you entered, and the booking will be created under that existing customer.`;
+            modalWarningText.textContent = `A customer named "${state.customerCollision.dataset.customerName}" already exists. Confirming will update that customer with any new email or phone you entered, and the booking will be created under that existing customer.`;
           }
           modalCustomer.textContent = `${state.customerCollision.textContent || getCustomerLabel()} (existing customer will be updated)`;
         } else {
