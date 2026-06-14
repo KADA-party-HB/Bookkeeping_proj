@@ -54,7 +54,6 @@ def get_delivery_pricing(cur) -> dict[str, Decimal]:
             "extra_fee_per_km": DEFAULT_DELIVERY_EXTRA_FEE_PER_KM,
             "customer_prices_include_vat": False,
             "customer_furnishing_without_tent_surcharge_enabled": True,
-            "admin_dark_mode_enabled": False,
         }
 
     return {
@@ -65,7 +64,6 @@ def get_delivery_pricing(cur) -> dict[str, Decimal]:
         "customer_furnishing_without_tent_surcharge_enabled": bool(
             row.get("customer_furnishing_without_tent_surcharge_enabled")
         ),
-        "admin_dark_mode_enabled": bool(row.get("admin_dark_mode_enabled")),
     }
 
 
@@ -215,12 +213,6 @@ def apply_price_catalog(cur, catalog: dict) -> dict:
                     delivery_pricing.get(
                         "customer_furnishing_without_tent_surcharge_enabled",
                         current_delivery_pricing["customer_furnishing_without_tent_surcharge_enabled"],
-                    )
-                ),
-                bool(
-                    delivery_pricing.get(
-                        "admin_dark_mode_enabled",
-                        current_delivery_pricing["admin_dark_mode_enabled"],
                     )
                 ),
             ),

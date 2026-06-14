@@ -124,13 +124,13 @@
           type="checkbox"
           name="admin_dark_mode_enabled"
           value="on"
-          {% if delivery_pricing.admin_dark_mode_enabled %}checked{% endif %}
+          {% if admin_dark_mode_enabled %}checked{% endif %}
           class="mt-1 h-4 w-4 rounded border-sky-300 text-sky-600 focus:ring-sky-300"
         >
         <span>
-          <span class="block text-sm font-medium text-slate-900">Enable dark mode for the admin workspace</span>
+          <span class="block text-sm font-medium text-slate-900">Enable dark mode for your admin workspace</span>
           <span class="mt-1 block text-xs leading-5 text-slate-600">
-            Changes the admin shell and common admin surfaces to a darker appearance without affecting customer pages.
+            Saved only for the currently logged-in admin account. Other admins keep their own preference, and customer pages are unaffected.
           </span>
         </span>
       </label>
@@ -140,7 +140,7 @@
         <div class="mt-2 space-y-1">
           <div>Customer VAT display: {{ "Enabled" if delivery_pricing.customer_prices_include_vat else "Disabled" }}</div>
           <div>No-tent furnishing surcharge: {{ "Enabled" if delivery_pricing.customer_furnishing_without_tent_surcharge_enabled else "Disabled" }}</div>
-          <div>Admin dark mode: {{ "Enabled" if delivery_pricing.admin_dark_mode_enabled else "Disabled" }}</div>
+          <div>Your admin dark mode: {{ "Enabled" if admin_dark_mode_enabled else "Disabled" }}</div>
         </div>
       </div>
 

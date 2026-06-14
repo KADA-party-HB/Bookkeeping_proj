@@ -6,13 +6,13 @@ RETURNING id, email, role;
 """
 
 SQL_GET_USER_BY_EMAIL = """
-SELECT id, email, password_hash, role, created_at
+SELECT id, email, password_hash, role, admin_dark_mode_enabled, created_at
 FROM users
 WHERE email = %s;
 """
 
 SQL_GET_USER_BY_ID = """
-SELECT id, email, password_hash, role, created_at
+SELECT id, email, password_hash, role, admin_dark_mode_enabled, created_at
 FROM users
 WHERE id = %s;
 """
@@ -22,6 +22,13 @@ UPDATE users
 SET password_hash = %s
 WHERE id = %s
 RETURNING id, email, role;
+"""
+
+SQL_UPDATE_USER_ADMIN_DARK_MODE = """
+UPDATE users
+SET admin_dark_mode_enabled = %s
+WHERE id = %s
+RETURNING id, email, role, admin_dark_mode_enabled;
 """
 
 # Customers
@@ -132,8 +139,7 @@ SELECT
   included_distance_km,
   extra_fee_per_km,
   customer_prices_include_vat,
-  customer_furnishing_without_tent_surcharge_enabled,
-  admin_dark_mode_enabled
+  customer_furnishing_without_tent_surcharge_enabled
 FROM delivery_pricing_settings
 WHERE singleton = TRUE
 LIMIT 1;
@@ -146,17 +152,15 @@ INSERT INTO delivery_pricing_settings (
   included_distance_km,
   extra_fee_per_km,
   customer_prices_include_vat,
-  customer_furnishing_without_tent_surcharge_enabled,
-  admin_dark_mode_enabled
+  customer_furnishing_without_tent_surcharge_enabled
 )
-VALUES (TRUE, %s, %s, %s, %s, %s, %s)
+VALUES (TRUE, %s, %s, %s, %s, %s)
 ON CONFLICT (singleton) DO UPDATE
 SET base_fee = EXCLUDED.base_fee,
     included_distance_km = EXCLUDED.included_distance_km,
     extra_fee_per_km = EXCLUDED.extra_fee_per_km,
     customer_prices_include_vat = EXCLUDED.customer_prices_include_vat,
     customer_furnishing_without_tent_surcharge_enabled = EXCLUDED.customer_furnishing_without_tent_surcharge_enabled,
-    admin_dark_mode_enabled = EXCLUDED.admin_dark_mode_enabled,
     updated_at = CURRENT_TIMESTAMP;
 """
 

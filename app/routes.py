@@ -50,6 +50,8 @@ from .sql import (
     # auth / users
     SQL_CREATE_USER,
     SQL_GET_USER_BY_EMAIL,
+    SQL_GET_USER_BY_ID,
+    SQL_UPDATE_USER_ADMIN_DARK_MODE,
 
     # customers
     SQL_GET_CUSTOMER_BY_EMAIL,
@@ -348,6 +350,20 @@ class SimpleRateLimiter:
 
 def current_user():
     return session.get("user_id"), session.get("role")
+
+
+def _current_user_record():
+    cached_user = getattr(g, "_current_user_record", None)
+    if cached_user is not None:
+        return cached_user
+
+    user_id, _role = current_user()
+    if not user_id:
+        return None
+
+    user = query(SQL_GET_USER_BY_ID, (user_id,), one=True)
+    g._current_user_record = user
+    return user
 
 
 def _csrf_token():
@@ -1016,9 +1032,6 @@ def _serialize_delivery_pricing_for_template(delivery_pricing: dict[str, Decimal
         "customer_furnishing_without_tent_surcharge_enabled": bool(
             delivery_pricing["customer_furnishing_without_tent_surcharge_enabled"]
         ),
-        "admin_dark_mode_enabled": bool(
-            delivery_pricing["admin_dark_mode_enabled"]
-        ),
     }
 
 
@@ -1029,7 +1042,6 @@ def _save_delivery_pricing_settings(
     extra_fee_per_km: Decimal,
     customer_prices_include_vat: bool,
     customer_furnishing_without_tent_surcharge_enabled: bool,
-    admin_dark_mode_enabled: bool,
 ):
     execute(
         SQL_UPSERT_DELIVERY_PRICING_SETTINGS,
@@ -1039,10 +1051,14 @@ def _save_delivery_pricing_settings(
             extra_fee_per_km,
             customer_prices_include_vat,
             customer_furnishing_without_tent_surcharge_enabled,
-            admin_dark_mode_enabled,
         ),
     )
     g.pop("_delivery_pricing_settings", None)
+
+
+def _save_admin_dark_mode_preference(*, user_id: int, enabled: bool):
+    execute(SQL_UPDATE_USER_ADMIN_DARK_MODE, (enabled, user_id))
+    g.pop("_current_user_record", None)
 
 
 def _format_decimal_compact(value) -> str:
@@ -1081,7 +1097,15 @@ def _furnishing_without_tent_surcharge_enabled() -> bool:
 
 
 def _admin_dark_mode_enabled() -> bool:
-    return bool(_get_delivery_pricing_settings().get("admin_dark_mode_enabled"))
+    user_id, role = current_user()
+    if role != "admin" or not user_id:
+        return False
+
+    user = _current_user_record()
+    if not user:
+        return False
+
+    return bool(user.get("admin_dark_mode_enabled"))
 
 
 def _price_with_no_tent_furnishing_surcharge(amount):
@@ -2595,6 +2619,7 @@ def admin_settings():
     return render_template(
         "admin_settings.html",
         delivery_pricing=delivery_pricing_settings,
+        admin_dark_mode_enabled=_admin_dark_mode_enabled(),
         delivery_pricing_summary=_delivery_pricing_summary_text(
             delivery_pricing_settings
         ),
@@ -2605,6 +2630,7 @@ def admin_settings():
 @bp.post("/admin/settings")
 def admin_settings_save():
     require_admin()
+    user_id, _role = current_user()
 
     try:
         base_fee = _parse_nonnegative_decimal_setting(
@@ -2634,7 +2660,10 @@ def admin_settings_save():
             extra_fee_per_km=extra_fee_per_km,
             customer_prices_include_vat=customer_prices_include_vat,
             customer_furnishing_without_tent_surcharge_enabled=customer_furnishing_without_tent_surcharge_enabled,
-            admin_dark_mode_enabled=admin_dark_mode_enabled,
+        )
+        _save_admin_dark_mode_preference(
+            user_id=user_id,
+            enabled=admin_dark_mode_enabled,
         )
         flash("Settings updated.", "success")
     except ValueError as exc:

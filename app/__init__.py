@@ -53,7 +53,7 @@ def create_app():
     if not secret_key:
         raise RuntimeError("SECRET_KEY must be set before the app can start.")
 
-    pending_booking_hold_days = _env_int("PENDING_BOOKING_HOLD_DAYS", 7)
+    pending_booking_hold_days = _env_int("PENDING_BOOKING_HOLD_DAYS", 14)
     if pending_booking_hold_days <= 0:
         raise RuntimeError("PENDING_BOOKING_HOLD_DAYS must be greater than 0.")
 

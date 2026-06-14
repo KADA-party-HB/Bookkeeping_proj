@@ -20,6 +20,7 @@ CREATE TABLE users (
   email VARCHAR(255) NOT NULL UNIQUE,
   password_hash VARCHAR(255) NOT NULL,
   role VARCHAR(20) NOT NULL DEFAULT 'customer',
+  admin_dark_mode_enabled BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT chk_user_role CHECK (role IN ('customer','admin'))
 );
@@ -76,7 +77,6 @@ CREATE TABLE delivery_pricing_settings (
   extra_fee_per_km NUMERIC(10,2) NOT NULL DEFAULT 5.00,
   customer_prices_include_vat BOOLEAN NOT NULL DEFAULT FALSE,
   customer_furnishing_without_tent_surcharge_enabled BOOLEAN NOT NULL DEFAULT TRUE,
-  admin_dark_mode_enabled BOOLEAN NOT NULL DEFAULT FALSE,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT chk_delivery_pricing_base_fee CHECK (base_fee >= 0),
   CONSTRAINT chk_delivery_pricing_included_distance CHECK (included_distance_km >= 0),
@@ -89,10 +89,9 @@ INSERT INTO delivery_pricing_settings (
   included_distance_km,
   extra_fee_per_km,
   customer_prices_include_vat,
-  customer_furnishing_without_tent_surcharge_enabled,
-  admin_dark_mode_enabled
+  customer_furnishing_without_tent_surcharge_enabled
 )
-VALUES (TRUE, 449.00, 10.00, 5.00, FALSE, TRUE, FALSE);
+VALUES (TRUE, 449.00, 10.00, 5.00, FALSE, TRUE);
 
 -- CATEGORY <-> RENTAL PERIOD pricing
 -- This is where the actual price lives.
