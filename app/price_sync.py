@@ -53,6 +53,7 @@ def get_delivery_pricing(cur) -> dict[str, Decimal]:
             "included_distance_km": DEFAULT_DELIVERY_INCLUDED_DISTANCE_KM,
             "extra_fee_per_km": DEFAULT_DELIVERY_EXTRA_FEE_PER_KM,
             "customer_prices_include_vat": False,
+            "customer_furnishing_without_tent_surcharge_enabled": True,
             "admin_dark_mode_enabled": False,
         }
 
@@ -61,6 +62,9 @@ def get_delivery_pricing(cur) -> dict[str, Decimal]:
         "included_distance_km": Decimal(str(row["included_distance_km"])).quantize(Decimal("0.01")),
         "extra_fee_per_km": Decimal(str(row["extra_fee_per_km"])).quantize(Decimal("0.01")),
         "customer_prices_include_vat": bool(row.get("customer_prices_include_vat")),
+        "customer_furnishing_without_tent_surcharge_enabled": bool(
+            row.get("customer_furnishing_without_tent_surcharge_enabled")
+        ),
         "admin_dark_mode_enabled": bool(row.get("admin_dark_mode_enabled")),
     }
 
@@ -140,6 +144,9 @@ def export_price_catalog(cur) -> dict:
             "customer_prices_include_vat": bool(
                 delivery_pricing["customer_prices_include_vat"]
             ),
+            "customer_furnishing_without_tent_surcharge_enabled": bool(
+                delivery_pricing["customer_furnishing_without_tent_surcharge_enabled"]
+            ),
         },
         "rental_periods": [
             {
@@ -202,6 +209,12 @@ def apply_price_catalog(cur, catalog: dict) -> dict:
                     delivery_pricing.get(
                         "customer_prices_include_vat",
                         current_delivery_pricing["customer_prices_include_vat"],
+                    )
+                ),
+                bool(
+                    delivery_pricing.get(
+                        "customer_furnishing_without_tent_surcharge_enabled",
+                        current_delivery_pricing["customer_furnishing_without_tent_surcharge_enabled"],
                     )
                 ),
                 bool(

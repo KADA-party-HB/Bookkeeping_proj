@@ -197,6 +197,7 @@
   .admin-darkmode #booking-calendar .fc {
     --fc-page-bg-color: rgb(15 23 42);
     --fc-neutral-bg-color: rgb(15 23 42);
+    --fc-neutral-text-color: rgb(15 23 42);
     --fc-border-color: rgba(148, 163, 184, 0.18);
     --fc-button-bg-color: rgb(30 41 59);
     --fc-button-border-color: rgba(148, 163, 184, 0.22);
@@ -223,16 +224,45 @@
   .admin-darkmode #booking-calendar .fc .fc-view-harness,
   .admin-darkmode #booking-calendar .fc .fc-daygrid-body,
   .admin-darkmode #booking-calendar .fc .fc-daygrid-body table,
-  .admin-darkmode #booking-calendar .fc .fc-col-header,
   .admin-darkmode #booking-calendar .fc .fc-daygrid-day-frame {
     background: rgb(15 23 42) !important;
   }
 
+  .admin-darkmode #booking-calendar .fc .fc-col-header,
+  .admin-darkmode #booking-calendar .fc .fc-col-header-cell,
+  .admin-darkmode #booking-calendar .fc .fc-col-header-cell .fc-scrollgrid-sync-inner,
+  .admin-darkmode #booking-calendar .fc .fc-scrollgrid-section-header > * {
+    background: rgb(226 232 240) !important;
+  }
+
+  .admin-darkmode #booking-calendar .fc-theme-standard th,
+  .admin-darkmode #booking-calendar .fc .fc-col-header-cell,
+  .admin-darkmode #booking-calendar .fc .fc-col-header-cell a,
+  .admin-darkmode #booking-calendar .fc .fc-col-header-cell .fc-scrollgrid-sync-inner,
+  .admin-darkmode #booking-calendar .fc .fc-scrollgrid-section-header th,
+  .admin-darkmode #booking-calendar .fc .fc-scrollgrid-section-header th * {
+    color: rgb(15 23 42) !important;
+    opacity: 1 !important;
+  }
+
   .admin-darkmode #booking-calendar .fc .fc-toolbar-title,
-  .admin-darkmode #booking-calendar .fc .fc-col-header-cell-cushion,
   .admin-darkmode #booking-calendar .fc .fc-daygrid-day-number,
+  .admin-darkmode #booking-calendar .fc .fc-day-other .fc-daygrid-day-number,
+  .admin-darkmode #booking-calendar .fc .fc-daygrid-day-top,
+  .admin-darkmode #booking-calendar .fc .fc-daygrid-more-link,
   .admin-darkmode #booking-calendar .fc .fc-button {
     color: rgb(241 245 249) !important;
+  }
+
+  .admin-darkmode #booking-calendar .fc .fc-col-header-cell-cushion {
+    color: rgb(15 23 42) !important;
+  }
+
+  .admin-darkmode #booking-calendar .fc .fc-col-header-cell,
+  .admin-darkmode #booking-calendar .fc .fc-col-header-cell *,
+  .admin-darkmode #booking-calendar .fc .fc-col-header-cell .fc-scrollgrid-sync-inner,
+  .admin-darkmode #booking-calendar .fc .fc-col-header-cell .fc-col-header-cell-cushion {
+    color: rgb(15 23 42) !important;
   }
 
   .admin-darkmode #booking-calendar .fc .fc-button {
@@ -338,6 +368,7 @@
     color: var(--booking-chip-text);
     box-shadow: none;
     overflow: hidden;
+    touch-action: manipulation;
   }
 
   .booking-event-chip[data-service="delivery"] {
@@ -400,6 +431,13 @@
     font-size: 0.68rem;
     font-weight: 600;
     color: rgb(21 128 61);
+  }
+
+  .admin-darkmode #booking-calendar .booking-event-chip,
+  .admin-darkmode #booking-calendar .booking-event-chip .booking-event-ref,
+  .admin-darkmode #booking-calendar .booking-event-chip .booking-event-name,
+  .admin-darkmode #booking-calendar .booking-event-chip.admin-note-marker .admin-note-marker-label {
+    color: inherit !important;
   }
 
   .booking-event-chip[data-continues-before="true"] {
@@ -465,6 +503,7 @@
     line-height: 1;
     box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
     transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
+    touch-action: manipulation;
   }
 
   #booking-calendar .calendar-day-add-note:hover {
@@ -502,6 +541,18 @@
   }
 
   @media (max-width: 767px) {
+    #calendar-booking-popup > div:last-child {
+      left: 0.75rem;
+      right: 0.75rem;
+      top: 0.75rem;
+      bottom: 0.75rem;
+      width: auto;
+      max-width: none;
+      max-height: none;
+      transform: none;
+      border-radius: 1.25rem;
+    }
+
     #booking-calendar .fc-daygrid-day-frame {
       min-height: 6.5rem;
     }
@@ -891,6 +942,21 @@
         return;
       }
       openBookingPopup(event);
+    };
+
+    const bindPopupTrigger = (element, eventRef) => {
+      if (!element) {
+        return;
+      }
+
+      const openFromInteraction = (interactionEvent) => {
+        interactionEvent.preventDefault();
+        interactionEvent.stopPropagation();
+        openPopup(eventRef);
+      };
+
+      element.addEventListener("click", openFromInteraction);
+      element.addEventListener("touchend", openFromInteraction, { passive: false });
     };
 
     const createSummaryCell = ({ className = "", text = null, html = null }) => {
@@ -1337,7 +1403,7 @@
           noteLabel.className = "admin-note-marker-label";
           noteLabel.textContent = noteText;
           chip.appendChild(noteLabel);
-          chip.addEventListener("click", () => openPopup(arg.event));
+          bindPopupTrigger(chip, arg.event);
           return { domNodes: [chip] };
         }
 
@@ -1377,7 +1443,7 @@
         textWrap.appendChild(name);
 
         chip.appendChild(textWrap);
-        chip.addEventListener("click", () => openPopup(arg.event));
+        bindPopupTrigger(chip, arg.event);
 
         return { domNodes: [chip] };
       },

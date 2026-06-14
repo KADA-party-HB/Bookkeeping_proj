@@ -132,6 +132,7 @@ SELECT
   included_distance_km,
   extra_fee_per_km,
   customer_prices_include_vat,
+  customer_furnishing_without_tent_surcharge_enabled,
   admin_dark_mode_enabled
 FROM delivery_pricing_settings
 WHERE singleton = TRUE
@@ -145,14 +146,16 @@ INSERT INTO delivery_pricing_settings (
   included_distance_km,
   extra_fee_per_km,
   customer_prices_include_vat,
+  customer_furnishing_without_tent_surcharge_enabled,
   admin_dark_mode_enabled
 )
-VALUES (TRUE, %s, %s, %s, %s, %s)
+VALUES (TRUE, %s, %s, %s, %s, %s, %s)
 ON CONFLICT (singleton) DO UPDATE
 SET base_fee = EXCLUDED.base_fee,
     included_distance_km = EXCLUDED.included_distance_km,
     extra_fee_per_km = EXCLUDED.extra_fee_per_km,
     customer_prices_include_vat = EXCLUDED.customer_prices_include_vat,
+    customer_furnishing_without_tent_surcharge_enabled = EXCLUDED.customer_furnishing_without_tent_surcharge_enabled,
     admin_dark_mode_enabled = EXCLUDED.admin_dark_mode_enabled,
     updated_at = CURRENT_TIMESTAMP;
 """
@@ -760,9 +763,11 @@ INSERT INTO bookings (
   custom_total_price,
   custom_price_note,
   booking_note,
-  admin_note
+  admin_note,
+  customer_prices_include_vat,
+  no_tent_furnishing_surcharge_applied
 )
-VALUES (%s, %s, %s, 'pending', %s, %s, %s, %s, %s, %s, %s, %s, %s)
+VALUES (%s, %s, %s, 'pending', %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
 RETURNING id;
 """
 
@@ -785,6 +790,8 @@ SELECT
   b.include_setup_service,
   b.custom_total_price,
   b.custom_price_note,
+  b.customer_prices_include_vat,
+  b.no_tent_furnishing_surcharge_applied,
   b.booking_note,
   b.admin_note,
   b.created_at
@@ -812,6 +819,8 @@ SELECT
   b.include_setup_service,
   b.custom_total_price,
   b.custom_price_note,
+  b.customer_prices_include_vat,
+  b.no_tent_furnishing_surcharge_applied,
   b.booking_note,
   NULL::TEXT AS admin_note,
   b.created_at
@@ -1285,6 +1294,8 @@ SET customer_id = %s,
     include_setup_service = %s,
     custom_total_price = %s,
     custom_price_note = %s,
+    customer_prices_include_vat = %s,
+    no_tent_furnishing_surcharge_applied = %s,
     booking_note = %s,
     admin_note = %s
 WHERE id = %s;

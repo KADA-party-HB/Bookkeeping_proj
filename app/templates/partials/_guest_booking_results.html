@@ -147,6 +147,7 @@
                       data-unit-price="{{ c.quoted_period_price if c.has_standard_price else 0 }}"
                       data-setup-fee="{{ c.setup_service_fee or 0 }}"
                       data-is-tent="{{ 'true' if c.is_tent else 'false' }}"
+                      data-is-furnishing="{{ 'true' if c.is_furnishing else 'false' }}"
                       data-available-item-ids='{{ c.available_item_ids|tojson }}'
                       class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 shadow-sm transition focus:border-pink-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-pink-100"
                     >
@@ -273,6 +274,7 @@
                           data-unit-price="{{ c.quoted_period_price if c.has_standard_price else 0 }}"
                           data-setup-fee="{{ c.setup_service_fee or 0 }}"
                           data-is-tent="{{ 'true' if c.is_tent else 'false' }}"
+                          data-is-furnishing="{{ 'true' if c.is_furnishing else 'false' }}"
                           data-available-item-ids='{{ c.available_item_ids|tojson }}'
                           class="w-24 rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 shadow-sm transition focus:border-pink-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-pink-100"
                         >
@@ -450,7 +452,7 @@
               id="address"
               name="address"
               type="text"
-              value=""
+              value="{{ customer_profile.address if role == 'customer' and customer_profile and customer_profile.address else '' }}"
               placeholder="T&auml;lt destination"
               autocomplete="street-address"
               class="mt-1 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 shadow-sm transition focus:border-pink-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-pink-100"
@@ -463,7 +465,7 @@
               id="postal_city"
               name="postal_city"
               type="text"
-              value=""
+              value="{{ customer_profile.postal_city if role == 'customer' and customer_profile and customer_profile.postal_city else '' }}"
               placeholder="Postort f&ouml;r T&auml;lt destination"
               autocomplete="address-level2"
               class="mt-1 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 shadow-sm transition focus:border-pink-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-pink-100"
@@ -529,12 +531,19 @@
             <span id="summary-delivery" class="font-semibold text-slate-950">Inte tillvalt</span>
           </div>
 
-          {% if customer_prices_include_vat %}
-            <div class="flex items-center justify-between gap-4">
-              <span class="text-slate-500">Pris exkl. moms</span>
-              <span id="summary-subtotal" class="font-semibold text-slate-950">0 kr</span>
+          {% if customer_furnishing_without_tent_surcharge_enabled %}
+            <div id="summary-furnishing-surcharge-row" class="hidden">
+              <div class="flex items-center justify-between gap-4">
+                <span class="text-slate-500">Inredning utan tält (+25%)</span>
+                <span id="summary-furnishing-surcharge" class="font-semibold text-slate-950">0 kr</span>
+              </div>
+              <div id="summary-furnishing-surcharge-note" class="mt-2 hidden rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                Bokningen innehåller inget tält, därför läggs ett tillägg på 25% på all inredning.
+              </div>
             </div>
+          {% endif %}
 
+          {% if customer_prices_include_vat %}
             <div class="flex items-center justify-between gap-4">
               <span class="text-slate-500">Moms (25%)</span>
               <span id="summary-vat" class="font-semibold text-slate-950">0 kr</span>
@@ -542,6 +551,12 @@
           {% endif %}
 
           <div class="border-t border-pink-100 pt-3">
+            {% if customer_prices_include_vat %}
+              <div class="mb-2 flex items-center justify-between gap-4 text-sm">
+                <span class="text-slate-500">Pris exkl. moms</span>
+                <span id="summary-subtotal" class="font-medium text-slate-900">0 kr</span>
+              </div>
+            {% endif %}
             <div class="flex items-center justify-between gap-4 text-base font-semibold">
               <span>{% if customer_prices_include_vat %}Totalt inkl. moms{% else %}Total{% endif %}</span>
               <span id="summary-total" class="text-rose-600">0 kr</span>

@@ -78,7 +78,6 @@ from .sql import (
     SQL_AVAILABLE_CATEGORIES,
     SQL_FIND_CATEGORY_RENTAL_PRICING,
     SQL_CREATE_BOOKING,
-    SQL_CREATE_BOOKING_WITH_ALLOCATIONS,
 
     # items
     SQL_LIST_ITEMS,
@@ -134,6 +133,7 @@ from .sql import (
 )
 
 bp = Blueprint("routes", __name__)
+NO_TENT_FURNISHING_SURCHARGE_RATE = Decimal("0.25")
 
 DEFAULT_META_KEYWORDS = (
     "kada, kada party, t\u00e4ltuthyrning, party, fest, fest utrustning, "
@@ -1013,6 +1013,9 @@ def _serialize_delivery_pricing_for_template(delivery_pricing: dict[str, Decimal
         "customer_prices_include_vat": bool(
             delivery_pricing["customer_prices_include_vat"]
         ),
+        "customer_furnishing_without_tent_surcharge_enabled": bool(
+            delivery_pricing["customer_furnishing_without_tent_surcharge_enabled"]
+        ),
         "admin_dark_mode_enabled": bool(
             delivery_pricing["admin_dark_mode_enabled"]
         ),
@@ -1025,6 +1028,7 @@ def _save_delivery_pricing_settings(
     included_distance_km: Decimal,
     extra_fee_per_km: Decimal,
     customer_prices_include_vat: bool,
+    customer_furnishing_without_tent_surcharge_enabled: bool,
     admin_dark_mode_enabled: bool,
 ):
     execute(
@@ -1034,6 +1038,7 @@ def _save_delivery_pricing_settings(
             included_distance_km,
             extra_fee_per_km,
             customer_prices_include_vat,
+            customer_furnishing_without_tent_surcharge_enabled,
             admin_dark_mode_enabled,
         ),
     )
@@ -1058,6 +1063,8 @@ def _delivery_pricing_summary_text(delivery_pricing: dict[str, Decimal]) -> str:
     )
     if delivery_pricing.get("customer_prices_include_vat"):
         summary += " Customer prices are shown including 25% VAT."
+    if delivery_pricing.get("customer_furnishing_without_tent_surcharge_enabled"):
+        summary += " Bookings without tents add a 25% surcharge on furnishings."
     return summary
 
 
@@ -1065,8 +1072,44 @@ def _customer_prices_include_vat_enabled() -> bool:
     return bool(_get_delivery_pricing_settings().get("customer_prices_include_vat"))
 
 
+def _furnishing_without_tent_surcharge_enabled() -> bool:
+    return bool(
+        _get_delivery_pricing_settings().get(
+            "customer_furnishing_without_tent_surcharge_enabled"
+        )
+    )
+
+
 def _admin_dark_mode_enabled() -> bool:
     return bool(_get_delivery_pricing_settings().get("admin_dark_mode_enabled"))
+
+
+def _price_with_no_tent_furnishing_surcharge(amount):
+    if amount is None:
+        return None
+
+    return (Decimal(str(amount)) * (Decimal("1.00") + NO_TENT_FURNISHING_SURCHARGE_RATE)).quantize(
+        Decimal("0.01"),
+        rounding=ROUND_HALF_UP,
+    )
+
+
+def _no_tent_furnishing_surcharge_applies(selected_category_quantities, category_context_by_id) -> bool:
+    if not _furnishing_without_tent_surcharge_enabled():
+        return False
+
+    has_furnishing = False
+    for category_id, qty in selected_category_quantities:
+        if not qty or qty <= 0:
+            continue
+
+        category_context = category_context_by_id.get(category_id) or {}
+        if category_context.get("is_tent"):
+            return False
+        if category_context.get("is_furnishing"):
+            has_furnishing = True
+
+    return has_furnishing
 
 
 def _apply_vat_to_money_fields(row, *field_names: str, include_vat: bool):
@@ -1308,6 +1351,86 @@ def _build_booking_item_summary(items):
         summary_map[key]["group_total"] += item.get("effective_line_total") or 0
 
     return summary_rows
+
+
+def _build_booking_overview_cost_breakdown(
+    booking,
+    items,
+    total,
+    *,
+    show_vat_breakdown: bool,
+):
+    if not total:
+        return None
+
+    rental_cost = Decimal(str(total.get("rental_cost") or 0)).quantize(Decimal("0.01"))
+    setup_cost = Decimal(str(total.get("setup_cost") or 0)).quantize(Decimal("0.01"))
+    delivery_cost = Decimal(str(total.get("delivery_cost") or 0)).quantize(Decimal("0.01"))
+    subtotal_ex_vat = Decimal(str(total.get("total_cost") or 0)).quantize(Decimal("0.01"))
+
+    furnishing_surcharge = Decimal("0.00")
+    if (
+        not total.get("has_booking_override")
+        and booking.get("no_tent_furnishing_surcharge_applied")
+        and items
+        and not any(item.get("is_tent") for item in items)
+    ):
+        for item in items:
+            if (
+                not item.get("is_furnishing")
+                or item.get("custom_total_price") is not None
+                or item.get("quoted_period_price") is None
+            ):
+                continue
+
+            displayed_price = Decimal(str(item["quoted_period_price"])).quantize(Decimal("0.01"))
+            base_price = (
+                displayed_price / (Decimal("1.00") + NO_TENT_FURNISHING_SURCHARGE_RATE)
+            ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            furnishing_surcharge += displayed_price - base_price
+
+    furnishing_surcharge = furnishing_surcharge.quantize(
+        Decimal("0.01"), rounding=ROUND_HALF_UP
+    )
+    rental_without_surcharge = max(
+        rental_cost - furnishing_surcharge,
+        Decimal("0.00"),
+    ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+    booking_custom_total_price = total.get("booking_custom_total_price")
+    if booking_custom_total_price is not None:
+        booking_custom_total_price = Decimal(str(booking_custom_total_price)).quantize(
+            Decimal("0.01"),
+            rounding=ROUND_HALF_UP,
+        )
+
+    vat_amount = None
+    total_display = subtotal_ex_vat
+    if show_vat_breakdown:
+        vat_amount = (subtotal_ex_vat * Decimal("0.25")).quantize(
+            Decimal("0.01"),
+            rounding=ROUND_HALF_UP,
+        )
+        total_display = (subtotal_ex_vat + vat_amount).quantize(
+            Decimal("0.01"),
+            rounding=ROUND_HALF_UP,
+        )
+
+    return {
+        "item_count": len(items or []),
+        "rental_without_surcharge": rental_without_surcharge,
+        "furnishing_surcharge": furnishing_surcharge,
+        "setup_cost": setup_cost,
+        "delivery_cost": delivery_cost,
+        "subtotal_ex_vat": subtotal_ex_vat,
+        "vat_amount": vat_amount,
+        "total_cost": total_display,
+        "show_furnishing_surcharge": furnishing_surcharge > 0,
+        "show_vat_breakdown": show_vat_breakdown,
+        "has_booking_override": bool(total.get("has_booking_override")),
+        "booking_custom_total_price": booking_custom_total_price,
+        "booking_custom_price_note": total.get("booking_custom_price_note"),
+    }
 
 
 def _count_booking_items_by_category(items):
@@ -1766,7 +1889,12 @@ def _create_admin_booking_with_allocations(
     custom_total_prices,
     custom_price_notes,
     category_context_by_id,
+    customer_prices_include_vat: bool,
 ):
+    no_tent_furnishing_surcharge_applies = (
+        booking_custom_total_price is None
+        and _no_tent_furnishing_surcharge_applies(selections, category_context_by_id)
+    )
     cur.execute(
         SQL_CREATE_BOOKING,
         (
@@ -1782,6 +1910,8 @@ def _create_admin_booking_with_allocations(
             booking_custom_price_note,
             booking_note,
             None,
+            customer_prices_include_vat,
+            no_tent_furnishing_surcharge_applies,
         ),
     )
     booking_id = cur.fetchone()["id"]
@@ -1802,6 +1932,13 @@ def _create_admin_booking_with_allocations(
             rental_period_id = pricing_row["rental_period_id"]
             quoted_period_label = pricing_row["period_label"]
             quoted_period_price = pricing_row["period_price"]
+            if (
+                no_tent_furnishing_surcharge_applies
+                and category_context.get("is_furnishing")
+            ):
+                quoted_period_price = _price_with_no_tent_furnishing_surcharge(
+                    quoted_period_price
+                )
         else:
             if custom_total_price is None and booking_custom_total_price is None:
                 raise ValueError(
@@ -1892,6 +2029,10 @@ def _reallocate_booking_items_for_dates(
     reserved_item_ids = set()
     rental_days = (date.fromisoformat(end_date) - date.fromisoformat(start_date)).days + 1
     pricing_by_category = {}
+    no_tent_furnishing_surcharge_applies = _no_tent_furnishing_surcharge_applies(
+        desired_category_quantities.items(),
+        category_context_by_id,
+    )
 
     def row_preservation_priority(row):
         return (
@@ -1987,6 +2128,13 @@ def _reallocate_booking_items_for_dates(
             rental_period_id = pricing_row["rental_period_id"]
             quoted_period_label = pricing_row["period_label"]
             quoted_period_price = pricing_row["period_price"]
+            if (
+                no_tent_furnishing_surcharge_applies
+                and category_context_by_id.get(row["category_id"], {}).get("is_furnishing")
+            ):
+                quoted_period_price = _price_with_no_tent_furnishing_surcharge(
+                    quoted_period_price
+                )
         else:
             has_line_override = row["custom_total_price"] is not None
             if not has_line_override and not booking_has_total_override:
@@ -2037,6 +2185,13 @@ def _reallocate_booking_items_for_dates(
             rental_period_id = pricing_row["rental_period_id"]
             quoted_period_label = pricing_row["period_label"]
             quoted_period_price = pricing_row["period_price"]
+            if (
+                no_tent_furnishing_surcharge_applies
+                and category_context.get("is_furnishing")
+            ):
+                quoted_period_price = _price_with_no_tent_furnishing_surcharge(
+                    quoted_period_price
+                )
         else:
             if not booking_has_total_override:
                 raise ValueError(
@@ -2401,6 +2556,7 @@ def home():
         "role": role,
         "min_date": min_date,
         "customer_prices_include_vat": customer_prices_include_vat,
+        "customer_furnishing_without_tent_surcharge_enabled": _furnishing_without_tent_surcharge_enabled(),
     }
 
     if _is_ajax_request():
@@ -2466,6 +2622,9 @@ def admin_settings_save():
         customer_prices_include_vat = _to_bool(
             request.form.get("customer_prices_include_vat")
         )
+        customer_furnishing_without_tent_surcharge_enabled = _to_bool(
+            request.form.get("customer_furnishing_without_tent_surcharge_enabled")
+        )
         admin_dark_mode_enabled = _to_bool(
             request.form.get("admin_dark_mode_enabled")
         )
@@ -2474,6 +2633,7 @@ def admin_settings_save():
             included_distance_km=included_distance_km,
             extra_fee_per_km=extra_fee_per_km,
             customer_prices_include_vat=customer_prices_include_vat,
+            customer_furnishing_without_tent_surcharge_enabled=customer_furnishing_without_tent_surcharge_enabled,
             admin_dark_mode_enabled=admin_dark_mode_enabled,
         )
         flash("Settings updated.", "success")
@@ -2657,35 +2817,66 @@ def guest_booking_create():
                         account_full_name,
                         account_email,
                         account_phone,
-                        None,
-                        None,
+                        booking_address,
+                        booking_postal_city,
                         created_user["id"],
                     ),
                 )
                 effective_customer_id = cur.fetchone()["id"]
+            else:
+                updated_address = (
+                    booking_address
+                    if booking_address is not None
+                    else customer["address"]
+                )
+                updated_postal_city = (
+                    booking_postal_city
+                    if booking_postal_city is not None
+                    else customer["postal_city"]
+                )
+                updated_phone = (
+                    account_phone
+                    if account_phone is not None
+                    else customer["phone"]
+                )
 
-            cur.execute(
-                SQL_CREATE_BOOKING_WITH_ALLOCATIONS,
-                (
-                    effective_customer_id,
-                    start,
-                    end,
-                    category_ids,
-                    qtys,
-                    include_delivery,
-                    delivery_fee,
-                    include_setup_service,
-                    None,
-                    None,
-                    booking_note,
-                    delivery_address,
-                    delivery_distance_km,
-                    [None] * len(category_ids),
-                    [None] * len(category_ids),
-                ),
+                if (
+                    updated_phone != customer["phone"]
+                    or updated_address != customer["address"]
+                    or updated_postal_city != customer["postal_city"]
+                ):
+                    cur.execute(
+                        SQL_UPDATE_CUSTOMER,
+                        (
+                            customer["full_name"],
+                            customer["email"],
+                            updated_phone,
+                            updated_address,
+                            updated_postal_city,
+                            customer["id"],
+                        ),
+                    )
+
+            booking_id, _turnaround_item_labels = _create_admin_booking_with_allocations(
+                cur,
+                customer_id=effective_customer_id,
+                start_date=start,
+                end_date=end,
+                selections=selections,
+                include_delivery=include_delivery,
+                delivery_fee=delivery_fee,
+                delivery_address=delivery_address,
+                delivery_distance_km=delivery_distance_km,
+                include_setup_service=include_setup_service,
+                booking_custom_total_price=None,
+                booking_custom_price_note=None,
+                booking_note=booking_note,
+                custom_total_prices=[None] * len(category_ids),
+                custom_price_notes=[None] * len(category_ids),
+                category_context_by_id=visible_by_id,
+                customer_prices_include_vat=_customer_prices_include_vat_enabled(),
             )
-            booking_row = cur.fetchone()
-            return booking_row["booking_id"], created_user, effective_customer_id
+            return booking_id, created_user, effective_customer_id
 
         booking_id, created_user, effective_customer_id = tx(work)
 
@@ -2894,81 +3085,56 @@ def booking_create_from_home():
         return redirect(url_for("routes.home", start_date=start, end_date=end))
 
     try:
-        if role == "admin":
-            def work(cur):
-                effective_customer_id = customer_id
+        def work(cur):
+            effective_customer_id = customer_id
 
-                if create_new_customer:
-                    cur.execute(SQL_GET_CUSTOMER_BY_FULL_NAME, (new_full_name,))
-                    existing_customer = cur.fetchone()
+            if create_new_customer:
+                cur.execute(SQL_GET_CUSTOMER_BY_FULL_NAME, (new_full_name,))
+                existing_customer = cur.fetchone()
 
-                    if existing_customer:
-                        cur.execute(
-                            SQL_UPDATE_CUSTOMER,
-                            (
-                                new_full_name,
-                                new_email if new_email is not None else existing_customer["email"],
-                                new_phone if new_phone is not None else existing_customer["phone"],
-                                existing_customer["address"],
-                                existing_customer["postal_city"],
-                                existing_customer["id"],
-                            ),
-                        )
-                        customer = cur.fetchone()
-                    else:
-                        cur.execute(
-                            SQL_CREATE_CUSTOMER,
-                            (new_full_name, new_email, new_phone, None, None, None),
-                        )
-                        customer = cur.fetchone()
+                if existing_customer:
+                    cur.execute(
+                        SQL_UPDATE_CUSTOMER,
+                        (
+                            new_full_name,
+                            new_email if new_email is not None else existing_customer["email"],
+                            new_phone if new_phone is not None else existing_customer["phone"],
+                            existing_customer["address"],
+                            existing_customer["postal_city"],
+                            existing_customer["id"],
+                        ),
+                    )
+                    customer = cur.fetchone()
+                else:
+                    cur.execute(
+                        SQL_CREATE_CUSTOMER,
+                        (new_full_name, new_email, new_phone, None, None, None),
+                    )
+                    customer = cur.fetchone()
 
-                    effective_customer_id = customer["id"]
+                effective_customer_id = customer["id"]
 
-                return _create_admin_booking_with_allocations(
-                    cur,
-                    customer_id=effective_customer_id,
-                    start_date=start,
-                    end_date=end,
-                    selections=selections,
-                    include_delivery=include_delivery,
-                    delivery_fee=delivery_fee,
-                    delivery_address=booking_delivery_full_address,
-                    delivery_distance_km=delivery_distance_km,
-                    include_setup_service=include_setup_service,
-                    booking_custom_total_price=booking_custom_total_price,
-                    booking_custom_price_note=booking_custom_price_note,
-                    booking_note=booking_note,
-                    custom_total_prices=custom_total_prices,
-                    custom_price_notes=custom_price_notes,
-                    category_context_by_id=visible_by_id,
-                )
-
-            booking_id, turnaround_item_labels = tx(work)
-        else:
-            row = query(
-                SQL_CREATE_BOOKING_WITH_ALLOCATIONS,
-                (
-                    customer_id,
-                    start,
-                    end,
-                    category_ids,
-                    qtys,
-                    include_delivery,
-                    delivery_fee,
-                    include_setup_service,
-                    booking_custom_total_price,
-                    booking_custom_price_note,
-                    booking_note,
-                    None,
-                    None,
-                    custom_total_prices,
-                    custom_price_notes,
-                ),
-                one=True,
-                commit=True,
+            return _create_admin_booking_with_allocations(
+                cur,
+                customer_id=effective_customer_id,
+                start_date=start,
+                end_date=end,
+                selections=selections,
+                include_delivery=include_delivery,
+                delivery_fee=delivery_fee,
+                delivery_address=booking_delivery_full_address,
+                delivery_distance_km=delivery_distance_km,
+                include_setup_service=include_setup_service,
+                booking_custom_total_price=booking_custom_total_price,
+                booking_custom_price_note=booking_custom_price_note,
+                booking_note=booking_note,
+                custom_total_prices=custom_total_prices,
+                custom_price_notes=custom_price_notes,
+                category_context_by_id=visible_by_id,
+                customer_prices_include_vat=_customer_prices_include_vat_enabled(),
             )
-            booking_id = row["booking_id"]
-            turnaround_item_labels = []
+
+        booking_id, turnaround_item_labels = tx(work)
 
         _notify_booking_event_email("created", booking_id)
 
@@ -4380,7 +4546,14 @@ def booking_detail(booking_id: int):
     items = query(SQL_BOOKING_ITEMS, (booking_id,))
     item_summary = _build_booking_item_summary(items)
     total = query(SQL_BOOKING_TOTAL, (booking_id,), one=True)
-    customer_prices_include_vat = role != "admin" and _customer_prices_include_vat_enabled()
+    booking_prices_include_vat = bool(booking.get("customer_prices_include_vat"))
+    customer_prices_include_vat = role != "admin" and booking_prices_include_vat
+    cost_breakdown = _build_booking_overview_cost_breakdown(
+        booking,
+        items,
+        total,
+        show_vat_breakdown=booking_prices_include_vat,
+    )
     if customer_prices_include_vat:
         _apply_customer_price_display_to_booking(
             booking=booking,
@@ -4396,6 +4569,7 @@ def booking_detail(booking_id: int):
         items=items,
         item_summary=item_summary,
         total=total,
+        cost_breakdown=cost_breakdown,
         customer_prices_include_vat=customer_prices_include_vat,
         role=role,
     )
@@ -4412,11 +4586,18 @@ def booking_order_pdf(booking_id: int):
     items = query(SQL_BOOKING_ITEMS, (booking_id,))
     item_summary = _build_booking_item_summary(items)
     total = query(SQL_BOOKING_TOTAL, (booking_id,), one=True)
+    cost_breakdown = _build_booking_overview_cost_breakdown(
+        booking,
+        items,
+        total,
+        show_vat_breakdown=bool(booking.get("customer_prices_include_vat")),
+    )
 
     pdf_bytes = build_booking_order_pdf(
         booking=booking,
         item_summary=item_summary,
         total=total or {},
+        cost_breakdown=cost_breakdown or {},
         static_root=Path(current_app.root_path) / "static",
     )
     return send_file(
@@ -4516,6 +4697,18 @@ def admin_booking_edit_save(booking_id: int):
         )
         quantities_changed = requested_category_quantities != current_category_quantities
         should_rebuild_booking_items = dates_changed or quantities_changed
+        booking_prices_include_vat = bool(booking.get("customer_prices_include_vat"))
+        no_tent_furnishing_surcharge_applied = bool(
+            booking.get("no_tent_furnishing_surcharge_applied")
+        )
+        if should_rebuild_booking_items:
+            no_tent_furnishing_surcharge_applied = (
+                custom_total_price is None
+                and _no_tent_furnishing_surcharge_applies(
+                    requested_category_quantities.items(),
+                    category_context_by_id,
+                )
+            )
 
         def work(cur):
             cur.execute(SQL_GET_CUSTOMER, (customer_id,))
@@ -4548,6 +4741,8 @@ def admin_booking_edit_save(booking_id: int):
                     include_setup_service,
                     custom_total_price,
                     custom_price_note,
+                    booking_prices_include_vat,
+                    no_tent_furnishing_surcharge_applied,
                     booking_note,
                     admin_note,
                     booking_id,

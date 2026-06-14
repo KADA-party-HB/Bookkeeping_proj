@@ -10,7 +10,7 @@
         </div>
         <h1 class="mt-4 text-3xl font-semibold tracking-tight text-slate-900">Pricing and workspace settings</h1>
         <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-          Manage customer-facing VAT display, delivery pricing, and the admin workspace theme from one place.
+          Manage customer-facing VAT display, the furnishing-only surcharge rule, delivery pricing, and the admin workspace theme from one place.
         </p>
       </div>
 
@@ -103,6 +103,22 @@
         </span>
       </label>
 
+      <label class="flex items-start gap-3 rounded-[1.5rem] border border-amber-200 bg-amber-50/60 px-4 py-4">
+        <input
+          type="checkbox"
+          name="customer_furnishing_without_tent_surcharge_enabled"
+          value="on"
+          {% if delivery_pricing.customer_furnishing_without_tent_surcharge_enabled %}checked{% endif %}
+          class="mt-1 h-4 w-4 rounded border-amber-300 text-amber-600 focus:ring-amber-300"
+        >
+        <span>
+          <span class="block text-sm font-medium text-slate-900">Add 25% to furnishings when no tents are booked</span>
+          <span class="mt-1 block text-xs leading-5 text-slate-600">
+            Applies a 25% surcharge to furnishing rental prices when a booking contains furnishings but no tents. The surcharge is shown in the customer payment summary and stored on new booking line prices.
+          </span>
+        </span>
+      </label>
+
       <label class="flex items-start gap-3 rounded-[1.5rem] border border-sky-200 bg-sky-50/60 px-4 py-4">
         <input
           type="checkbox"
@@ -123,6 +139,7 @@
         <div class="font-medium text-slate-900">Current state</div>
         <div class="mt-2 space-y-1">
           <div>Customer VAT display: {{ "Enabled" if delivery_pricing.customer_prices_include_vat else "Disabled" }}</div>
+          <div>No-tent furnishing surcharge: {{ "Enabled" if delivery_pricing.customer_furnishing_without_tent_surcharge_enabled else "Disabled" }}</div>
           <div>Admin dark mode: {{ "Enabled" if delivery_pricing.admin_dark_mode_enabled else "Disabled" }}</div>
         </div>
       </div>

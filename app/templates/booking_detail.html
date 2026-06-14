@@ -349,19 +349,69 @@
 <div class="bg-white border rounded-xl p-6 shadow-sm mt-6">
   <h3 class="text-lg font-semibold">Total</h3>
 
-  {% if total %}
-    <div class="mt-3 text-sm text-slate-700 space-y-1">
-      <div><b>Days:</b> {{ total.days }}</div>
-      <div><b>Rental cost:</b> {{ total.rental_cost }} kr</div>
-      <div><b>Setup cost:</b> {{ total.setup_cost }} kr</div>
-      <div><b>Delivery cost:</b> {{ total.delivery_cost }} kr</div>
-      {% if total.has_booking_override %}
-        <div><b>Booking override:</b> {{ total.booking_custom_total_price }} kr</div>
-        {% if total.booking_custom_price_note %}
-          <div><b>Override note:</b> {{ total.booking_custom_price_note }}</div>
-        {% endif %}
+  {% if cost_breakdown %}
+    <div class="mt-3 space-y-3 text-sm text-slate-700">
+      <div class="flex items-center justify-between gap-4">
+        <span>Items</span>
+        <span class="font-semibold text-slate-950">{{ cost_breakdown.item_count }} selected</span>
+      </div>
+      <div class="flex items-center justify-between gap-4">
+        <span>Rental cost</span>
+        <span class="font-semibold text-slate-950">{{ cost_breakdown.rental_without_surcharge }} kr</span>
+      </div>
+      <div class="flex items-center justify-between gap-4">
+        <span>Setup cost</span>
+        <span class="font-semibold text-slate-950">
+          {% if booking.include_setup_service %}{{ cost_breakdown.setup_cost }} kr{% else %}Not included{% endif %}
+        </span>
+      </div>
+      <div class="flex items-center justify-between gap-4">
+        <span>Delivery cost</span>
+        <span class="font-semibold text-slate-950">
+          {% if booking.include_delivery %}
+            {{ cost_breakdown.delivery_cost }} kr{% if booking.delivery_distance_km is not none %} ({{ booking.delivery_distance_km }} km){% endif %}
+          {% else %}
+            Not included
+          {% endif %}
+        </span>
+      </div>
+      {% if cost_breakdown.show_furnishing_surcharge %}
+        <div>
+          <div class="flex items-center justify-between gap-4">
+            <span>Furnishing without tent (+25%)</span>
+            <span class="font-semibold text-slate-950">{{ cost_breakdown.furnishing_surcharge }} kr</span>
+          </div>
+          <div class="mt-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            This booking includes no tent, so a 25% surcharge is added to all furnishings.
+          </div>
+        </div>
       {% endif %}
-      <div class="text-base pt-2"><b>Total:</b> {{ total.total_cost }} kr</div>
+      {% if cost_breakdown.show_vat_breakdown %}
+        <div class="flex items-center justify-between gap-4">
+          <span>VAT (25%)</span>
+          <span class="font-semibold text-slate-950">{{ cost_breakdown.vat_amount }} kr</span>
+        </div>
+      {% endif %}
+      {% if cost_breakdown.has_booking_override %}
+        <div class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900">
+          <div class="font-medium">Booking override: {{ cost_breakdown.booking_custom_total_price }} kr</div>
+          {% if cost_breakdown.booking_custom_price_note %}
+            <div class="mt-1 text-sm">{{ cost_breakdown.booking_custom_price_note }}</div>
+          {% endif %}
+        </div>
+      {% endif %}
+      <div class="border-t border-slate-200 pt-3">
+        {% if cost_breakdown.show_vat_breakdown %}
+          <div class="mb-2 flex items-center justify-between gap-4">
+            <span>Price excl. VAT</span>
+            <span class="font-medium text-slate-900">{{ cost_breakdown.subtotal_ex_vat }} kr</span>
+          </div>
+        {% endif %}
+        <div class="flex items-center justify-between gap-4 text-base font-semibold">
+          <span>{% if cost_breakdown.show_vat_breakdown %}Total incl. VAT{% else %}Total{% endif %}</span>
+          <span class="text-rose-600">{{ cost_breakdown.total_cost }} kr</span>
+        </div>
+      </div>
     </div>
   {% else %}
     <p class="text-sm text-slate-600 mt-2"><i>Could not compute total.</i></p>
@@ -483,35 +533,66 @@
     </div>
 
     <div class="space-y-3 px-6 py-6 text-sm text-slate-700">
-      {% if total %}
+      {% if cost_breakdown %}
         <div class="flex items-center justify-between gap-4">
-          <span>Dagar</span>
-          <span class="font-semibold text-slate-950">{{ total.days }}</span>
+          <span>Artiklar</span>
+          <span class="font-semibold text-slate-950">{{ cost_breakdown.item_count }} valda</span>
         </div>
         <div class="flex items-center justify-between gap-4">
-          <span>Hyreskostnad</span>
-          <span class="font-semibold text-slate-950">{{ total.rental_cost }} kr</span>
+          <span>Hyra</span>
+          <span class="font-semibold text-slate-950">{{ cost_breakdown.rental_without_surcharge }} kr</span>
         </div>
         <div class="flex items-center justify-between gap-4">
-          <span>Monteringskostnad</span>
-          <span class="font-semibold text-slate-950">{{ total.setup_cost }} kr</span>
+          <span>Montering</span>
+          <span class="font-semibold text-slate-950">
+            {% if booking.include_setup_service %}{{ cost_breakdown.setup_cost }} kr{% else %}Inte tillvalt{% endif %}
+          </span>
         </div>
         <div class="flex items-center justify-between gap-4">
-          <span>Leveranskostnad</span>
-          <span class="font-semibold text-slate-950">{{ total.delivery_cost }} kr</span>
+          <span>Leverans</span>
+          <span class="font-semibold text-slate-950">
+            {% if booking.include_delivery %}
+              {{ cost_breakdown.delivery_cost }} kr{% if booking.delivery_distance_km is not none %} ({{ booking.delivery_distance_km }} km){% endif %}
+            {% else %}
+              Inte tillvalt
+            {% endif %}
+          </span>
         </div>
-        {% if total.has_booking_override %}
+        {% if cost_breakdown.show_furnishing_surcharge %}
+          <div>
+            <div class="flex items-center justify-between gap-4">
+              <span>Inredning utan tält (+25%)</span>
+              <span class="font-semibold text-slate-950">{{ cost_breakdown.furnishing_surcharge }} kr</span>
+            </div>
+            <div class="mt-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              Bokningen innehåller inget tält, därför läggs ett tillägg på 25% på all inredning.
+            </div>
+          </div>
+        {% endif %}
+        {% if cost_breakdown.show_vat_breakdown %}
+          <div class="flex items-center justify-between gap-4">
+            <span>Moms (25%)</span>
+            <span class="font-semibold text-slate-950">{{ cost_breakdown.vat_amount }} kr</span>
+          </div>
+        {% endif %}
+        {% if cost_breakdown.has_booking_override %}
           <div class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900">
-            <div class="font-medium">Prisjustering för bokningen: {{ total.booking_custom_total_price }} kr</div>
-            {% if total.booking_custom_price_note %}
-              <div class="mt-1 text-sm">{{ total.booking_custom_price_note }}</div>
+            <div class="font-medium">Prisjustering för bokningen: {{ cost_breakdown.booking_custom_total_price }} kr</div>
+            {% if cost_breakdown.booking_custom_price_note %}
+              <div class="mt-1 text-sm">{{ cost_breakdown.booking_custom_price_note }}</div>
             {% endif %}
           </div>
         {% endif %}
         <div class="border-t border-emerald-100 pt-3">
+          {% if cost_breakdown.show_vat_breakdown %}
+            <div class="mb-2 flex items-center justify-between gap-4 text-sm">
+              <span>Pris exkl. moms</span>
+              <span class="font-medium text-slate-900">{{ cost_breakdown.subtotal_ex_vat }} kr</span>
+            </div>
+          {% endif %}
           <div class="flex items-center justify-between gap-4 text-base font-semibold">
-            <span>Totalt</span>
-            <span class="text-rose-600">{{ total.total_cost }} kr</span>
+            <span>{% if cost_breakdown.show_vat_breakdown %}Totalt inkl. moms{% else %}Total{% endif %}</span>
+            <span class="text-rose-600">{{ cost_breakdown.total_cost }} kr</span>
           </div>
         </div>
       {% else %}

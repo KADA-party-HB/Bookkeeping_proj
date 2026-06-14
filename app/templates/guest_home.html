@@ -208,13 +208,24 @@
     let perPage = Number(pagerPerPage?.value || responsivePerPage);
     const defaultSubmitLabel = submitButton?.textContent.trim() || "";
     const pricesIncludeVat = {{ customer_prices_include_vat|default(false)|tojson }};
+    const noTentFurnishingSurchargeEnabled = {{ customer_furnishing_without_tent_surcharge_enabled|default(false)|tojson }};
+    const noTentFurnishingSurchargeRate = 0.25;
     const vatRate = 0.25;
+    const vatMultiplier = 1 + vatRate;
     const summarySubtotal = form.querySelector("#summary-subtotal");
     const summaryVat = form.querySelector("#summary-vat");
+    const summaryFurnishingSurchargeRow = form.querySelector("#summary-furnishing-surcharge-row");
+    const summaryFurnishingSurcharge = form.querySelector("#summary-furnishing-surcharge");
+    const summaryFurnishingSurchargeNote = form.querySelector("#summary-furnishing-surcharge-note");
 
     const parseNumber = (value) => {
       const parsed = Number(String(value || "0").replace(",", "."));
       return Number.isFinite(parsed) ? parsed : 0;
+    };
+
+    const toExVat = (amount) => {
+      const parsed = parseNumber(amount);
+      return pricesIncludeVat ? parsed / vatMultiplier : parsed;
     };
 
     const parseItemIdList = (value) => {
@@ -800,22 +811,36 @@
 
           return {
             qty,
-            unitPrice: parseNumber(input.dataset.unitPrice),
-            setupFee: parseNumber(input.dataset.setupFee),
+            unitPrice: toExVat(input.dataset.unitPrice),
+            setupFee: toExVat(input.dataset.setupFee),
             isTent: input.dataset.isTent === "true",
+            isFurnishing: input.dataset.isFurnishing === "true",
           };
         })
         .filter(Boolean);
 
       const itemCount = selected.reduce((sum, item) => sum + item.qty, 0);
-      const rental = selected.reduce((sum, item) => sum + (item.unitPrice * item.qty), 0);
+      const rentalBase = selected.reduce((sum, item) => sum + (item.unitPrice * item.qty), 0);
+      const furnishingRentalBase = selected.reduce(
+        (sum, item) => sum + (item.isFurnishing ? item.unitPrice * item.qty : 0),
+        0,
+      );
+      const hasTentSelection = selected.some((item) => item.isTent);
+      const furnishingSurcharge = noTentFurnishingSurchargeEnabled && furnishingRentalBase > 0 && !hasTentSelection
+        ? furnishingRentalBase * noTentFurnishingSurchargeRate
+        : 0;
+      const rental = rentalBase + furnishingSurcharge;
       const setup = includeSetup?.checked
         ? selected.reduce((sum, item) => sum + (item.setupFee * item.qty), 0)
         : 0;
-      const delivery = includeDelivery?.checked && validatedDelivery ? validatedDelivery.deliveryFee : 0;
+      const delivery = includeDelivery?.checked && validatedDelivery
+        ? toExVat(validatedDelivery.deliveryFee)
+        : 0;
 
       return {
         itemCount,
+        rentalBase,
+        furnishingSurcharge,
         rental,
         setup,
         delivery,
@@ -825,18 +850,30 @@
 
     const renderSummary = () => {
       const state = getState();
-      const subtotalExVat = pricesIncludeVat ? state.total / (1 + vatRate) : state.total;
-      const vatAmount = pricesIncludeVat ? state.total - subtotalExVat : 0;
+      const furnishingSurchargeDisplay = state.furnishingSurcharge;
+      const subtotalExVat = state.total;
+      const vatAmount = pricesIncludeVat ? subtotalExVat * vatRate : 0;
+      const totalDisplay = pricesIncludeVat ? subtotalExVat + vatAmount : subtotalExVat;
 
       if (summaryItems) summaryItems.textContent = `${state.itemCount} valda`;
-      if (summaryRental) summaryRental.textContent = formatMoney(state.rental);
+      if (summaryRental) summaryRental.textContent = formatMoney(state.rentalBase);
+      if (summaryFurnishingSurchargeRow) {
+        const surchargeApplies = state.furnishingSurcharge > 0;
+        summaryFurnishingSurchargeRow.classList.toggle("hidden", !surchargeApplies);
+        if (summaryFurnishingSurcharge) {
+          summaryFurnishingSurcharge.textContent = formatMoney(furnishingSurchargeDisplay);
+        }
+        if (summaryFurnishingSurchargeNote) {
+          summaryFurnishingSurchargeNote.classList.toggle("hidden", !surchargeApplies);
+        }
+      }
       if (summarySetup) summarySetup.textContent = includeSetup?.checked ? formatMoney(state.setup) : "Inte tillvalt";
 
       if (summaryDelivery) {
         if (!includeDelivery?.checked) {
           summaryDelivery.textContent = "Inte tillvalt";
         } else if (validatedDelivery) {
-          summaryDelivery.textContent = `${formatMoney(validatedDelivery.deliveryFee)} (${validatedDelivery.distanceKm.toFixed(2)} km)`;
+          summaryDelivery.textContent = `${formatMoney(toExVat(validatedDelivery.deliveryFee))} (${validatedDelivery.distanceKm.toFixed(2)} km)`;
         } else if (validationInFlight) {
           summaryDelivery.textContent = "Validerar...";
         } else if (!hasCompleteDeliveryAddress()) {
@@ -848,7 +885,7 @@
 
       if (summarySubtotal) summarySubtotal.textContent = formatMoney(subtotalExVat);
       if (summaryVat) summaryVat.textContent = formatMoney(vatAmount);
-      if (summaryTotal) summaryTotal.textContent = formatMoney(state.total);
+      if (summaryTotal) summaryTotal.textContent = formatMoney(totalDisplay);
     };
 
     const validateDeliveryAddress = async () => {

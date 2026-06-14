@@ -75,6 +75,7 @@ CREATE TABLE delivery_pricing_settings (
   included_distance_km NUMERIC(10,2) NOT NULL DEFAULT 10.00,
   extra_fee_per_km NUMERIC(10,2) NOT NULL DEFAULT 5.00,
   customer_prices_include_vat BOOLEAN NOT NULL DEFAULT FALSE,
+  customer_furnishing_without_tent_surcharge_enabled BOOLEAN NOT NULL DEFAULT TRUE,
   admin_dark_mode_enabled BOOLEAN NOT NULL DEFAULT FALSE,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT chk_delivery_pricing_base_fee CHECK (base_fee >= 0),
@@ -88,9 +89,10 @@ INSERT INTO delivery_pricing_settings (
   included_distance_km,
   extra_fee_per_km,
   customer_prices_include_vat,
+  customer_furnishing_without_tent_surcharge_enabled,
   admin_dark_mode_enabled
 )
-VALUES (TRUE, 449.00, 10.00, 5.00, FALSE, FALSE);
+VALUES (TRUE, 449.00, 10.00, 5.00, FALSE, TRUE, FALSE);
 
 -- CATEGORY <-> RENTAL PERIOD pricing
 -- This is where the actual price lives.

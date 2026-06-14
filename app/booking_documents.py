@@ -116,6 +116,7 @@ def build_booking_order_pdf(
     booking,
     item_summary,
     total,
+    cost_breakdown,
     static_root: Path,
 ) -> bytes:
     styles = getSampleStyleSheet()
@@ -180,6 +181,14 @@ def build_booking_order_pdf(
 
     def field_paragraph(label: str, value: str) -> Paragraph:
         return Paragraph(f"<b>{label}</b> {_text(value)}", body_style)
+
+    delivery_distance_suffix = ""
+    if booking.get("delivery_distance_km") is not None:
+        delivery_distance_suffix = f" ({booking.get('delivery_distance_km')} km)"
+
+    delivery_cost_text = _format_money(cost_breakdown.get("delivery_cost") if cost_breakdown else 0)
+    if booking.get("include_delivery"):
+        delivery_cost_text = f"{delivery_cost_text}{delivery_distance_suffix}"
 
     story = []
     logo_path = static_root / "img" / LOGO_FILENAME
@@ -262,7 +271,7 @@ def build_booking_order_pdf(
             ],
             [
                 field_paragraph("Plats/adress:", _booking_location(booking)),
-                field_paragraph("Leveranskostnad:", _format_money(total.get("delivery_cost") if total else 0)),
+                field_paragraph("Leveranskostnad:", delivery_cost_text),
             ],
         ],
         colWidths=[85 * mm, 85 * mm],
@@ -352,21 +361,69 @@ def build_booking_order_pdf(
 
     summary_section = [Paragraph("4. Summering", section_style)]
     total_rows = [
-        [Paragraph("Hyra", body_style), Paragraph(_format_money(total.get("rental_cost") if total else 0), numeric_style)],
-        [Paragraph("Montering", body_style), Paragraph(_format_money(total.get("setup_cost") if total else 0), numeric_style)],
-        [Paragraph("Leverans", body_style), Paragraph(_format_money(total.get("delivery_cost") if total else 0), numeric_style)],
+        [
+            Paragraph("Artiklar", body_style),
+            Paragraph(f"{int(cost_breakdown.get('item_count') or 0)} valda", numeric_style),
+        ],
+        [
+            Paragraph("Hyra", body_style),
+            Paragraph(_format_money(cost_breakdown.get("rental_without_surcharge") if cost_breakdown else 0), numeric_style),
+        ],
+        [
+            Paragraph("Montering", body_style),
+            Paragraph(
+                _format_money(cost_breakdown.get("setup_cost") if cost_breakdown else 0)
+                if booking.get("include_setup_service")
+                else "Inte tillvalt",
+                numeric_style,
+            ),
+        ],
+        [
+            Paragraph("Leverans", body_style),
+            Paragraph(
+                delivery_cost_text
+                if booking.get("include_delivery")
+                else "Inte tillvalt",
+                numeric_style,
+            ),
+        ],
     ]
+    if cost_breakdown and cost_breakdown.get("show_furnishing_surcharge"):
+        total_rows.append(
+            [
+                Paragraph("Inredning utan tält (+25%)", body_style),
+                Paragraph(_format_money(cost_breakdown.get("furnishing_surcharge") or 0), numeric_style),
+            ]
+        )
+    if cost_breakdown and cost_breakdown.get("show_vat_breakdown"):
+        total_rows.append(
+            [
+                Paragraph("Moms (25%)", body_style),
+                Paragraph(_format_money(cost_breakdown.get("vat_amount") or 0), numeric_style),
+            ]
+        )
     if total and total.get("has_booking_override"):
         total_rows.append(
             [
                 Paragraph("Bokningsoverride", body_style),
-                Paragraph(_format_money(total.get("booking_custom_total_price") or 0), numeric_style),
+                Paragraph(_format_money(cost_breakdown.get("booking_custom_total_price") or 0), numeric_style),
+            ]
+        )
+    if cost_breakdown and cost_breakdown.get("show_vat_breakdown"):
+        total_rows.append(
+            [
+                Paragraph("Pris exkl. moms", body_style),
+                Paragraph(_format_money(cost_breakdown.get("subtotal_ex_vat") or 0), numeric_style),
             ]
         )
     total_rows.append(
         [
-            Paragraph("<b>Totalt att betala</b>", label_style),
-            Paragraph(f"<b>{_format_money(total.get('total_cost') if total else 0)}</b>", numeric_style),
+            Paragraph(
+                "<b>Totalt inkl. moms</b>" if cost_breakdown and cost_breakdown.get("show_vat_breakdown")
+                else "<b>Totalt att betala</b>",
+                label_style,
+            ),
+            Paragraph(f"<b>{_format_money(cost_breakdown.get('total_cost') if cost_breakdown else 0)}</b>", numeric_style),
         ]
     )
     total_table = Table(total_rows, colWidths=[138 * mm, 40 * mm])
