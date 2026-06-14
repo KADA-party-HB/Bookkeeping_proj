@@ -298,6 +298,15 @@ availability AS (
   FROM item_overlap
   GROUP BY category_id
 ),
+period_bounds AS (
+  SELECT
+    crpp.category_id,
+    MIN(rp.min_days) AS standard_period_min_days,
+    MAX(rp.max_days) AS standard_period_max_days
+  FROM category_rental_period_prices crpp
+  JOIN rental_periods rp ON rp.id = crpp.rental_period_id
+  GROUP BY crpp.category_id
+),
 matching_period AS (
   SELECT
     crpp.category_id,
@@ -326,6 +335,8 @@ SELECT
   mp.max_days AS rental_period_max_days,
   mp.price AS quoted_period_price,
   (mp.rental_period_id IS NOT NULL) AS has_standard_price,
+  pb.standard_period_min_days,
+  pb.standard_period_max_days,
 
   (tc.category_id IS NOT NULL) AS is_tent,
   tc.capacity,
@@ -350,6 +361,7 @@ FROM categories c
 LEFT JOIN availability a ON a.category_id = c.id
 LEFT JOIN tent_categories tc ON tc.category_id = c.id
 LEFT JOIN furnishing_categories fc ON fc.category_id = c.id
+LEFT JOIN period_bounds pb ON pb.category_id = c.id
 LEFT JOIN matching_period mp
   ON mp.category_id = c.id
  AND mp.rn = 1
@@ -1105,9 +1117,9 @@ SELECT
   COUNT(*) FILTER (WHERE status = 'confirmed') AS confirmed_bookings,
   COUNT(*) FILTER (WHERE status = 'pending') AS pending_bookings,
   COUNT(*) FILTER (WHERE has_tent) AS bookings_with_tents,
-  COUNT(*) FILTER (WHERE status <> 'pending') AS revenue_booking_count,
-  COALESCE(SUM(total_cost) FILTER (WHERE status <> 'pending'), 0) AS total_income,
-  COALESCE(AVG(total_cost) FILTER (WHERE status <> 'pending'), 0) AS average_booking
+  COUNT(*) FILTER (WHERE status = 'confirmed') AS revenue_booking_count,
+  COALESCE(SUM(total_cost) FILTER (WHERE status = 'confirmed'), 0) AS total_income,
+  COALESCE(AVG(total_cost) FILTER (WHERE status = 'confirmed'), 0) AS average_booking
 FROM booking_totals;
 """
 

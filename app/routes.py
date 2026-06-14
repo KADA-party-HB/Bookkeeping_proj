@@ -1328,6 +1328,42 @@ def _normalize_category_quantity_map(quantity_map):
     }
 
 
+def _format_day_count_swedish(day_count):
+    if day_count == 1:
+        return "1 dag"
+    return f"{day_count} dagar"
+
+
+def _standard_price_unavailability_message(category_row, rental_days=None):
+    if not category_row or category_row.get("has_standard_price"):
+        return ""
+
+    standard_min_days = category_row.get("standard_period_min_days")
+    standard_max_days = category_row.get("standard_period_max_days")
+
+    if (
+        rental_days is not None
+        and standard_min_days is not None
+        and rental_days < standard_min_days
+    ):
+        return (
+            "Perioden har inget standardpris för mindre än "
+            f"{_format_day_count_swedish(standard_min_days)}."
+        )
+
+    if (
+        rental_days is not None
+        and standard_max_days is not None
+        and rental_days > standard_max_days
+    ):
+        return (
+            "Perioden har inget standardpris för mer än "
+            f"{_format_day_count_swedish(standard_max_days)}."
+        )
+
+    return "Perioden har inget standardpris för vald period."
+
+
 def _build_booking_edit_category_rows(current_items, all_categories, available_categories):
     quantity_by_category = _count_booking_items_by_category(current_items)
     custom_qty_by_category = {}
@@ -1383,7 +1419,21 @@ def _build_booking_edit_category_rows(current_items, all_categories, available_c
 
 
 def _query_available_categories(start_date: str, end_date: str):
-    return query(SQL_AVAILABLE_CATEGORIES, (start_date, end_date))
+    categories = query(SQL_AVAILABLE_CATEGORIES, (start_date, end_date))
+    start_date_obj = _parse_iso_date_or_none(start_date)
+    end_date_obj = _parse_iso_date_or_none(end_date)
+    rental_days = None
+
+    if start_date_obj and end_date_obj:
+        rental_days = (end_date_obj - start_date_obj).days + 1
+
+    for row in categories:
+        row["standard_price_hint"] = _standard_price_unavailability_message(
+            row,
+            rental_days=rental_days,
+        )
+
+    return categories
 
 
 def _query_guest_category_overview():
@@ -2555,7 +2605,7 @@ def guest_booking_create():
 
         if not category["has_standard_price"]:
             flash(
-                f"{category['display_name']} har inget standardpris för de valda datumen.",
+                f"{category['display_name']}: {category.get('standard_price_hint') or 'Perioden har inget standardpris för vald period.'}",
                 "error",
             )
             return redirect(url_for("routes.home", start_date=start, end_date=end))
@@ -2820,7 +2870,7 @@ def booking_create_from_home():
 
         if role != "admin" and not cat_row["has_standard_price"]:
             flash(
-                f"{cat_row['display_name']} has no standard price for the selected dates.",
+                f"{cat_row['display_name']}: {cat_row.get('standard_price_hint') or 'Perioden har inget standardpris för vald period.'}",
                 "error",
             )
             return redirect(url_for("routes.home", start_date=start, end_date=end))

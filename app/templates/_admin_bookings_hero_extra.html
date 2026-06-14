@@ -2,12 +2,12 @@
   <div class="rounded-2xl border border-white/80 bg-white/80 p-4 shadow-sm backdrop-blur">
     <div class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">Booking revenue</div>
     <div class="mt-2 text-2xl font-semibold text-slate-900">{{ metrics.total_income }} kr</div>
-    <div class="mt-2 text-sm text-slate-500">Across {{ metrics.revenue_booking_count }} non-pending bookings in the database.</div>
+    <div class="mt-2 text-sm text-slate-500">Across {{ metrics.revenue_booking_count }} confirmed bookings in the database.</div>
   </div>
   <div class="rounded-2xl border border-white/80 bg-white/80 p-4 shadow-sm backdrop-blur">
     <div class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">Average booking</div>
     <div class="mt-2 text-2xl font-semibold text-sky-700">{{ "%.2f"|format(metrics.average_booking) }} kr</div>
-    <div class="mt-2 text-sm text-slate-500">Pending bookings in the database are excluded from this average.</div>
+    <div class="mt-2 text-sm text-slate-500">Only confirmed bookings in the database are included in this average.</div>
   </div>
   <div class="rounded-2xl border border-white/80 bg-white/80 p-4 shadow-sm backdrop-blur">
     <div class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">At a glance</div>

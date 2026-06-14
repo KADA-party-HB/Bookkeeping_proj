@@ -113,7 +113,7 @@
                       <div class="font-medium text-slate-900">{{ c.quoted_period_price }} kr</div>
                       <div class="text-xs text-slate-500">{{ c.rental_period_label }}</div>
                     {% else %}
-                      <div class="font-medium text-amber-700">Kan inte bokas för de här datumen</div>
+                      <div class="font-medium text-amber-700">{{ c.standard_price_hint or 'Perioden har inget standardpris för vald period.' }}</div>
                     {% endif %}
                   </div>
 
@@ -208,7 +208,7 @@
                             {% endif %}
                           </div>
                         {% else %}
-                          <span class="text-amber-700">Inget standardpris för vald period</span>
+                          <span class="text-amber-700">{{ c.standard_price_hint or 'Perioden har inget standardpris för vald period.' }}</span>
                         {% endif %}
                       </td>
 
