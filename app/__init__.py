@@ -86,6 +86,10 @@ def create_app():
     if stale_booking_cleanup_interval_seconds < 0:
         raise RuntimeError("STALE_BOOKING_CLEANUP_INTERVAL_SECONDS cannot be negative.")
 
+    public_booking_lead_days = _env_int("PUBLIC_BOOKING_LEAD_DAYS", 0)
+    if public_booking_lead_days < 0:
+        raise RuntimeError("PUBLIC_BOOKING_LEAD_DAYS cannot be negative.")
+
     login_rate_limit_attempts = _env_int("LOGIN_RATE_LIMIT_ATTEMPTS", 5)
     if login_rate_limit_attempts <= 0:
         raise RuntimeError("LOGIN_RATE_LIMIT_ATTEMPTS must be greater than 0.")
@@ -204,6 +208,7 @@ def create_app():
         DELIVERY_ADDRESS_MIN_CONFIDENCE=delivery_address_min_confidence,
         MAX_CONTENT_LENGTH=max_content_length,
         STALE_BOOKING_CLEANUP_INTERVAL_SECONDS=stale_booking_cleanup_interval_seconds,
+        PUBLIC_BOOKING_LEAD_DAYS=public_booking_lead_days,
         LOGIN_RATE_LIMIT_ATTEMPTS=login_rate_limit_attempts,
         LOGIN_RATE_LIMIT_WINDOW_SECONDS=login_rate_limit_window_seconds,
         REGISTRATION_RATE_LIMIT_ATTEMPTS=registration_rate_limit_attempts,

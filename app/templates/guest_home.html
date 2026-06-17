@@ -73,7 +73,13 @@
       <div class="flex items-center justify-between gap-3">
         <div>
           <h2 class="text-lg font-bold text-slate-950">Välj datum</h2>
-          <p class="mt-1 text-sm text-slate-600">Välj hyresperiod minst 7 dagar framåt för exakt tillgänglighet. Sortiment och standardpriser visas redan nedan.</p>
+          <p class="mt-1 text-sm text-slate-600">
+            {% if public_booking_lead_days > 0 %}
+              Välj hyresperiod minst {{ public_booking_lead_days }} {{ "dag" if public_booking_lead_days == 1 else "dagar" }} framåt för exakt tillgänglighet. Sortiment och standardpriser visas redan nedan.
+            {% else %}
+              Välj hyresperiod för exakt tillgänglighet. Sortiment och standardpriser visas redan nedan.
+            {% endif %}
+          </p>
         </div>
         <div class="rounded-full bg-pink-500 px-3 py-1 text-xs font-medium text-white shadow-sm whitespace-nowrap">Steg 1</div>
       </div>

@@ -1481,6 +1481,18 @@ def _format_day_count_swedish(day_count):
     return f"{day_count} dagar"
 
 
+def _public_booking_lead_days():
+    configured_days = current_app.config.get("PUBLIC_BOOKING_LEAD_DAYS", 0)
+    try:
+        return max(int(configured_days), 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _public_booking_min_start_date():
+    return date.today() + timedelta(days=_public_booking_lead_days())
+
+
 def _standard_price_unavailability_message(category_row, rental_days=None):
     if not category_row or category_row.get("has_standard_price"):
         return ""
@@ -2433,7 +2445,7 @@ def _parse_nonnegative_int_or_none(value):
 
 
 def _normalize_public_date_range(start_value: str, end_value: str):
-    minimum_start_date = date.today() + timedelta(days=1)
+    minimum_start_date = _public_booking_min_start_date()
     start_date = _parse_iso_date_or_none(start_value)
     end_date = _parse_iso_date_or_none(end_value)
 
@@ -2666,7 +2678,8 @@ def home():
             role=role,
         )
     
-    min_date = (date.today() + timedelta(days=7)).isoformat()
+    public_booking_lead_days = _public_booking_lead_days()
+    min_date = _public_booking_min_start_date().isoformat()
 
     context = {
         "start_date": start,
@@ -2676,6 +2689,7 @@ def home():
         "customer_profile": customer_profile,
         "role": role,
         "min_date": min_date,
+        "public_booking_lead_days": public_booking_lead_days,
         "customer_prices_include_vat": customer_prices_include_vat,
         "customer_furnishing_without_tent_surcharge_enabled": _furnishing_without_tent_surcharge_enabled(),
     }
@@ -2788,10 +2802,20 @@ def guest_booking_create():
         return redirect(
             url_for("routes.home", start_date=normalized_start, end_date=normalized_end)
         )
-    minimum_start_date = date.today() + timedelta(days=7)
+    minimum_start_date = _public_booking_min_start_date()
+    public_booking_lead_days = _public_booking_lead_days()
 
     if start_date_obj < minimum_start_date:
-        flash("Startdatum måste vara minst 7 dagar fram i tiden.", "error")
+        flash(
+            (
+                "Startdatum måste vara minst "
+                f"{_format_day_count_swedish(public_booking_lead_days)} fram i tiden."
+            )
+            if public_booking_lead_days > 0
+            else "Startdatum kan inte vara tidigare än idag."
+            ,
+            "error",
+        )
         return redirect(
             url_for("routes.home", start_date=normalized_start, end_date=normalized_end)
         )
