@@ -15,7 +15,7 @@ from flask import (
     send_file,
 )
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from io import BytesIO
 import json
@@ -1687,24 +1687,13 @@ def _can_allocate_distinct_items(candidate_item_ids_by_category, requested_categ
     return True
 
 
-def _validate_shared_item_selection(category_rows_by_id, requested_category_quantities, *, allow_turnaround: bool):
-    normalized_quantities = _normalize_category_quantity_map(requested_category_quantities)
-    if len(normalized_quantities) <= 1:
-        return
-
-    candidate_item_ids_by_category = {
-        category_id: _category_candidate_item_ids(
-            category_rows_by_id.get(category_id),
-            include_turnaround=allow_turnaround,
-        )
-        for category_id in normalized_quantities
-    }
-
-    if _can_allocate_distinct_items(candidate_item_ids_by_category, normalized_quantities):
-        return
-
+def _raise_shared_item_allocation_error(
+    category_rows_by_id,
+    requested_category_quantities,
+    candidate_item_ids_by_category,
+):
     overlapping_names = []
-    selected_category_ids = list(normalized_quantities)
+    selected_category_ids = list(requested_category_quantities)
     for category_id in selected_category_ids:
         current_candidates = set(candidate_item_ids_by_category.get(category_id, []))
         if not current_candidates:
@@ -1724,7 +1713,8 @@ def _validate_shared_item_selection(category_rows_by_id, requested_category_quan
 
     if not overlapping_names:
         overlapping_names = [
-            (category_rows_by_id.get(category_id) or {}).get("display_name") or f"Category {category_id}"
+            (category_rows_by_id.get(category_id) or {}).get("display_name")
+            or f"Category {category_id}"
             for category_id in selected_category_ids
         ]
 
@@ -1732,6 +1722,55 @@ def _validate_shared_item_selection(category_rows_by_id, requested_category_quan
         "The selected categories share the same physical item stock, so this combination cannot be booked together: "
         + ", ".join(overlapping_names)
         + "."
+    )
+
+
+def _assign_distinct_item_ids_to_slots(allocation_slots):
+    item_to_slot_index = {}
+
+    def try_assign(slot_index, seen_item_ids):
+        for item_id in allocation_slots[slot_index]["candidate_item_ids"]:
+            if item_id in seen_item_ids:
+                continue
+
+            seen_item_ids.add(item_id)
+            assigned_slot_index = item_to_slot_index.get(item_id)
+            if assigned_slot_index is None or try_assign(assigned_slot_index, seen_item_ids):
+                item_to_slot_index[item_id] = slot_index
+                return True
+
+        return False
+
+    for slot_index in range(len(allocation_slots)):
+        if not try_assign(slot_index, set()):
+            return None
+
+    return {
+        slot_index: item_id
+        for item_id, slot_index in item_to_slot_index.items()
+    }
+
+
+def _validate_shared_item_selection(category_rows_by_id, requested_category_quantities, *, allow_turnaround: bool):
+    normalized_quantities = _normalize_category_quantity_map(requested_category_quantities)
+    if len(normalized_quantities) <= 1:
+        return
+
+    candidate_item_ids_by_category = {
+        category_id: _category_candidate_item_ids(
+            category_rows_by_id.get(category_id),
+            include_turnaround=allow_turnaround,
+        )
+        for category_id in normalized_quantities
+    }
+
+    if _can_allocate_distinct_items(candidate_item_ids_by_category, normalized_quantities):
+        return
+
+    _raise_shared_item_allocation_error(
+        category_rows_by_id,
+        normalized_quantities,
+        candidate_item_ids_by_category,
     )
 
 
@@ -2050,9 +2089,10 @@ def _reallocate_booking_items_for_dates(
     turnaround_item_labels = []
     added_count = 0
     removed_count = 0
-    reserved_item_ids = set()
     rental_days = (date.fromisoformat(end_date) - date.fromisoformat(start_date)).days + 1
     pricing_by_category = {}
+    candidate_item_ids_by_category = {}
+    allocation_slots = []
     no_tent_furnishing_surcharge_applies = _no_tent_furnishing_surcharge_applies(
         desired_category_quantities.items(),
         category_context_by_id,
@@ -2066,6 +2106,7 @@ def _reallocate_booking_items_for_dates(
             row["item_id"],
         )
 
+    slot_order = 0
     for category_id, desired_qty in sorted(desired_category_quantities.items()):
         current_rows = rows_by_category.get(category_id, [])
         category_context = category_context_by_id.get(category_id)
@@ -2098,49 +2139,96 @@ def _reallocate_booking_items_for_dates(
                 candidate["item_id"],
             )
         )
+        candidate_item_ids = [candidate["item_id"] for candidate in candidates]
+        candidate_item_ids_by_category[category_id] = candidate_item_ids
 
-        chosen_candidates = []
-        for candidate in candidates:
-            if candidate["item_id"] in reserved_item_ids:
-                continue
-            chosen_candidates.append(candidate)
-            if len(chosen_candidates) == desired_qty:
-                break
-
-        if len(chosen_candidates) < desired_qty:
+        if len(candidate_item_ids) < desired_qty:
             raise ValueError(
-                f'Cannot update "{display_name}" because only {len(chosen_candidates)} of {desired_qty} items are available for the selected dates.'
+                f'Cannot update "{display_name}" because only {len(candidate_item_ids)} of {desired_qty} items are available for the selected dates.'
             )
 
-        reserved_item_ids.update(candidate["item_id"] for candidate in chosen_candidates)
-
-        candidate_by_item_id = {candidate["item_id"]: candidate for candidate in chosen_candidates}
-        chosen_ids = set(candidate_by_item_id)
-        kept_ids = set()
-        pending_rows = []
+        candidate_by_item_id = {
+            candidate["item_id"]: candidate
+            for candidate in candidates
+        }
 
         for row in rows_to_keep:
-            if row["item_id"] in chosen_ids and row["item_id"] not in kept_ids:
-                reassigned_existing_rows.append(
-                    (row, row["item_id"], candidate_by_item_id[row["item_id"]])
+            ordered_candidate_ids = [
+                candidate["item_id"]
+                for candidate in sorted(
+                    candidates,
+                    key=lambda candidate: (
+                        1 if candidate["is_turnaround"] else 0,
+                        0 if candidate["item_id"] == row["item_id"] else 1,
+                        0 if candidate["item_id"] in current_item_ids else 1,
+                        candidate["item_id"],
+                    ),
                 )
-                kept_ids.add(row["item_id"])
-            else:
-                pending_rows.append(row)
+            ]
+            allocation_slots.append(
+                {
+                    "kind": "existing",
+                    "category_id": category_id,
+                    "display_name": display_name,
+                    "row": row,
+                    "candidate_item_ids": ordered_candidate_ids,
+                    "candidate_by_item_id": candidate_by_item_id,
+                    "slot_order": slot_order,
+                }
+            )
+            slot_order += 1
 
-        remaining_candidates = [
-            candidate
-            for candidate in chosen_candidates
-            if candidate["item_id"] not in kept_ids
-        ]
+        added_slot_count = max(desired_qty - len(rows_to_keep), 0)
+        added_count += added_slot_count
+        if added_slot_count:
+            ordered_candidate_ids = [
+                candidate["item_id"]
+                for candidate in sorted(
+                    candidates,
+                    key=lambda candidate: (
+                        1 if candidate["is_turnaround"] else 0,
+                        0 if candidate["item_id"] not in current_item_ids else 1,
+                        candidate["item_id"],
+                    ),
+                )
+            ]
+            for _ in range(added_slot_count):
+                allocation_slots.append(
+                    {
+                        "kind": "added",
+                        "category_id": category_id,
+                        "display_name": display_name,
+                        "candidate_item_ids": ordered_candidate_ids,
+                        "candidate_by_item_id": candidate_by_item_id,
+                        "slot_order": slot_order,
+                    }
+                )
+                slot_order += 1
 
-        for row, candidate in zip(pending_rows, remaining_candidates):
-            reassigned_existing_rows.append((row, candidate["item_id"], candidate))
+    allocation_slots.sort(
+        key=lambda slot: (
+            0 if slot["kind"] == "existing" else 1,
+            len(slot["candidate_item_ids"]),
+            slot["category_id"],
+            slot["slot_order"],
+        )
+    )
 
-        remaining_candidates = remaining_candidates[len(pending_rows):]
-        added_count += len(remaining_candidates)
-        for candidate in remaining_candidates:
-            added_rows.append((category_id, candidate))
+    assigned_item_ids_by_slot = _assign_distinct_item_ids_to_slots(allocation_slots)
+    if assigned_item_ids_by_slot is None:
+        _raise_shared_item_allocation_error(
+            category_context_by_id,
+            desired_category_quantities,
+            candidate_item_ids_by_category,
+        )
+
+    for slot_index, slot in enumerate(allocation_slots):
+        item_id = assigned_item_ids_by_slot[slot_index]
+        candidate = slot["candidate_by_item_id"][item_id]
+        if slot["kind"] == "existing":
+            reassigned_existing_rows.append((slot["row"], item_id, candidate))
+        else:
+            added_rows.append((slot["category_id"], candidate))
 
     cur.execute(SQL_DELETE_BOOKING_ITEMS_FOR_BOOKING, (booking_id,))
 
@@ -2311,8 +2399,17 @@ def _load_customer_profile_for_user(user_id: int):
     return query(SQL_GET_CUSTOMER_BY_USER_ID, (user_id,), one=True)
 
 
-def _parse_iso_date_or_none(value: str):
-    value = (value or "").strip()
+def _parse_iso_date_or_none(value: str | date | datetime | None):
+    if isinstance(value, datetime):
+        return value.date()
+
+    if isinstance(value, date):
+        return value
+
+    if not isinstance(value, str):
+        return None
+
+    value = value.strip()
     if not value:
         return None
 
