@@ -2433,7 +2433,7 @@ def _parse_nonnegative_int_or_none(value):
 
 
 def _normalize_public_date_range(start_value: str, end_value: str):
-    minimum_start_date = date.today() + timedelta(days=7)
+    minimum_start_date = date.today() + timedelta(days=1)
     start_date = _parse_iso_date_or_none(start_value)
     end_date = _parse_iso_date_or_none(end_value)
 
