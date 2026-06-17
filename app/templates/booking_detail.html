@@ -17,14 +17,14 @@
     {% if role == 'admin' %}
       <div class="ml-auto flex w-full flex-wrap gap-2 md:w-auto">
         <a
-          class="rounded-lg border px-3 py-2 text-sm hover:bg-slate-50"
+          class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 transition hover:bg-slate-50 hover:text-slate-900"
           href="{{ url_for('routes.booking_order_pdf', booking_id=booking.id) }}"
         >
           Download order PDF
         </a>
 
         <a
-          class="rounded-lg border px-3 py-2 text-sm hover:bg-slate-50"
+          class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 transition hover:bg-slate-50 hover:text-slate-900"
           href="{{ url_for('routes.admin_booking_edit_form', booking_id=booking.id) }}"
         >
           Edit
@@ -32,7 +32,7 @@
 
         <form method="post" action="{{ url_for('routes.booking_confirm', booking_id=booking.id) }}">
           <button
-            class="rounded-lg border px-3 py-2 text-sm hover:bg-slate-50"
+            class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 transition hover:bg-slate-50 hover:text-slate-900"
             type="submit"
             {% if booking.status == 'cancelled' %}disabled{% endif %}
           >
