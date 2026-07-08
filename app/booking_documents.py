@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from datetime import date
 from decimal import Decimal
 from io import BytesIO
 from pathlib import Path
@@ -670,23 +669,19 @@ def build_booking_receipt_pdf(
         [
             [
                 field_paragraph("Bokningsnummer:", str(booking.get("id") or "-")),
-                field_paragraph("Kvitto skapat:", _format_date(date.today())),
-            ],
-            [
                 field_paragraph("Bokning skapad:", _format_date(booking.get("created_at"))),
-                field_paragraph("Status:", booking.get("status") or "-"),
             ],
             [
                 field_paragraph("Hyresperiod:", f"{_format_date(booking.get('start_date'))} till {_format_date(booking.get('end_date'))}"),
                 field_paragraph("Plats/adress:", _booking_location(booking)),
             ],
             [
-                field_paragraph("Leverans:", _format_bool(booking.get("include_delivery"), true_label="Ingår", false_label="Ingår inte")),
-                field_paragraph("Leveranskostnad:", delivery_cost_text),
+                field_paragraph("Status:", booking.get("status") or "-"),
+                field_paragraph("Montering:", _format_bool(booking.get("include_setup_service"), true_label="Ingår", false_label="Ingår inte")),
             ],
             [
-                field_paragraph("Montering:", _format_bool(booking.get("include_setup_service"), true_label="Ingår", false_label="Ingår inte")),
-                "",
+                field_paragraph("Leverans:", _format_bool(booking.get("include_delivery"), true_label="Ingår", false_label="Ingår inte")),
+                field_paragraph("Leveranskostnad:", delivery_cost_text),
             ],
         ],
         colWidths=[85 * mm, 85 * mm],
