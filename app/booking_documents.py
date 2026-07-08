@@ -609,7 +609,7 @@ def build_booking_receipt_pdf(
     story.append(
         Paragraph(
             (
-                "Detta dokument sammanfattar vad den mottagna betalningen avser for bokning "
+                "Detta dokument sammanfattar vad den mottagna betalningen avser för bokning "
                 f"#{_text(booking.get('id'))}. Extern betalningsreferens, som Swish-nummer, "
                 "hanteras utanför systemet."
             ),
