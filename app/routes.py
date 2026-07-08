@@ -30,7 +30,7 @@ from werkzeug.exceptions import RequestEntityTooLarge
 from werkzeug.security import generate_password_hash
 from werkzeug.utils import secure_filename
 
-from .booking_documents import build_booking_order_pdf
+from .booking_documents import build_booking_order_pdf, build_booking_receipt_pdf
 from .city_lookup import extract_city_name
 from .db import PaginationOptions, paginate_query, query, execute, tx
 from .delivery import (
@@ -4755,6 +4755,39 @@ def booking_order_pdf(booking_id: int):
         mimetype="application/pdf",
         as_attachment=True,
         download_name=f"booking-{booking_id}-order-contract.pdf",
+    )
+
+
+@bp.get("/bookings/<int:booking_id>/receipt-pdf")
+def booking_receipt_pdf(booking_id: int):
+    require_admin()
+    booking = query(SQL_BOOKING_DETAIL, (booking_id,), one=True)
+    if not booking:
+        flash("Bokningen hittades inte.", "error")
+        return redirect(url_for("routes.home"))
+
+    items = query(SQL_BOOKING_ITEMS, (booking_id,))
+    item_summary = _build_booking_item_summary(items)
+    total = query(SQL_BOOKING_TOTAL, (booking_id,), one=True)
+    cost_breakdown = _build_booking_overview_cost_breakdown(
+        booking,
+        items,
+        total,
+        show_vat_breakdown=bool(booking.get("customer_prices_include_vat")),
+    )
+
+    pdf_bytes = build_booking_receipt_pdf(
+        booking=booking,
+        item_summary=item_summary,
+        total=total or {},
+        cost_breakdown=cost_breakdown or {},
+        static_root=Path(current_app.root_path) / "static",
+    )
+    return send_file(
+        BytesIO(pdf_bytes),
+        mimetype="application/pdf",
+        as_attachment=True,
+        download_name=f"booking-{booking_id}-receipt.pdf",
     )
 
 

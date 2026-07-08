@@ -25,6 +25,13 @@
 
         <a
           class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 transition hover:bg-slate-50 hover:text-slate-900"
+          href="{{ url_for('routes.booking_receipt_pdf', booking_id=booking.id) }}"
+        >
+          Download receipt PDF
+        </a>
+
+        <a
+          class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 transition hover:bg-slate-50 hover:text-slate-900"
           href="{{ url_for('routes.admin_booking_edit_form', booking_id=booking.id) }}"
         >
           Edit

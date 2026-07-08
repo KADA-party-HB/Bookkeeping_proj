@@ -14,6 +14,7 @@ Table users {
   email varchar(255) [not null, unique]
   password_hash varchar(255) [not null]
   role user_role [not null, default: 'customer']
+  admin_dark_mode_enabled boolean [not null, default: false]
   created_at timestamp [not null]
 
   Note: 'Application users. Admin/customer role is enforced in the app and DB.'
@@ -48,6 +49,18 @@ Table rental_periods {
   created_at timestamp [not null]
 
   Note: 'Reusable rental duration ranges.'
+}
+
+Table delivery_pricing_settings {
+  singleton boolean [pk, default: true]
+  base_fee numeric(10,2) [not null, default: 449.00]
+  included_distance_km numeric(10,2) [not null, default: 10.00]
+  extra_fee_per_km numeric(10,2) [not null, default: 5.00]
+  customer_prices_include_vat boolean [not null, default: false]
+  customer_furnishing_without_tent_surcharge_enabled boolean [not null, default: true]
+  updated_at timestamp [not null]
+
+  Note: 'Singleton settings row for delivery pricing and customer-facing price display toggles.'
 }
 
 Table category_rental_period_prices {
@@ -110,6 +123,7 @@ Table furnishing_categories {
   category_id int [pk, ref: > categories.id]
   furnishing_kind varchar(100) [not null]
   weight_kg numeric(5,2)
+  setup_service_fee numeric(10,2) [not null, default: 0.00]
   notes text
 
   Note: 'Furnishing-only category details.'
@@ -129,6 +143,8 @@ Table bookings {
   custom_total_price numeric(10,2)
   custom_price_note text
   booking_note text
+  customer_prices_include_vat boolean [not null, default: false]
+  no_tent_furnishing_surcharge_applied boolean [not null, default: false]
   admin_note text
   created_at timestamp [not null]
 
@@ -138,7 +154,7 @@ Table bookings {
     (start_date, end_date)
   }
 
-  Note: 'Booking header. Delivery, setup, and manual price overrides are stored here as snapshots.'
+  Note: 'Booking header. Delivery, setup, price-display flags, and manual price overrides are stored here as snapshots.'
 }
 
 Table admin_calendar_notes {
