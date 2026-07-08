@@ -681,11 +681,11 @@ def build_booking_receipt_pdf(
                 field_paragraph("Plats/adress:", _booking_location(booking)),
             ],
             [
-                field_paragraph("Leverans:", _format_bool(booking.get("include_delivery"), true_label="Ingar", false_label="Ingar inte")),
+                field_paragraph("Leverans:", _format_bool(booking.get("include_delivery"), true_label="Ingår", false_label="Ingår inte")),
                 field_paragraph("Leveranskostnad:", delivery_cost_text),
             ],
             [
-                field_paragraph("Montering:", _format_bool(booking.get("include_setup_service"), true_label="Ingar", false_label="Ingar inte")),
+                field_paragraph("Montering:", _format_bool(booking.get("include_setup_service"), true_label="Ingår", false_label="Ingår inte")),
                 "",
             ],
         ],
